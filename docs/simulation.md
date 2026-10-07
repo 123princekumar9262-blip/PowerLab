@@ -1,173 +1,168 @@
-# Simulation model — Phase 1: half-wave rectifier, R load
+# Simulation model
 
-This document is the mathematical reference for what the engine computes. Every
-number on screen — waveforms, circuit state, explanations, measurements — comes
-from the model below. Nothing is drawn from an "expected waveform".
+This is the mathematical reference for what the engine computes. Every number on
+screen comes from the model below: waveforms, circuit highlighting, explanations,
+lesson text, challenge checks and measurements. No waveform is drawn from an
+"expected" shape.
 
-## 1. Circuit
+## 1. Circuits
 
-```
-            D1
-   ┌──────┤>|──────┐ +
-   │ +    A    K   │
-  (~) vin          R   vout
-   │ −             │
-   └───────────────┘ −   (return, 0 V reference)
-```
+Three rectifiers × four loads = 12 circuits, all built from one netlist engine
+(`src/circuits/rectifier.ts`).
 
-A single series loop: source → D1 (anode → cathode) → R → back to the source.
+| Rectifier | Diodes | Source | Path drop |
+|---|---|---|---|
+| Half-wave | D1 | vin between source + and the return | Vf (+ Ron·i) |
+| Center-tap | D1 (upper), D2 (lower) | two half-windings, +vin and −vin vs the center tap | Vf |
+| Bridge | D1 a→p, D2 b→p, D3 n→a, D4 n→b | vin between a and b | 2·Vf (diagonal pair) |
 
-## 2. Source
+| Load | Elements between the + and − outputs | `vout` is |
+|---|---|---|
+| R | R | the voltage across R |
+| RL | L in series with R | the voltage across L + R (it can go negative) |
+| RC | C in parallel with R (capacitor-input filter) | vC |
+| RLC | series L, then C ∥ R (choke-input / LC filter) | vC (the rectifier output is `vrect`) |
 
-```
-vin(t) = Vm · sin(ωt + φ)
-Vm = √2 · Vrms          (peak of a sinusoid with RMS value Vrms)
-ω  = 2πf                (angular frequency, rad/s)
-T  = 1/f                (period)
-θ  = ωt + φ             (electrical angle, shown on screen wrapped to 0–360°)
-```
+Source: `vin(t) = Vm·sin(ωt + φ)` with `Vm = √2·Vrms` and `ω = 2πf`. The defaults are
+12 V RMS (a transformer secondary, not mains) and 50 Hz.
 
-Defaults: Vrms = 12 V (a transformer secondary, not mains), f = 50 Hz, φ = 0°.
+## 2. Diode model
 
-## 3. Diode model
+Piecewise linear: **ON** means `vAK = Vf + Ron·i` with `i > 0`; **OFF** means `i = 0` with `vAK ≤ Vf`.
+The ideal diode is `Vf = 0, Ron = 0`. Defaults: Vf = 0.7 V, Ron = 0.
 
-Piecewise-linear ("constant voltage drop + on-resistance"):
+## 3. Solving one instant: assumed-state method over the diode network
 
-| State | Constitutive law             | Validity condition |
-|-------|------------------------------|--------------------|
-| ON    | vD = Vf + Ron · iD           | iD > 0             |
-| OFF   | iD = 0                       | vD ≤ Vf            |
-
-- **Ideal diode**: Vf = 0, Ron = 0 (a perfect switch).
-- **Real diode**: default Vf = 0.7 V (silicon), Ron = 0 Ω (adjustable).
-
-`vD` is always anode minus cathode.
-
-## 4. How the diode state is decided (assumed-state method)
-
-Seen from the diode terminals, the rest of the circuit is a Thévenin source
-`vth = vin` in series with `Rth = R`. At every instant the solver
-(`src/solvers/diode.ts`) tests both hypotheses:
-
-1. **Assume ON.** KVL around the loop: `vin = R·i + Vf + Ron·i`, so
-   `i = (vin − Vf) / (R + Ron)`. The hypothesis holds only if `i > 0`
-   (a diode cannot conduct backwards).
-2. **Assume OFF.** `i = 0`, so there is no drop across R and the diode sees
-   the full source: `vD = vin`. The hypothesis holds only if `vD ≤ Vf`.
-
-Exactly one hypothesis is self-consistent. At the boundary `vin = Vf` both give
-`i = 0`, and the solver reports OFF.
-
-The resulting **bias classification** drives the explanations:
-
-| Condition            | Bias                      | State |
-|----------------------|---------------------------|-------|
-| vin > Vf             | forward-conducting        | ON    |
-| 0 < vin ≤ Vf         | forward-below-threshold   | OFF (real-diode "dead zone") |
-| vin < 0              | reverse                   | OFF   |
-| vin = 0              | zero                      | OFF   |
-
-The state comes from the circuit conditions, not from the sign of the source.
-A unit test proves this by shifting φ by 90°, which makes the diode start ON at t = 0.
-
-## 5. Circuit equations
-
-Once the diode state is known:
+For a diode combination (each diode assumed ON or OFF), the circuit is linear. It is solved by
+**modified nodal analysis** (`src/circuits/netlist.ts`). The unknowns are the node voltages plus a
+branch current for each source, inductor, capacitor and ON diode:
 
 ```
-io   = iD                         (KCL: one series loop → one current)
-vout = R · io                     (Ohm's law across the load)
-vD   = vin − vout                 (KVL; equals Vf + Ron·io when ON, vin when OFF)
+source       va − vb = V(t+h)
+ON diode     va − vb − Ron·i = Vf
+OFF diode    (open circuit)
+inductor     i − (h/L)·(va − vb) = iL(t)      backward Euler of L·di/dt = v
+capacitor    (va − vb) − (h/C)·i = vC(t)      backward Euler of C·dv/dt = i
+resistor     i = (va − vb)/R                  (conductance stamp)
 ```
 
-The tests check all three at every sample, together with `io ≥ 0`.
+A combination is **self-consistent** if every ON diode has `i > 0` and every OFF diode has
+`v ≤ Vf`. The model tries combinations nearest to the present one first (fewest flips) and
+keeps the first consistent one. With one diode this reduces exactly to the Phase 1 test
+("assume ON → is i > 0? assume OFF → is vD ≤ Vf?"). Physically impossible combinations,
+such as all four ideal bridge diodes ON while vin ≠ 0, give a singular matrix and are rejected.
 
-## 6. Time simulation
+**Floating bridge.** With all four bridge diodes OFF, the AC source is disconnected and its
+potential is undefined. Kirchhoff's current law at node a is then redundant and is replaced
+by the constraint `va + vb = vp + vn`, which carries no current. Each blocking diode therefore
+takes its share, as in a real bridge. No artificial "gmin" conductances are used: an earlier
+version with 1 pS references let single bridge diodes appear ON with about 10⁻¹⁷ A, and was removed.
 
-`src/simulation/engine.ts` steps a `CircuitModel` through time:
+**Why backward Euler.** It is L-stable: a diode switching an inductor or capacitor never
+rings numerically. The trapezoidal rule does ring, for example when a capacitor sits directly
+across a voltage source. Its first-order error at Δt = T/2000 is ≲ 0.3 %, which the theory
+comparison measures.
 
-```
-Δt   = duration / N          (N steps fitted so the last sample lands exactly on the duration)
-x₀   = model.initialState()
-for k = 1 … N:
-    (solutionₖ, xₖ) = model.step(xₖ₋₁, tₖ₋₁, Δt)
-```
+## 4. Time stepping with exact switching instants
 
-`x` is the energy-storage state vector. The R load has none (`{}`), so each
-instant is solved algebraically. Later phases put `iL` / `vC` here and
-integrate them inside `step`.
-
-- **Auto timestep**: Δt = T / 2000 (10 µs at 50 Hz).
-- **Manual timestep**: user-set, but tightened to at least 16 samples/cycle and
-  capped at 400 000 samples total. Every adjustment is reported on screen.
-- **Simulation vs rendering**: the scope draws a min/max envelope per pixel
-  column when there are more samples than pixels. Only the drawing is decimated;
-  measurements always use every sample.
-
-### Event detection
-
-Between two samples the engine watches for:
-
-| Event                                  | Detection                    | Refinement |
-|----------------------------------------|------------------------------|------------|
-| Diode ON / OFF                         | state differs between samples | bisection on `model.step` from the previous state |
-| Current starts / stops                 | `|io|` crosses 1 fA           | bisection on `model.step` |
-| Vin zero crossing (rising / falling)   | sign change of vin            | bisection on `vin(t)` |
-| Vin positive / negative peak           | local extremum of samples     | golden-section search on `vin(t)` |
-
-Bisection runs 60 iterations, which brackets the event to machine precision. Event times
-are therefore exact rather than quantised to Δt (e.g. real-diode turn-on is
-found at θ₁ = asin(Vf/Vm) to ~10⁻¹² rad).
-
-## 7. Measurements (from the simulated data)
-
-All measurements use the **last full source cycle** `[tend − T, tend]`:
+`src/simulation/engine.ts`:
 
 ```
-X_avg = (1/T) ∫ x dt          (trapezoidal rule, linear interpolation at window edges)
-X_rms = √( (1/T) ∫ x² dt )
-X_pk  = max over the window's samples
-PIV   = max(−vD)
-γ     = 360° · (time D1 is ON in the window) / T      (using refined event times)
-f_ripple = (pulses − 1) / (t_last pulse − t_first pulse) (from current-start events)
-P     = (1/T) ∫ vout · io dt
+for each step [t₀, t₁]:
+  solve at t₁ from the state at t₀ (consistent combination, preferring the present one)
+  if the combination changed:
+     bisect for tₛ, the first instant the OLD combination is inconsistent
+     advance the OLD circuit exactly to tₛ (iL, vC stay continuous)
+     record events at tₛ; probe a tiny step to find the NEW combination
+     continue from tₛ to t₁ with the new circuit
 ```
 
-## 8. Theory (closed form) used for comparison
+Stepping exactly to the switching instant is what makes, for example, an inductor's current
+reach zero precisely when its diode turns off (the extinction angle).
+Numerical guards:
 
-With θ₁ = asin(Vf/Vm), θ₂ = π − θ₁ and k = R/(R + Ron), the diode conducts for
-θ₁ < θ < θ₂, where `vout = k·(Vm·sinθ − Vf)`:
+- The switching search has a floor of 10⁻⁹·Δt. As h → 0 an inductor becomes a pure current
+  source and its voltage is numerically undetermined.
+- A switch within that floor of a sample is recorded on the sample.
+- With every diode open, the inductor current is pinned to exactly 0.
+
+Events: diode ON/OFF, current start/stop (rectifier begins or stops delivering), vin zero
+crossings and peaks (refined on the analytic source), and output crests and valleys (loads with storage).
+
+Auto timestep: Δt = T/2000. A manual timestep is clamped to at least 16 samples/cycle
+and at most 400 000 samples. Every adjustment is reported on screen. The scope draws a
+min/max envelope per pixel column: only the drawing is decimated, never the data.
+
+## 5. Measurements (from the simulated waveforms)
+
+All values are taken over the **last full cycle**. Steady state is declared when Vdc changes by
+< 0.1 % between the last two cycles; until then, steady-state theory rows are not compared.
 
 ```
-Vdc     = (k/2π) · [ 2·Vm·cosθ₁ − Vf·(π − 2θ₁) ]
-Vo,rms² = (k²/2π) · [ Vm²·((π − 2θ₁)/2 + sin2θ₁/2) − 4·Vm·Vf·cosθ₁ + Vf²·(π − 2θ₁) ]
-Vo,pk   = k·(Vm − Vf)
-Idc = Vdc/R,   Io,rms = Vo,rms/R,   Io,pk = Vo,pk/R
-γ   = π − 2θ₁          (180° for the ideal diode)
-PIV = Vm,   f_ripple = f
+Vdc = (1/T)∫vout dt     Vrms = √((1/T)∫vout² dt)     ripple = max − min
+RF  = √(Vrms² − Vdc²)/Vdc       η = P_R / P_source
+γ, θon, β    from the refined D1 ON/OFF event times
+f_ripple     = (output crests per cycle) × f   (plateau-aware: a crest may span two equal samples)
+PIV          = max over all diodes of −vD
 ```
 
-For the ideal diode these reduce to the textbook results `Vdc = Vm/π` and
-`Vo,rms = Vm/2`. If Vf ≥ Vm the diode never conducts and every output quantity is 0.
+## 6. Theory: an independent closed-form derivation
 
-**Tolerance**: a row is flagged ⚠ when |simulated − theory| / |theory| > 1 %. With
-the auto timestep the observed error is ~10⁻⁶. Trapezoidal integration over a whole
-period of a periodic signal is very accurate, so the flag mainly fires when a coarse
-grid misses the waveform's crest. For example, 16 samples/cycle with φ = 11.25° gives a
-peak error of 1 − cos(11.25°) ≈ 1.9 %. The test suite reproduces this case.
+`src/measurements/theory/index.ts` writes each steady-state waveform as an **analytic function
+of θ** (piecewise, with transcendental angles found by root finding). It then evaluates
+averages and RMS values by quadrature of those formulas. It never calls the simulator.
 
-## 9. Validation
+Notation: `n` = pulses per cycle; `Vft`, `Ront` = drop and resistance in the conduction path
+(×2 for a bridge); `θ₁ = asin(Vft/Vm)`; `k = R/(R + Ront)`.
 
-`npm test` runs the suite in `tests/`:
+**R load**
+```
+Vdc = n·k/(2π)·[2Vm·cosθ₁ − Vft(π − 2θ₁)]      (ideal: Vm/π, 2Vm/π)
+γ = π − 2θ₁ ;  PIV: Vm (half-wave), Vm + Vo,pk (center-tap), Vo,pk + Vf + Ron·Ipk (bridge)
+```
 
-- conduction in the positive half-cycle, blocking in the negative half-cycle
-- Vout = 0, Io = Id = 0 whenever OFF; Vout = Vin (ideal) / Vin − Vf (real) when ON
-- the real-diode dead zone, θ₁ / θ₂ switching angles, and the Ron drop
-- KVL / KCL / Ohm / io ≥ 0 at every sample, plus periodicity
-- agreement with theory to < 10⁻⁴ for five parameter sets, and the ⚠ flag on a coarse grid
-- R changes the current (∝ 1/R) but not the ON/OFF pattern; f sets the period; Vrms scales the output
-- limiting cases: R = 1 mΩ, R = 10 MΩ, Vf = 0 ≡ ideal, Vf ≥ Vm, frequency/amplitude extremes
-- invalid inputs (NaN, ∞, 0 Hz, negative R, undefined, absurd Δt): clamped, reported, no NaN anywhere
-- the WHY engine (state, trend, headline), event landing, and step navigation
+**RL load** (Z = √(R² + (ωL)²), φ = atan(ωL/R), ωτ = ωL/R)
+```
+i(θ) = (Vm/Z)·sin(θ − φ) − Vft/R + A·e^(−(θ−θ₁)/ωτ),   A chosen so i(θ₁) = 0
+β: first root of i(β) = 0 (the extinction angle)        Vdc = R·Idc  (avg vL = 0)
+full-wave, continuous (no root before π):
+i(θ) = (Vm/Z)·sin(θ − φ) − Vft/R + B·e^(−θ/ωτ),   B = 2(Vm/Z)·sinφ / (1 − e^(−π/ωτ))
+Idc = (2Vm/π − Vft)/(R + Ront)
+```
 
-`npm run smoke` drives the real UI in a browser (see README).
+**RC load** (exact for Ron = 0)
+```
+charging:  vo = |vin| − Vft,  iD = ωC·Vm·cosθ + (Vm·sinθ − Vft)/R
+turn-off:  ωRC·cosθ + sinθ = Vft/Vm           (root in (π/2, π))
+hold-up:   vo = vo(θoff)·e^(−(θ−θoff)/ωRC)
+turn-on:   Vm·|sinθ| − Vft = vo(θ)             (next pulse)
+```
+The textbook approximations `ΔV ≈ Vpk/(n·f·R·C)` and `Vdc ≈ Vpk − ΔV/2` are shown as "approx." rows.
+
+**RLC (LC filter).** In full-wave continuous mode, `Vdc = 2Vm/π − Vft − Ront·Idc` exactly (avg vL = 0,
+avg iC = 0). The critical inductance `Lc ≈ R/(3ω)` and the ripple from the 2nd harmonic are approximations.
+Half-wave or discontinuous operation has no closed form, and the table says so.
+
+## 7. Energy (Phase 6)
+
+`wl = ½·L·iL²`, `wc = ½·C·vC²`, `ps = Σ V·i_out` (sources), `pload = R·io²`, `pd = Σ vD·iD`.
+Because the solved network satisfies KCL and KVL at every instant, Tellegen's theorem makes
+the signed element powers sum to zero. The Energy view shows this live (Σp = 0 ✓). Over a
+steady cycle the tests also check `P_source = P_R + P_diodes + ΔW/T` to 0.5 %.
+
+## 8. Validation
+
+`npm test` runs 287 tests:
+
+- **Physics.** Conduction and blocking, the real-diode dead zone, KVL/KCL/Ohm at every sample,
+  periodicity, bridge diode pairing, the symmetric blocking split, PIV for each topology, the RL hold-on and
+  extinction, RC charging only when vin − Vf ≥ vC, KCL at the capacitor node, and energy conservation
+  for all 24 circuit/diode configurations.
+- **Theory agreement.** Every exact row is within 1 % on all 24 configurations (worst observed ≈ 0.3 %).
+  The ⚠ flag fires on a deliberately coarse timestep.
+- **Limits.** L from 1 µH to 10 H, C from 1 nF to 0.1 F, R from 1 mΩ to 10 MΩ, Vf ≥ Vm, inrush at φ = 90°,
+  and NaN/∞/negative inputs, on every circuit. Results stay finite and explainable, with fewer than 5 solver fallbacks.
+- **Modes.** Every lesson claim is checked against the simulation. Every challenge starts
+  unsolved and has a verified 3-star design. Event landing and stepping are tested.
+
+`npm run smoke` drives the real UI in Edge: 54 checks, plus screenshots in `scripts/out/`.

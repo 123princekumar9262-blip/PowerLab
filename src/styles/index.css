@@ -1585,3 +1585,270 @@ tr.row-approx td {
     grid-template-columns: 84px 1fr 76px;
   }
 }
+
+/* ── Modes: Learn / Predict / Challenge (Phases 8–10) ─────────────────────── */
+.mode-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.mode-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mode-head h2 {
+  margin: 4px 0 0;
+  font-size: 17px;
+}
+.mode-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0 6px;
+}
+.primary-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #06101f;
+  font-weight: 650;
+  font-size: 13px;
+}
+.primary-btn:disabled {
+  opacity: 0.4;
+}
+.lesson-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.lesson-card {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.lesson-card:hover {
+  border-color: var(--text-3);
+}
+.lesson-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.lesson-n--stars {
+  min-width: 52px;
+  color: var(--warning);
+  letter-spacing: 1px;
+}
+.lesson-title {
+  display: block;
+  font-weight: 650;
+  font-size: 13.5px;
+}
+.lesson-sum {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.lesson-progress {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 12px;
+}
+.lesson-progress span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.lesson-progress span.done {
+  background: var(--good);
+}
+.lesson-progress span.current {
+  background: var(--accent);
+}
+.lesson-step-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.lesson-body {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.quiz {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 6px;
+}
+.quiz-q {
+  margin: 0 0 2px;
+  font-weight: 650;
+  font-size: 13px;
+}
+.quiz-opt {
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  font-size: 13px;
+}
+.quiz-opt:hover:not(:disabled) {
+  border-color: var(--text-3);
+}
+.quiz-opt.is-right {
+  border-color: var(--good);
+  background: var(--good-bg);
+}
+.quiz-opt.is-wrong {
+  border-color: var(--critical);
+  background: var(--critical-bg);
+}
+.quiz-feedback {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+}
+.quiz-feedback.ok {
+  color: var(--text-1);
+}
+.quiz-feedback.no {
+  color: var(--text-1);
+}
+.criteria {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.criteria li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.criteria li.pass {
+  border-color: rgba(34, 177, 76, 0.45);
+}
+.criteria li.pass .crit-mark {
+  color: var(--good);
+}
+.crit-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.stars {
+  font-size: 22px;
+  color: var(--warning);
+  margin: 6px 0;
+  letter-spacing: 2px;
+}
+.hint summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.hint p {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.sketch {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  cursor: crosshair;
+  touch-action: none;
+  --scope-lane: #0e131a;
+}
+.sketch-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 6px 0 10px;
+}
+.sketch-legend .sw {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.sw--vin {
+  background: repeating-linear-gradient(90deg, var(--sig-vin) 0 4px, transparent 4px 7px);
+}
+.sw--you {
+  background: var(--text-1);
+}
+.sw--vout {
+  background: var(--sig-vout);
+}
+.guesses {
+  display: grid;
+  gap: 8px;
+}
+.guess {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.guess-result {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.guess-result .ok {
+  color: var(--good);
+}
+.guess-result .no {
+  color: var(--warning);
+}
+.score {
+  font-size: 15px;
+  margin: 12px 0 4px;
+}
+.instrument--hidden {
+  min-height: 260px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 40px;
+  background: repeating-linear-gradient(45deg, var(--surface-1) 0 12px, var(--surface-2) 12px 24px);
+}

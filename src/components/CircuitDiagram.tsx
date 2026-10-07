@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { LoadType, RectifierTopology, ResolvedParams, SimulationResult, SimulationSample } from '../types/simulation.ts'
-import { formatA, formatSI, formatV } from '../utils/format.ts'
+import { formatA, formatSI, formatV, formatCapacitance } from '../utils/format.ts'
 import { CapacitorSym, DiodeSym, diodeEnds, hopV, inductorPath, resistorPath, SourceSym, type DeviceState } from './circuit/symbols.tsx'
 
 interface Props {
@@ -145,7 +145,7 @@ export function CircuitDiagram({ topology, load, params, sample, result }: Props
     labels.push(
       <g key="clabel">
         <text className="label" x={cx - 30} y={cMid - 4} textAnchor="end">C</text>
-        <text className="sub" x={cx - 30} y={cMid + 13} textAnchor="end">{formatSI(params.capacitance, 'F')}</text>
+        <text className="sub" x={cx - 30} y={cMid + 13} textAnchor="end">{formatCapacitance(params.capacitance)}</text>
         {!idle && <text className="value value--small" x={cx - 30} y={cMid + 32} textAnchor="end">iC {formatA(ic, true)}</text>}
       </g>,
     )

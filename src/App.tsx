@@ -8,6 +8,10 @@ import { ParameterPanel } from './components/ParameterPanel.tsx'
 import { Scope } from './components/Scope.tsx'
 import { StatePanel } from './components/StatePanel.tsx'
 import { Transport } from './components/Transport.tsx'
+import { ChallengePanel } from './components/modes/ChallengePanel.tsx'
+import { LessonPanel } from './components/modes/LessonPanel.tsx'
+import { PredictPanel } from './components/modes/PredictPanel.tsx'
+import { useModes } from './state/useModes.ts'
 import { getExplainer } from './explanations/index.ts'
 import { compareWithTheory } from './measurements/compare.ts'
 import { indexAtTime, runSimulation } from './simulation/engine.ts'
@@ -45,6 +49,8 @@ export function App() {
     : null
 
   const setCursor = useCallback((time: number, byUser = false) => dispatch({ type: 'setCursor', time, byUser }), [])
+  const modes = useModes(state, dispatch, result, comparison, explanation?.sample ?? null)
+  const hide = modes.hideAnswers
 
   usePlayback({
     playing: state.playing,
@@ -139,6 +145,7 @@ export function App() {
         onLoad={(load) => dispatch({ type: 'chooseLoad', load })}
         onRun={onRun}
         onMode={(mode) => dispatch({ type: 'setMode', mode })}
+        circuitLocked={(state.mode === 'learn' && !!modes.lesson) || (state.mode === 'challenge' && !!modes.challenge) || state.mode === 'predict'}
       />
 
       {!result || !explanation || !viewport || !comparison ? (
@@ -175,6 +182,7 @@ export function App() {
               samples={result.trace.length}
               onChange={(params) => dispatch({ type: 'setParams', params })}
               onReset={() => dispatch({ type: 'resetParams' })}
+              editable={state.mode === 'challenge' && modes.challenge ? modes.challenge.editable : undefined}
             />
           </aside>
 
@@ -186,11 +194,17 @@ export function App() {
                   ⚡ Energy view
                 </button>
               </div>
-              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={explanation.sample} result={result} params={result.params} />
+              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={hide ? null : explanation.sample} result={hide ? null : result} params={result.params} />
             </section>
 
-            {state.showEnergy && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
+            {state.showEnergy && !hide && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
 
+            {hide ? (
+              <section className="instrument instrument--hidden" aria-label="Oscilloscope (hidden)">
+                <p className="intro-lead">The oscilloscope is covered until you reveal your prediction.</p>
+                <p className="muted">Sketch the output on the right and estimate the numbers — then compare with the simulation.</p>
+              </section>
+            ) : (
             <section className="instrument" aria-label="Oscilloscope">
               <Transport
                 playing={state.playing}
@@ -234,12 +248,47 @@ export function App() {
                 <EventStrip groups={visibleGroups} selectedId={state.selectedEventGroupId} onSelect={selectGroup} />
               </div>
             </section>
+            )}
 
-            <MeasurementTable comparison={comparison} />
+            {!hide && <MeasurementTable comparison={comparison} />}
           </div>
 
           <aside className="col-state">
-            {selectedGroup && (
+            {state.mode === 'learn' && (
+              <LessonPanel
+                lesson={modes.lesson}
+                step={modes.lessonStep}
+                facts={modes.facts}
+                completed={modes.completed}
+                onStart={modes.startLesson}
+                onStep={modes.setLessonStep}
+                onExit={modes.exitLesson}
+                onComplete={modes.completeLesson}
+              />
+            )}
+            {state.mode === 'challenge' && (
+              <ChallengePanel
+                challenge={modes.challenge}
+                result={modes.challengeResult}
+                best={modes.bestStars}
+                onStart={modes.startChallenge}
+                onExit={modes.exitChallenge}
+                onSubmit={modes.submitChallenge}
+              />
+            )}
+            {state.mode === 'predict' && modes.prediction && (
+              <PredictPanel
+                task={modes.prediction.task}
+                result={result}
+                comparison={comparison}
+                revealed={modes.prediction.revealed}
+                best={modes.bestPredict}
+                onReveal={modes.revealPrediction}
+                onNext={modes.newPrediction}
+                onExplore={() => dispatch({ type: 'setMode', mode: 'lab' })}
+              />
+            )}
+            {selectedGroup && !hide && (
               <EventDetail
                 group={selectedGroup}
                 angleDeg={sineSource(result.params).angleDeg(selectedGroup.time)}
@@ -247,7 +296,7 @@ export function App() {
                 onClose={() => dispatch({ type: 'selectEventGroup', id: null })}
               />
             )}
-            <StatePanel ex={explanation} signalIds={result.signalIds} whyOpen={state.whyOpen} onToggleWhy={() => dispatch({ type: 'toggleWhy' })} />
+            {!hide && <StatePanel ex={explanation} signalIds={result.signalIds} whyOpen={state.whyOpen} onToggleWhy={() => dispatch({ type: 'toggleWhy' })} />}
           </aside>
         </main>
       )}

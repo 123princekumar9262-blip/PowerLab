@@ -86,6 +86,8 @@ export type LabAction =
   | { type: 'toggleEnergy' }
   | { type: 'selectEventGroup'; id: string | null; time?: number }
   | { type: 'toggleWhy' }
+  | { type: 'setWhy'; open: boolean }
+  | { type: 'setEnergy'; on: boolean }
   | { type: 'observedDiode'; on: boolean }
 
 export function circuitIdOf(state: Pick<LabState, 'topology' | 'load'>): CircuitId {
@@ -151,12 +153,12 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       return { ...state, layoutMode: action.mode }
     case 'toggleConduction':
       return { ...state, showConduction: !state.showConduction }
-    case 'toggleEnergy': {
-      const on = !state.showEnergy
-      const visible = { ...state.visible }
-      for (const s of Object.keys(SIGNAL_META) as SignalId[]) if (SIGNAL_META[s].advanced) visible[s] = on
-      return { ...state, showEnergy: on, visible }
-    }
+    case 'toggleEnergy':
+      return withEnergy(state, !state.showEnergy)
+    case 'setEnergy':
+      return state.showEnergy === action.on ? state : withEnergy(state, action.on)
+    case 'setWhy':
+      return state.whyOpen === action.open ? state : { ...state, whyOpen: action.open }
     case 'selectEventGroup':
       return {
         ...state,
@@ -173,6 +175,12 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       return { ...state, progress: { ...state.progress, [key]: true } }
     }
   }
+}
+
+function withEnergy(state: LabState, on: boolean): LabState {
+  const visible = { ...state.visible }
+  for (const s of Object.keys(SIGNAL_META) as SignalId[]) if (SIGNAL_META[s].advanced) visible[s] = on
+  return { ...state, showEnergy: on, visible }
 }
 
 /**

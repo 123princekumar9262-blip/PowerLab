@@ -8,6 +8,8 @@ interface Props {
   onLoad: (l: LoadType) => void
   onRun: () => void
   onMode: (m: AppMode) => void
+  /** True while a lesson, challenge or prediction owns the circuit choice. */
+  circuitLocked: boolean
 }
 
 const MODES: Array<{ id: AppMode; label: string; title: string }> = [
@@ -18,7 +20,7 @@ const MODES: Array<{ id: AppMode; label: string; title: string }> = [
 ]
 
 /** Product header + the guided flow: choose → run → explore → ask WHY. */
-export function Header({ state, onTopology, onLoad, onRun, onMode }: Props) {
+export function Header({ state, onTopology, onLoad, onRun, onMode, circuitLocked }: Props) {
   const { progress } = state
   const steps = [
     { label: 'Choose rectifier', done: state.topology !== null },
@@ -30,7 +32,7 @@ export function Header({ state, onTopology, onLoad, onRun, onMode }: Props) {
   ]
   const current = steps.findIndex((s) => !s.done)
   const canRun = state.topology !== null && state.load !== null
-  const lockedCircuit = state.mode === 'learn' || state.mode === 'challenge'
+  const lockedCircuit = circuitLocked
 
   return (
     <header className={`top ${state.hasRun ? 'top--compact' : 'top--intro'}`}>

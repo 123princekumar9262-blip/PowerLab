@@ -10,8 +10,12 @@ const PREFIXES: ReadonlyArray<[number, string]> = [
   [1e-12, 'p'],
 ]
 
-/** Magnitudes below this are displayed as exactly zero (avoids "−0.000" and 1e-17 dust). */
-const DISPLAY_ZERO = 1e-13
+/**
+ * Magnitudes below this are displayed as exactly zero. Nothing in this lab is meaningful
+ * below 1 nV / 1 nA (the smallest real current is ~µA at 10 MΩ); smaller values are
+ * numerical dust, e.g. vin 10⁻⁹·Δt after a zero crossing.
+ */
+const DISPLAY_ZERO = 1e-9
 
 /**
  * Engineering format with SI prefix: 0.7 → "0.700 V", 0.0505 → "50.50 mA", 16.97 → "16.97 V".
@@ -52,4 +56,11 @@ export function formatPercent(x: number, digits = 3): string {
   if (Math.abs(v) < 1e-6) return '0 %'
   if (Math.abs(v) < 10 ** -digits) return `${v.toExponential(1)} %`
   return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(digits)} %`
+}
+
+/** Capacitance in µF (how students and datasheets quote filter capacitors): 0.0022 → "2200 µF". */
+export function formatCapacitance(c: number): string {
+  const uF = c * 1e6
+  if (uF < 0.1) return formatSI(c, 'F')
+  return `${Number(uF.toPrecision(4))} µF`
 }
