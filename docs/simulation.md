@@ -272,9 +272,73 @@ E_L,max/min = ½·L·Io,pk²/Io,min² are exact for Ron = 0 and labelled approxi
 refined switching instants. ΔE_L equals their sum to within the backward-Euler numerical dissipation
 ½·L·(Δi)² per step, a relative error of about Δt/(2τ): 0.1 % at the default τ = 5 ms, 1 % at τ = 0.5 ms.
 
-## 11. Validation
+## 11. Single-phase controlled rectifiers
 
-`npm test` runs 406 tests:
+**SCRs.** The same gated diode element as the three-phase SCRs (one implementation). Gate pulses come from one shared
+helper: each SCR is gated while the source angle is between its natural point + α and the end of the half-cycle (devices
+of the positive half-cycle: natural point 0°; the others: 180°). Half-wave: T1. Fully controlled bridge: T1 + T4 fired at α,
+T2 + T3 at 180° + α. Semi-controlled bridge (`semi-bridge`): SCRs T1, T2 on top and diodes D3, D4 below. When vin reverses
+the current moves from D4 to D3, so the leg T1 + D3 freewheels the load (vo = −2Vf, never negative: no inversion).
+
+**Theory.**
+```
+R load:   conduction from θs = max(α, θ₁) to 180° − θ₁   (ideal: Vdc = (Vm/2π)(1 + cos α) half-wave, (Vm/π)(1 + cos α) full-wave)
+RL, no clamp (half-wave, center-tap, fully controlled bridge):
+          i(θ) = (Vm/Z)·sin(θ − φ) − Vft/Reff + [i0 − (Vm/Z)·sin(θs − φ) + Vft/Reff]·e^(−(θ−θs)/ωτ)
+          half-wave: from θs with i = 0 until the extinction root β (always discontinuous)
+          full-wave: periodic solution over [α, α + 180°] if it stays positive (Vdc = (2Vm/π)·cos α − drops),
+                     else pulses from θs dying at β < θs + 180°
+RL with a clamp (freewheeling diode, or the semi-controlled bridge's own leg) — one "clamp" theory:
+          source interval [θs, θe]: L·di/dt + (R + Ront)·i = Vm·sinθ − Vft
+          clamp interval  [θe, θs + P]: L·di/dt + (R + Roc)·i = −Vcl      (Vcl = Vf for Dfw, 2Vf for the semi leg)
+          θe = 180° − asin((Vft − Vcl)/Vm); continuous current = the linear fixed point i(θs) = i(θs + P)
+```
+RC and RLC with SCRs (and RLC with a freewheeling diode) have no closed form here. The table then says *"Closed-form
+equation not applicable under the current operating condition. Use numerical simulation."* Every theory states its
+assumptions (load, continuous/discontinuous, ideal source, device model, α).
+
+**Efficiency** is measured as P_load / (P_load + measured device losses). For the circuit this equals P_load / P_source.
+It does not count the integrator's own numerical dissipation (backward Euler loses about Δt/τ of the reactive energy) as a
+loss, so ideal devices give exactly 100 %.
+
+**Conditioning.** Where a compared quantity is a small difference of a large waveform, its integration error scales with
+the waveform amplitude, not with the small value. Vdc (at large α) is allowed 0.2 % of Vm, with the error propagated to the
+ripple factor. Io,min and ΔIo are allowed 0.5 % of Vm/R, and E_L,min 1 % of ½·L·(Vm/R)². These errors were checked to halve
+with Δt (first order) and converge to the theory.
+
+## 12. Commutation overlap μ (three-phase)
+
+With source inductance Ls a commutation takes time. During it the outgoing and incoming phases are shorted through
+2·Ls, and 2·Ls·di/dt = v_line = √2·VLL·sin θ (θ measured from the natural commutation point). The current moves from
+0 to Id between α and α + μ:
+
+```
+cos α − cos(α + μ) = 2·ω·Ls·Id / (√2·VLL) = 2·ω·Ls·Id / (√6·Vph)
+```
+Note the √6·**Vph** (= √2·VLL). Written with VLL in place of Vph, μ comes out about √3 times too small. The simulation
+confirms the derived form within 1–2 % (e.g. diode bridge, Ls = 1 mH, L = 100 mH: 19.01° measured vs 19.14°).
+
+**Measured μ** (`simulation/commutation.ts`): for each device turn-on in a group (upper/lower), the outgoing device is the
+one still conducting just after it; the commutation ends at that device's own turn-off event. μ = ω·(t_end − t_start). The
+engine emits `commutation-start` / `commutation-end` events (only when μ > 0). **Theoretical μ** (`measurements/overlap.ts`)
+solves the relation per commutation with Id = the simulated current during it. The comparison is reported only when every
+assumption holds: a healthy balanced source, Ls > 0, Rs = 0, Ron = 0, current continuous and varying less than 5 % during the
+overlap, and no freewheeling then. Otherwise each violated assumption is listed. μ is compared within 3 %: it is a short
+interval resolved by a first-order integrator, and the error shrinks with Δt.
+
+## 13. Compare mode
+
+`compare/compare.ts` simulates both rectifiers with the same load, f, devices and α. The basis sets the sources:
+same Vph; same VLL (three-phase Vph = V/√3); or same output/input power (B's voltage re-simulated by a √P secant until
+matched within 0.1 %). Every metric is computed from the two simulated datasets: output, current, power (η as above,
+Pdc = Vdc·Idc, P_in = average source power), worst-case device stress over the last cycle, and pulses per cycle (ripple
+frequency / f). TUF is simulated as Pdc / Σ(Vrms·Irms) over the source windings, using winding currents from the
+device currents via `sourceWindings()`. It matches the textbook secondary values for ideal R loads: 0.287, 0.573, 0.811,
+0.664, 0.954. The textbook value is returned separately, labelled theoretical, and only where it applies.
+
+## 14. Validation
+
+`npm test` runs 426 tests:
 
 - **Physics.** Conduction and blocking, the real-diode dead zone, KVL/KCL/Ohm at every sample,
   periodicity, bridge diode pairing, the symmetric blocking split, PIV for each topology, the RL hold-on and
@@ -301,8 +365,13 @@ refined switching instants. ΔE_L equals their sum to within the backward-Euler 
   Σp = 0; the analytic freewheel decay; theory within 1 % on seven parameter sets; with vs without (Vdc
   rises to Vm/π − Vf, Vo,min → −Vf, β → 180°, continuous current, lower ripple factor, E_L,min > 0). The WHY,
   lens, step-through, experiments and what-ifs are checked against the simulation, and the other circuits are unchanged.
+- **Controlled rectifiers, overlap, compare.** α timing (each SCR fires exactly at α), no turn-on without a gate, forward
+  blocking before α, extinction from the simulated current, semi-controlled freewheel leg, fully controlled pair sequence,
+  Vdc formulas, theory agreement over α for every single-phase controlled circuit, center-tap/bridge freewheel (KCL, clamp,
+  WHY), μ = 0 with Ls = 0, μ from events agreeing with the overlap relation, unavailability with reasons, Compare bases, metrics
+  from simulation, TUF values and labelling.
 - **Presentation.** Channel presets, the short WHY / current-path / state line, Inspect mode and the
   panel state (tabs, drawers, density) are tested against the simulation; density never changes parameters.
 
-`npm run smoke`, `npm run smoke3` and `npm run smoke-fw` drive the real UI in Edge: 56 + 40 + 29 checks,
+`npm run smoke`, `npm run smoke3`, `npm run smoke-fw` and `npm run smoke-ctl` drive the real UI in Edge: 56 + 40 + 29 + 36 checks,
 plus screenshots in `scripts/out/`.

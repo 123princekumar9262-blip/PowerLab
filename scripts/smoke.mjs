@@ -34,7 +34,7 @@ await page.reload()
 await page.screenshot({ path: OUT + '01-intro.png' })
 check(await page.getByRole('button', { name: /Run simulation/ }).isDisabled(), 'Run is disabled until rectifier and load are chosen')
 
-await page.getByRole('radio', { name: 'Half-wave' }).click()
+await page.getByRole('radio', { name: 'Half-wave', exact: true }).click()
 await page.getByRole('radio', { name: /^R$/ }).click()
 await page.screenshot({ path: OUT + '02-chosen.png' })
 await page.getByRole('button', { name: /Run simulation/ }).click()

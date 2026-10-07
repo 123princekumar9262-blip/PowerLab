@@ -3,23 +3,28 @@ import type { Comparison, RowGroup } from '../../measurements/compare.ts'
 import type { Density } from '../../state/labState.ts'
 import { formatA, formatV } from '../../utils/format.ts'
 import { MeasurementTable } from '../MeasurementTable.tsx'
+import { OverlapPanel } from './OverlapPanel.tsx'
+import type { SimulationResult, SimulationSample } from '../../types/simulation.ts'
+import { isThreePhase } from '../../types/simulation.ts'
 
-type Tab = 'summary' | 'output' | 'load' | 'diodes' | 'timing' | 'theory'
+type Tab = 'summary' | 'output' | 'load' | 'diodes' | 'timing' | 'commutation' | 'theory'
 
 const TABS: Array<{ id: Tab; label: string; groups?: RowGroup[]; engineer?: boolean }> = [
   { id: 'summary', label: 'Summary' },
   { id: 'output', label: 'Output', groups: ['Output'] },
   { id: 'load', label: 'Load', groups: ['Load current', 'Inductor energy'] },
   { id: 'diodes', label: 'Diodes', groups: ['Diodes', 'Freewheeling diode', 'Power'] },
-  { id: 'timing', label: 'Timing', groups: ['Timing'], engineer: true },
+  { id: 'timing', label: 'Timing', groups: ['Timing', 'Commutation'], engineer: true },
+  { id: 'commutation', label: 'Commutation / μ' },
   { id: 'theory', label: 'Theory vs Simulation', engineer: true },
 ]
 
 /** MEASUREMENTS — a six-number summary first; every detailed row in its own tab. */
-export function MeasurementsPanel({ comparison, density }: { comparison: Comparison; density: Density }) {
-  const [tab, setTab] = useState<Tab>('summary')
+export function MeasurementsPanel({ comparison, density, result, sample, initialTab }: { comparison: Comparison; density: Density; result: SimulationResult; sample: SimulationSample; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'summary')
   const m = comparison.measurements
-  const tabs = TABS.filter((t) => !t.engineer || density === 'engineer')
+  const three = isThreePhase(result.params.topology)
+  const tabs = TABS.filter((t) => (!t.engineer || density === 'engineer') && (t.id !== 'commutation' || three))
   const cur = tabs.find((t) => t.id === tab) ?? tabs[0]
   const summary: Array<[string, string, string]> = [
     ['Vdc', 'Average output', formatV(m.voutAvg)],
@@ -38,7 +43,9 @@ export function MeasurementsPanel({ comparison, density }: { comparison: Compari
           </button>
         ))}
       </div>
-      {cur.id === 'summary' ? (
+      {cur.id === 'commutation' ? (
+        <OverlapPanel result={result} sample={sample} />
+      ) : cur.id === 'summary' ? (
         <>
           <dl className="summary-grid">
             {summary.map(([sym, label, v]) => (

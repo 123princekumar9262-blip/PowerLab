@@ -27,6 +27,8 @@ import { InspectPanel } from './components/panels/InspectPanel.tsx'
 import { MeasurementsPanel } from './components/panels/MeasurementsPanel.tsx'
 import { TheoryPanel } from './components/panels/TheoryPanel.tsx'
 import { EventsView } from './components/panels/EventsView.tsx'
+import { FiringPanel } from './components/panels/FiringPanel.tsx'
+import { CompareLab } from './components/compare/CompareLab.tsx'
 import { useModes } from './state/useModes.ts'
 import { lensStages } from './explanations/lens.ts'
 import { stateLine } from './explanations/concise.ts'
@@ -46,7 +48,7 @@ import { presetVisible, type ChannelPreset } from './visualization/presets.ts'
 import { groupEvents, groupIndex, type EventGroup } from './visualization/eventGroups.ts'
 import { formatA, formatDeg, formatTime, formatV } from './utils/format.ts'
 
-const MODE_LABEL = { lab: 'Explore', learn: 'Lesson', experiment: 'Experiment', predict: 'Predict', challenge: 'Challenge', reverse: 'Reverse' } as const
+const MODE_LABEL = { lab: 'Explore', learn: 'Lesson', experiment: 'Experiment', predict: 'Predict', challenge: 'Challenge', reverse: 'Reverse', compare: 'Compare' } as const
 
 /** "What do you want to study?" — each choice configures channels, view and panels. */
 const STUDIES = [
@@ -55,6 +57,7 @@ const STUDIES = [
   { id: 'load', label: 'How the load current behaves' },
   { id: 'firing', label: 'How the firing angle affects the output' },
   { id: 'energy', label: 'Energy flow' },
+  { id: 'commutation', label: 'Commutation overlap μ' },
   { id: 'measure', label: 'Measurements' },
   { id: 'theory', label: 'Theory' },
 ] as const
@@ -233,6 +236,9 @@ export function App() {
       case 'measure':
         dispatch({ type: 'openDrawer', drawer: { kind: 'measure' } })
         break
+      case 'commutation':
+        dispatch({ type: 'openDrawer', drawer: { kind: 'measure', part: 'commutation' } })
+        break
       case 'theory':
         dispatch({ type: 'openDrawer', drawer: { kind: 'theory' } })
         break
@@ -341,7 +347,15 @@ export function App() {
 
   const whyPanel =
     result && explanation ? (
-      <WhyPanel result={result} ex={explanation} detailed={state.whyOpen} onToggleDetailed={() => dispatch({ type: 'toggleWhy' })} onLens={() => dispatch({ type: 'setLens', stage: 0 })} lens={lensPanel} />
+      <WhyPanel
+        result={result}
+        ex={explanation}
+        detailed={state.whyOpen}
+        onToggleDetailed={() => dispatch({ type: 'toggleWhy' })}
+        onLens={() => dispatch({ type: 'setLens', stage: 0 })}
+        lens={lensPanel}
+        extra={explanation.firing && comparison && !isThreePhase(result.params.topology) ? <FiringPanel ex={explanation} params={state.params} circuitId={circuitId} measurements={comparison.measurements} /> : null}
+      />
     ) : null
   const energyPanel = result && explanation && m ? <EnergyPanel result={result} sample={explanation.sample} measurements={m} /> : null
   const scopeViews: Array<{ id: ScopeView; label: string }> = [
@@ -356,7 +370,7 @@ export function App() {
     <div className={`app ${state.focus ? 'app--focus' : ''}`}>
       <Header
         state={state}
-        onTopology={(topology) => dispatch({ type: 'chooseTopology', topology })}
+        onRectifier={(r) => dispatch({ type: 'chooseRectifier', topology: r.topology, device: r.device })}
         onLoad={(load) => dispatch({ type: 'chooseLoad', load })}
         onRun={onRun}
         onMode={(mode) => dispatch({ type: 'setMode', mode })}
@@ -365,7 +379,9 @@ export function App() {
         circuitLocked={(state.mode === 'learn' && !!modes.lesson) || (state.mode === 'challenge' && !!modes.challenge) || (state.mode === 'predict' && modes.predictTab === 'sketch') || state.mode === 'reverse'}
       />
 
-      {!result || !explanation || !viewport || !comparison ? (
+      {state.mode === 'compare' ? (
+        <CompareLab />
+      ) : !result || !explanation || !viewport || !comparison ? (
         <main className="intro">
           <section className="bench bench--intro">
             {state.topology && state.load ? (
@@ -449,7 +465,7 @@ export function App() {
                       }}
                     >
                       <option value="">What do you want to study?</option>
-                      {STUDIES.filter((s) => s.id !== 'firing' || three).map((s) => (
+                      {STUDIES.filter((s) => (s.id !== 'commutation' || three) && (s.id !== 'firing' || three || result.params.control.device === 'scr' || result.params.topology === 'semi-bridge')).map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.label}
                         </option>
@@ -620,7 +636,7 @@ export function App() {
                     }}
                   />
                 )}
-                {scopeView === 'events' && <EventsView groups={visibleGroups} selectedId={state.selectedEventGroupId} angleOf={angleOf} onSelect={selectGroup} />}
+                {scopeView === 'events' && <EventsView groups={visibleGroups} selectedId={state.selectedEventGroupId} angleOf={angleOf} onSelect={selectGroup} names={explanation.threePhase?.names ?? explanation.names} />}
                 {scopeView === 'compare' && <CompareView result={result} params={state.params} circuitId={circuitId} cursorTime={state.cursorTime} onCursorTime={(t) => setCursor(t, true)} />}
               </section>
             )}
@@ -727,7 +743,7 @@ export function App() {
               )}
               {drawer.kind === 'measure' && (
                 <Drawer variant="sheet" eyebrow="Analysis" title="Measurements" onClose={() => dispatch({ type: 'closeDrawer' })}>
-                  <MeasurementsPanel comparison={comparison} density={state.density} />
+                  <MeasurementsPanel comparison={comparison} density={state.density} result={result} sample={explanation.sample} initialTab={drawer.part === 'commutation' ? 'commutation' : undefined} />
                 </Drawer>
               )}
               {drawer.kind === 'theory' && (

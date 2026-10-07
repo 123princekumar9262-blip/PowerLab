@@ -1,10 +1,11 @@
-import { LOADS, TOPOLOGIES } from '../circuits/registry.ts'
+import { LOADS, RECTIFIERS, type RectifierChoice } from '../circuits/registry.ts'
+import { alwaysControlled } from '../types/simulation.ts'
 import type { AppMode, Density, LabState, Section } from '../state/labState.ts'
-import type { LoadType, RectifierTopology } from '../types/simulation.ts'
+import type { LoadType } from '../types/simulation.ts'
 
 interface Props {
   state: LabState
-  onTopology: (t: RectifierTopology) => void
+  onRectifier: (r: RectifierChoice) => void
   onLoad: (l: LoadType) => void
   onRun: () => void
   onMode: (m: AppMode) => void
@@ -21,6 +22,7 @@ const MODES: Array<{ id: AppMode; label: string; title: string }> = [
   { id: 'predict', label: 'Predict', title: 'Predict first — then the simulation shows what really happens' },
   { id: 'challenge', label: 'Challenge', title: 'Design tasks checked by the simulation' },
   { id: 'reverse', label: 'Reverse', title: 'Reverse engineering: identify the rectifier from its waveforms' },
+  { id: 'compare', label: 'Compare', title: 'Compare two rectifiers side by side on the same basis' },
 ]
 
 /** Product header + the guided flow: choose → run → explore → ask WHY. */
@@ -30,7 +32,9 @@ const DENSITIES: Array<{ id: Density; label: string; title: string }> = [
   { id: 'engineer', label: 'Engineer', title: 'Adds every channel, device voltages, timing, theory comparison and advanced parameters' },
 ]
 
-export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, onDensity, circuitLocked }: Props) {
+export function Header({ state, onRectifier, onLoad, onRun, onMode, onSection, onDensity, circuitLocked }: Props) {
+  const device = state.params.control?.device ?? 'diode'
+  const chosen = (r: RectifierChoice) => state.topology === r.topology && (alwaysControlled(r.topology) || r.device === device)
   const three = state.section === 'three'
   const { progress } = state
   const steps = [
@@ -71,7 +75,7 @@ export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, on
         </nav>
       )}
 
-      <div className="setup" aria-disabled={lockedCircuit}>
+      <div className={`setup ${state.mode === 'compare' ? 'setup--compare' : ''}`} aria-disabled={lockedCircuit}>
         <div className="seg section-seg" role="tablist" aria-label="Section">
           {(['single', 'three'] as const).map((sec) => (
             <button key={sec} role="tab" aria-selected={state.section === sec} disabled={lockedCircuit} className={state.section === sec ? 'on' : ''} onClick={() => onSection(sec)}>
@@ -83,18 +87,23 @@ export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, on
           <span className="picker-label">
             <b>1</b> Rectifier
           </span>
-          {TOPOLOGIES.filter((t) => t.phases === (three ? 3 : 1)).map((t) => (
-            <button
-              key={t.id}
-              role="radio"
-              aria-checked={state.topology === t.id}
-              disabled={lockedCircuit}
-              className={`pick ${state.topology === t.id ? 'on' : ''}`}
-              onClick={() => onTopology(t.id)}
-              title={t.label}
-            >
-              {t.short}
-            </button>
+          {(['Uncontrolled', 'Controlled'] as const).map((g) => (
+            <span key={g} className="pick-group" role="group" aria-label={g}>
+              <span className="pick-group-label">{g === 'Controlled' ? 'Controlled (SCR)' : 'Diode'}</span>
+              {RECTIFIERS.filter((r) => r.phases === (three ? 3 : 1) && r.group === g).map((r) => (
+                <button
+                  key={r.key}
+                  role="radio"
+                  aria-checked={chosen(r)}
+                  disabled={lockedCircuit}
+                  className={`pick ${chosen(r) ? 'on' : ''}`}
+                  onClick={() => onRectifier(r)}
+                  title={r.label}
+                >
+                  {r.short}
+                </button>
+              ))}
+            </span>
           ))}
         </div>
         <div className="picker" role="radiogroup" aria-label="Load">

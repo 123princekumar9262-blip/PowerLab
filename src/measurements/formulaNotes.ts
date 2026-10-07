@@ -33,5 +33,9 @@ export const FORMULA_NOTES: Partial<Record<MeasureKey, { concept: string; explai
   conductionAngleDeg: { concept: 'Conduction angle', explain: 'How many degrees per cycle the reference device conducts: 180° for an ideal half-wave on R, 120° in a three-phase bridge, more with an inductor holding it on.' },
   turnOnAngleDeg: { concept: 'Turn-on angle', explain: 'Where conduction starts: when the source exceeds the device drop (diodes) or when the gate fires (SCRs).' },
   turnOffAngleDeg: { concept: 'Turn-off / extinction angle', explain: 'Where conduction ends: the current reaches zero (extinction angle β) or another device takes over.' },
+  overlapDeg: {
+    concept: 'Commutation overlap μ',
+    explain: 'With source inductance Ls the current cannot jump from one phase to the next: for μ degrees both devices conduct and the two phases are shorted through 2·Ls. Integrating 2·Ls·di/dt = √2·VLL·sinθ from α to α + μ while the current transfers 0 → Id gives cos α − cos(α + μ) = 2ωLs·Id/(√6·Vph). The measured μ comes from the simulated turn-on of the incoming device and turn-off of the outgoing one.',
+  },
   efficiency: { concept: 'Rectification efficiency', explain: 'η = P_load / P_source: the fraction of the input power that reaches the load; the rest is lost in the devices.' },
 }

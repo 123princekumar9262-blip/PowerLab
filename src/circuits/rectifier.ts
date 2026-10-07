@@ -41,6 +41,20 @@ interface Built {
 /** Large resistance that keeps a disconnected phase conductor's node defined [Ω]. */
 const OPEN_PHASE_R = 1e9
 
+/**
+ * Gate pulse of an SCR, synchronized to the source: applied while the source angle is between
+ * natural + α and natural + α + width (degrees, modulo 360). `natural` is the device's natural
+ * commutation point — where the equivalent diode would start conducting. One rule for every
+ * rectifier: single-phase pulses last to the end of the half-cycle (width 180° − α); three-phase
+ * pulses are 120° wide, so discontinuous current can re-start.
+ */
+export function gatePulse(angleDeg: (t: number) => number, natural: number, alphaDeg: number, width: number) {
+  return (t: number) => {
+    const d = (((angleDeg(t) - natural - alphaDeg) % 360) + 360) % 360
+    return d < width
+  }
+}
+
 function buildNetlist(p: ResolvedParams): Built {
   const els: Element[] = []
   let nodes = 0
@@ -50,11 +64,17 @@ function buildNetlist(p: ResolvedParams): Built {
   let vin = sineSource(p).v
   let phaseFn: Built['phase']
 
+  // Single-phase SCR gating: devices that conduct in the positive half-cycle have their natural
+  // point at θ = 0°, the others at 180°; each is fired α later.
+  const scr1 = !isThreePhase(p.topology) && p.control.device === 'scr'
+  const alphaDeg1 = (p.control.alpha * 180) / Math.PI
+  const g1 = (natural: number) => (scr1 ? gatePulse(sineSource(p).angleDeg, natural, alphaDeg1, 180 - alphaDeg1) : undefined)
+
   switch (p.topology) {
     case 'half-wave':
       // 1 = source +, 2 = cathode (P); the return is the reference node.
       els.push({ kind: 'V', id: 'Vs', a: 1, b: 0, value: vin })
-      els.push({ kind: 'D', id: 'D1', a: 1, b: 2 })
+      els.push({ kind: 'D', id: 'D1', a: 1, b: 2, gate: g1(0) })
       nodes = 2
       P = 2
       diodeIds = ['D1']
@@ -63,25 +83,31 @@ function buildNetlist(p: ResolvedParams): Built {
       // Center tap = reference. Upper winding: v1 = +vin. Lower winding: v2 = −vin.
       els.push({ kind: 'V', id: 'Vs1', a: 1, b: 0, value: vin })
       els.push({ kind: 'V', id: 'Vs2', a: 0, b: 2, value: vin })
-      els.push({ kind: 'D', id: 'D1', a: 1, b: 3 })
-      els.push({ kind: 'D', id: 'D2', a: 2, b: 3 })
+      els.push({ kind: 'D', id: 'D1', a: 1, b: 3, gate: g1(0) })
+      els.push({ kind: 'D', id: 'D2', a: 2, b: 3, gate: g1(180) })
       nodes = 3
       P = 3
       diodeIds = ['D1', 'D2']
       break
     case 'bridge':
+    case 'semi-bridge': {
       // AC inputs a = 1, b = 2; DC output p = 3 (+); the − output n is the reference node.
+      // Fully controlled: four SCRs (T1 + T4 fired at α, T2 + T3 at 180° + α).
+      // Semi-controlled: SCRs on top (T1, T2), diodes below (D3, D4) — the standard bridge
+      // whose own leg (T1 + D3 or T2 + D4) freewheels the load current.
+      const low = p.topology === 'bridge'
       els.push({ kind: 'V', id: 'Vs', a: 1, b: 2, value: vin })
-      els.push({ kind: 'D', id: 'D1', a: 1, b: 3 }) // a → p
-      els.push({ kind: 'D', id: 'D2', a: 2, b: 3 }) // b → p
-      els.push({ kind: 'D', id: 'D3', a: 0, b: 1 }) // n → a
-      els.push({ kind: 'D', id: 'D4', a: 0, b: 2 }) // n → b
+      els.push({ kind: 'D', id: 'D1', a: 1, b: 3, gate: g1(0) }) // a → p
+      els.push({ kind: 'D', id: 'D2', a: 2, b: 3, gate: g1(180) }) // b → p
+      els.push({ kind: 'D', id: 'D3', a: 0, b: 1, gate: low ? g1(180) : undefined }) // n → a
+      els.push({ kind: 'D', id: 'D4', a: 0, b: 2, gate: low ? g1(0) : undefined }) // n → b
       // With all four diodes OFF the source floats: pin its potential symmetrically.
       els.push({ kind: 'REF', id: 'Ref', a: 1, b: 2, p: 3, n: 0 })
       nodes = 3
       P = 3
       diodeIds = ['D1', 'D2', 'D3', 'D4']
       break
+    }
     default: {
       const b = buildThreePhase(p, els)
       nodes = b.nodes
@@ -203,10 +229,7 @@ function buildThreePhase(p: ResolvedParams, els: Element[]) {
   // Gate pulses: each SCR is fired α after its natural commutation instant — the moment its
   // phase becomes the highest (upper / half-wave: phase angle 30°) or lowest (lower: 210°).
   // Wide (120°) pulses keep the incoming partner gated, so discontinuous current re-starts.
-  const gateFor = (x: Phase, natural: number) => (t: number) => {
-    const d = (((src.phaseAngleDeg(x, t) - natural - alphaDeg) % 360) + 360) % 360
-    return d < 120
-  }
+  const gateFor = (x: Phase, natural: number) => gatePulse((t) => src.phaseAngleDeg(x, t), natural, alphaDeg, 120)
 
   let diodeIds: DiodeId[]
   if (halfWave) {
@@ -283,6 +306,7 @@ export function signalsFor(topology: RectifierTopology, load: LoadType, freewhee
     return s
   }
   const fw = topology !== 'half-wave'
+  const four = topology === 'bridge' || topology === 'semi-bridge'
   const s: SignalId[] = ['vin']
   if (load === 'RLC') s.push('vrect')
   s.push('vout', 'vd')
@@ -290,6 +314,7 @@ export function signalsFor(topology: RectifierTopology, load: LoadType, freewhee
   if (load === 'RL' || load === 'RLC') s.push('vl')
   s.push('io', 'id')
   if (fw) s.push('id2')
+  if (four) s.push('id3', 'id4')
   if (freewheel) s.push('ifw', 'vfw')
   if (load === 'RLC') s.push('il')
   if (load === 'RC' || load === 'RLC') s.push('ic')
@@ -303,6 +328,7 @@ const TOPOLOGY_NAMES: Record<RectifierTopology, string> = {
   'half-wave': 'Half-wave rectifier',
   'center-tap': 'Full-wave center-tap rectifier',
   bridge: 'Full-wave bridge rectifier',
+  'semi-bridge': 'Single-phase semi-controlled bridge',
   '3ph-half-wave': 'Three-phase half-wave (3-pulse) rectifier',
   '3ph-bridge': 'Three-phase bridge (6-pulse) rectifier',
   '3ph-half-controlled': 'Three-phase half-controlled bridge',
@@ -329,7 +355,7 @@ export function rectifierModel(topology: RectifierTopology, load: LoadType): Cir
     ? topology === '3ph-half-wave'
       ? ['Da', 'Db', 'Dc']
       : ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']
-    : (['D1', 'D2', 'D3', 'D4'].slice(0, topology === 'half-wave' ? 1 : topology === 'center-tap' ? 2 : 4) as DiodeId[])
+    : (['D1', 'D2', 'D3', 'D4'].slice(0, topology === 'half-wave' ? 1 : topology === 'center-tap' ? 2 : 4) as DiodeId[]) // bridge and semi-bridge: 4
 
   const solveWith: CircuitModel<RectifierState>['solveWith'] = (p, state, t, h, combo) => {
     const b = built(p)
@@ -367,11 +393,11 @@ export function rectifierModel(topology: RectifierTopology, load: LoadType): Cir
         if (d.id !== 'Dfw') values[DIODE_SIGNALS[k]] = d.current
       })
     } else {
-      values.id = sol.diodes[0].current
-      if (sol.diodes.length > 1 && sol.diodes[1].id !== 'Dfw') {
-        values.vd2 = sol.diodes[1].voltage
-        values.id2 = sol.diodes[1].current
-      }
+      const devs = sol.diodes.filter((d) => d.id !== 'Dfw')
+      devs.forEach((d, k) => {
+        values[DIODE_SIGNALS[k]] = d.current
+      })
+      if (devs.length > 1) values.vd2 = devs[1].voltage
     }
     const fwd = sol.diodes.find((d) => d.id === 'Dfw')
     if (fwd) {
@@ -449,5 +475,37 @@ export function rectifierModel(topology: RectifierTopology, load: LoadType): Cir
       if (!best) throw new Error('No solvable diode combination')
       return { ...best, fallback: true }
     },
+  }
+}
+
+/**
+ * The source windings of a rectifier and how each winding's current follows from the device
+ * currents (KCL at its terminal). Used to compute the transformer secondary VA — and so the
+ * transformer utilization factor — from SIMULATED currents.
+ */
+export function sourceWindings(topology: RectifierTopology): Array<{ name: string; terms: Array<[DiodeId, number]> }> {
+  switch (topology) {
+    case 'half-wave':
+      return [{ name: 'secondary', terms: [['D1', 1]] }]
+    case 'center-tap':
+      return [
+        { name: 'upper half-winding', terms: [['D1', 1]] },
+        { name: 'lower half-winding', terms: [['D2', 1]] },
+      ]
+    case 'bridge':
+    case 'semi-bridge':
+      return [{ name: 'secondary', terms: [['D1', 1], ['D3', -1]] }]
+    case '3ph-half-wave':
+      return [
+        { name: 'phase a', terms: [['Da', 1]] },
+        { name: 'phase b', terms: [['Db', 1]] },
+        { name: 'phase c', terms: [['Dc', 1]] },
+      ]
+    default:
+      return [
+        { name: 'phase a', terms: [['D1', 1], ['D4', -1]] },
+        { name: 'phase b', terms: [['D3', 1], ['D6', -1]] },
+        { name: 'phase c', terms: [['D5', 1], ['D2', -1]] },
+      ]
   }
 }

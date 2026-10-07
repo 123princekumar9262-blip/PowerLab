@@ -1,4 +1,4 @@
-import { isThreePhase, type ResolvedParams } from '../../types/simulation.ts'
+import { isBridge, isThreePhase, type ResolvedParams } from '../../types/simulation.ts'
 import { extremes, simpson } from './numeric.ts'
 
 /**
@@ -37,6 +37,7 @@ export type MeasureKey =
   | 'ifwAvg'
   | 'ifwPeak'
   | 'fwConductionDeg'
+  | 'overlapDeg'
 
 export interface TheoryValue {
   value: number
@@ -79,11 +80,12 @@ export interface Waveform {
 /** Pulses per cycle (n) and the forward drop / resistance in the conduction path. */
 export function pathDrops(p: ResolvedParams) {
   // Any bridge puts two devices in series with the load.
-  const twoDevices = p.topology === 'bridge' || p.topology === '3ph-bridge' || p.topology === '3ph-half-controlled'
+  const twoDevices = isBridge(p.topology)
   const pulses: Record<ResolvedParams['topology'], number> = {
     'half-wave': 1,
     'center-tap': 2,
     bridge: 2,
+    'semi-bridge': 2,
     '3ph-half-wave': 3,
     '3ph-bridge': 6,
     // Half-controlled: with α > 0 the upper (fired) and lower (natural) halves no longer
@@ -106,6 +108,7 @@ export function pivAt(p: ResolvedParams, θ: number, vout: number, i: number): n
     case 'center-tap':
       return vout + Math.abs(vin) // −vD = vP − (±vin)
     case 'bridge':
+    case 'semi-bridge':
       // Conducting pair: the blocking pair sees vout + Vf + Ron·i. All OFF: each shares (vout + |vin|)/2.
       return i > 0 ? vout + p.diode.vf + p.diode.ron * i : (vout + Math.abs(vin)) / 2
     default:

@@ -1,6 +1,7 @@
-import { supportsFreewheel, type SimulationResult } from '../types/simulation.ts'
+import type { SimulationResult } from '../types/simulation.ts'
 import { measure, type Measurements } from './measurements.ts'
 import { theoryFor, type MeasureKey, type Theory } from './theory/index.ts'
+import { overlapAnalysis } from './overlap.ts'
 
 /**
  * Agreement expected between simulation and EXACT closed-form theory. With the auto
@@ -9,10 +10,13 @@ import { theoryFor, type MeasureKey, type Theory } from './theory/index.ts'
  */
 export const RELATIVE_TOLERANCE = 0.01
 
-export type RowGroup = 'Source' | 'Output' | 'Load current' | 'Diodes' | 'Freewheeling diode' | 'Inductor energy' | 'Timing' | 'Power'
+export type RowGroup = 'Source' | 'Output' | 'Load current' | 'Diodes' | 'Freewheeling diode' | 'Inductor energy' | 'Timing' | 'Commutation' | 'Power'
 
 /** Display order of the row groups (every group a row can belong to). */
-export const ROW_GROUPS: RowGroup[] = ['Source', 'Output', 'Load current', 'Diodes', 'Freewheeling diode', 'Inductor energy', 'Timing', 'Power']
+export const ROW_GROUPS: RowGroup[] = ['Source', 'Output', 'Load current', 'Diodes', 'Freewheeling diode', 'Inductor energy', 'Timing', 'Commutation', 'Power']
+
+/** μ is a short interval resolved by a first-order integrator: allow 3 % (it shrinks with Δt). */
+const OVERLAP_TOLERANCE = 0.03
 
 export interface ComparisonRow {
   key: MeasureKey
@@ -61,6 +65,7 @@ const ROWS: ReadonlyArray<{ key: MeasureKey; label: string; symbol: string; unit
   { key: 'conductionAngleDeg', label: 'D1 conduction angle', symbol: 'γ', unit: '°', group: 'Timing' },
   { key: 'turnOnAngleDeg', label: 'D1 turn-on angle', symbol: 'θon', unit: '°', group: 'Timing' },
   { key: 'turnOffAngleDeg', label: 'D1 turn-off / extinction', symbol: 'β', unit: '°', group: 'Timing' },
+  { key: 'overlapDeg', label: 'Commutation overlap', symbol: 'μ', unit: '°', group: 'Commutation' },
   { key: 'efficiency', label: 'Rectification efficiency', symbol: 'η', unit: '', group: 'Power' },
 ]
 
@@ -85,19 +90,23 @@ function simulatedValue(m: Measurements, key: MeasureKey, theory: number | null)
 export function compareWithTheory(result: SimulationResult): Comparison {
   const measurements = measure(result)
   const theory = theoryFor(result.params)
+  // Overlap theory needs the simulated Id during each commutation and holds only under its
+  // assumptions — otherwise the row shows the measured μ with the reason, never a fake 0 % error.
+  const ov = overlapAnalysis(result)
+  if (ov && ov.available && ov.theoryMu !== null) theory.values.overlapDeg = { value: ov.theoryMu, formula: ov.formula, kind: 'exact' }
   const p = result.params
   const continuous = measurements.rectCurrentMin === null ? null : measurements.rectCurrentMin > 0
   // Scale for absolute comparisons when the theoretical value is exactly zero.
   const zeroScale: Record<string, number> = { V: p.vm, A: p.vm / p.resistance, '°': 360, Hz: p.frequency, '': 1, J: 0.5 * p.inductance * (p.vm / p.resistance) ** 2 }
 
   const three = result.params.topology.startsWith('3ph')
-  // Current-ripple and inductor-energy rows belong to the circuits that offer a freewheeling
-  // diode (so with/without can be compared); the Dfw rows only when it is fitted.
-  const rippleRows = !three && supportsFreewheel(p.topology, p.load)
+  // Current-ripple and inductor-energy rows for single-phase RL loads (where the freewheeling
+  // diode and SCR control change them most); the Dfw rows only when it is fitted.
+  const rippleRows = !three && p.load === 'RL'
   const FW_KEYS: MeasureKey[] = ['ifwAvg', 'ifwPeak', 'fwConductionDeg']
   const RIPPLE_KEYS: MeasureKey[] = ['ioMin', 'ioRipplePP', 'ioRippleFactor', 'wlMax', 'wlMin']
   const defs = ROWS.filter((d) => (three ? d.key !== 'vinRms' : d.key !== 'vphRms' && d.key !== 'vllRms'))
-    .filter((d) => (FW_KEYS.includes(d.key) ? !three && p.control.freewheel : RIPPLE_KEYS.includes(d.key) ? rippleRows : true))
+    .filter((d) => (FW_KEYS.includes(d.key) ? !three && p.control.freewheel : RIPPLE_KEYS.includes(d.key) ? rippleRows : d.key === 'overlapDeg' ? three : true))
   const rows = defs.map((def): ComparisonRow => {
     const t = theory.values[def.key]
     const th = t?.value ?? null
@@ -105,6 +114,7 @@ export function compareWithTheory(result: SimulationResult): Comparison {
     const label = three && def.key === 'vinPeak' ? { label: 'Peak phase voltage', symbol: 'Vm' } : {}
     const base = { ...def, ...label, simulated: sim, theory: th, formula: t?.formula ?? null, kind: t?.kind ?? ('none' as const) }
     const noCompare = (skipped?: string): ComparisonRow => ({ ...base, error: null, errorIsAbsolute: false, withinTolerance: true, skipped })
+    if (def.key === 'overlapDeg' && th === null) return noCompare(ov?.reasons[0] ?? 'Overlap theory comparison unavailable for this operating condition.')
     if (th === null || sim === null) return noCompare()
     if (t?.kind === 'approx') return noCompare('approximation — shown for reference, not checked')
     // Steady-state formulas are only comparable once the transient has died out.
@@ -113,9 +123,26 @@ export function compareWithTheory(result: SimulationResult): Comparison {
     // Near-zero theoretical values (e.g. Vo,min touching 0 at a commutation) make relative
     // error meaningless: compare absolutely, within 1 % of the quantity's full scale.
     const scale = zeroScale[def.unit] ?? 1
-    const errorIsAbsolute = Math.abs(th) < 0.05 * scale
+    // μ is always compared relatively (a few degrees is not "near zero" for an overlap angle).
+    const errorIsAbsolute = def.key !== 'overlapDeg' && Math.abs(th) < 0.05 * scale
     const error = errorIsAbsolute ? sim - th : (sim - th) / Math.abs(th)
-    const tol = errorIsAbsolute ? (th === 0 && def.unit !== 'V' && def.unit !== 'A' ? 1e-6 * scale : RELATIVE_TOLERANCE * scale) : RELATIVE_TOLERANCE
+    let tol = errorIsAbsolute ? (th === 0 && def.unit !== 'V' && def.unit !== 'A' ? 1e-6 * scale : RELATIVE_TOLERANCE * scale) : RELATIVE_TOLERANCE
+    // Ill-conditioned rows: the integration error of an average scales with the waveform's
+    // amplitude (Vm), not with the (small) average itself. When Vdc is a small difference of large
+    // areas (large α, strongly inductive load) allow 0.2 % of Vm in Vdc, and propagate that to the
+    // ripple factor (δRF/RF ≈ (RF² + 1)/RF² · δVdc/Vdc).
+    const vdcAbs = 0.002 * p.vm
+    const vdc = Math.abs(theory.values.voutAvg?.value ?? 0)
+    if (def.key === 'voutAvg' && !errorIsAbsolute) tol = Math.max(tol, vdcAbs / Math.abs(th))
+    if (def.key === 'rippleFactor' && vdc > 0) tol = Math.max(tol, ((th * th + 1) / (th * th)) * (vdcAbs / vdc))
+    if (def.key === 'overlapDeg') tol = OVERLAP_TOLERANCE
+    // Current extremes and ripple are small differences of a large waveform: their integration
+    // error scales with the current amplitude (Vm/R), not with the small value itself.
+    const iScale = zeroScale.A
+    const absTol = (abs: number) => (errorIsAbsolute ? Math.max(tol, abs) : Math.max(tol, abs / Math.abs(th)))
+    if (def.key === 'ioMin' || def.key === 'ioRipplePP') tol = absTol(0.005 * iScale)
+    if (def.key === 'ioRippleFactor') tol = absTol(0.005)
+    if (def.key === 'wlMin') tol = absTol(0.01 * zeroScale.J)
     return { ...base, error, errorIsAbsolute, withinTolerance: Math.abs(error) <= tol }
   })
 

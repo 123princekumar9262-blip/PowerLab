@@ -16,10 +16,13 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
   Diodes or SCRs with firing angle α = 0–180°, an optional freewheeling diode, source R/L
   (commutation overlap), and fault injection.
 
-- **Freewheeling diode** (half-wave + RL): toggle Dfw ON/OFF and compare the two circuits side by side.
+- **Single-phase controlled rectifiers**: half-wave controlled, semi-controlled bridge (2 SCRs + 2 diodes) and fully controlled bridge, with firing angle α = 0–180°.
+- **Freewheeling diode** on every single-phase rectifier (half-wave, center-tap, bridge; R, RL, RLC) and every three-phase one.
+- **Commutation overlap μ** (three-phase, source inductance Ls): measured from the switching events, compared with the overlap relation when its assumptions hold.
+- **Compare** mode: two rectifiers simulated side by side on a declared basis (same Vph, same VLL, same output or input power).
 
-Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 406 unit tests pass, along with
-three browser smoke suites (56 single-phase, 40 three-phase and 29 freewheeling-diode checks).
+Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 426 unit tests pass, along with
+four browser smoke suites (56 single-phase, 40 three-phase, 29 freewheeling-diode and 36 controlled/compare checks).
 
 ## Run it
 
@@ -32,7 +35,8 @@ npm test             # physics / theory / limits / lessons / challenges (Vitest)
 npm run build        # type-check + production build into dist/
 npm run smoke        # browser smoke tests — need the dev server on port 5199:
 npm run smoke3       #   npm run dev -- --port 5199     (then, in another terminal)
-npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw
+npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw && npm run smoke-ctl
+npm run smoke-ctl
 ```
 
 The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
@@ -59,7 +63,7 @@ changes when you open or close a panel.
 - **What do you want to study?** (above the circuit) sets things up for you: channels, view, highlighting and the panel. Choices include how the diodes switch, how the output is formed, the load current, the firing angle, energy flow, measurements and theory.
 - **Primary view**: **Waveforms**, **Angle view** (three-phase), **Events**, or **With / without Dfw** (freewheel circuit), one at a time.
 - **Channels**: presets **Basic · Diode analysis · Load analysis · Power electronics · Everything**, or pick channels one by one with **+ Add channel**. Click a channel chip to hide it.
-- **Parameters**: Basic shows V, f and R. **Advanced parameters** holds load elements (L, C), devices (diode model, Vf, Ron, SCRs and α, freewheeling diode), source (φ, sequence, Rs, Ls) and simulation settings. It opens by itself when a challenge unlocks a field inside it.
+- **Parameters**: Basic shows V, f and R (plus the firing angle α for a controlled rectifier). **Advanced parameters** holds load elements (L, C), devices (diode model, Vf, Ron, diodes/SCRs, freewheeling diode), source (φ, sequence, Rs, Ls) and simulation settings. It opens by itself when a challenge unlocks a field inside it.
 - Drawers are non-modal: the cursor and playback keep working behind them, and **Esc** closes them.
 
 | Control | Action |
@@ -74,10 +78,24 @@ changes when you open or close a panel.
 | Step size: Event · 15° · Δt | next detected event · next 15° of θ · one timestep |
 | Speed 0.25×–4× | 1× = one source cycle every 4 s (slow motion) |
 
+### Controlled rectifiers (SCRs)
+
+The rectifier picker has two groups: **Diode** and **Controlled (SCR)**. Single-phase controlled options are
+**Half-wave controlled**, **Semi-controlled** (T1, T2 on top, D3, D4 below) and **Fully controlled** (T1–T4); three-phase adds
+**3-pulse controlled**, **Half-controlled** and **Fully controlled bridge**. The firing angle α becomes a main parameter.
+
+An SCR is the same netlist diode element with a gate: it turns ON only while forward biased **and** gated, then latches
+until its current falls to zero. Gate pulses are synchronised to the source: each SCR is fired α after its natural turn-on
+point (single-phase pulses last to the end of the half-cycle; three-phase pulses are 120° wide). Nothing is scheduled: the
+solver decides every switching instant.
+
+The **Why** tab of a controlled rectifier adds a **Firing angle α** panel. It shows the measured conduction start, Vdc, and
+the same circuit simulated at α = 0 for reference, plus **Why is the SCR OFF?** and **Why did it turn ON now?**.
+
 ### Freewheeling diode
 
-Choose **Half-wave** + **RL** and press **Freewheeling diode: OFF** in the bench bar (or the
-toggle under Parameters). Dfw is a real circuit element across the load, with its anode on the − output and its
+Choose any single-phase rectifier with an R, RL or RLC load and press **Freewheeling diode: OFF**
+in the bench bar (or the toggle under Advanced parameters → Devices). Dfw is a real circuit element across the load, with its anode on the − output and its
 cathode on the + output. Nothing about its behaviour is scripted: the solver decides at every step whether it conducts.
 
 - **Freewheeling diode card** (State tab): Dfw ON/OFF with its bias, current and voltage, plus Vin,
@@ -98,6 +116,34 @@ cathode on the + output. Nothing about its behaviour is scripted: the solver dec
 The architecture is reusable: `supportsFreewheel(topology, load)` in `types/simulation.ts` is the only
 rule deciding which circuits accept Dfw. The netlist, solver, events, measurements and explanations are generic
 (the three-phase rectifiers already use the same element).
+
+### Commutation overlap μ (three-phase)
+
+Set **Source inductance Ls** (Advanced parameters → Source). The overlap then appears naturally: for μ degrees two devices
+of the same group conduct together. Measurements → **Commutation / μ** (or *What do you want to study? → Commutation
+overlap μ*) shows:
+
+- **Measured μ** = θ(outgoing device turns OFF) − θ(incoming device turns ON), from the simulation's events.
+- **Theoretical μ** from cos α − cos(α + μ) = 2ωLs·Id/(√6·Vph), solved numerically, with Id taken from the
+  simulated current during each commutation.
+- The difference, every commutation with its current transfer, and the assumptions. When an assumption fails (Rs > 0,
+  Ron > 0, a fault, a strongly varying current, Ls = 0) the comparison says *unavailable* and why — never a 0 % error.
+
+The scope shades each overlap in amber, and the Events view lists *commutation begins* and *fully conducting*
+next to the natural commutation points.
+
+### Compare mode
+
+**Compare** (top navigation) is its own lab: choose rectifier A and B (only implemented ones are offered) and a
+**comparison basis**: same phase RMS voltage, same line-to-line RMS voltage, same output power or same input power. The
+power bases re-simulate B until it matches. Load, R, L, C, f, devices and α are held constant and listed.
+
+**Run comparison** simulates both. The results open with summary cards, then tabs: **Output, Current, Power, Stress,
+Rectification**. Every value is computed from the two simulations and tagged *Simulated*. The only exception is the textbook
+TUF, tagged *Theoretical* and shown only for ideal diodes with an R load. The simulated TUF uses the secondary VA from the
+simulated winding currents. Below the tabs: **Why do they differ?** (generated from the results), **Compare waveforms**
+(Overlay / Separate / Difference) and **Which should I choose?** (low ripple, high power, battery charging, motor drive,
+general supply), each with its trade-offs.
 
 ### Three-phase section
 
@@ -149,13 +195,16 @@ src/
     params.ts                defaults, limits, sanitizeParams (validation → SI units)
     source.ts                vin(t) = Vm·sin(ωt + φ); threePhaseSource (sequence, imbalance)
     engine.ts                time stepping with exact switching instants, event detection
+    commutation.ts           commutation intervals (start/end events, measured μ) — one detector for engine and measurements
   solvers/
     linear.ts                dense Gaussian elimination (singular ⇒ impossible diode combination)
     rootFinding.ts           bisection, golden-section search
   circuits/
     netlist.ts               MNA solver: R, L, C (backward Euler), sources, PWL diodes, SCRs, faults,
                              floating-network reference
-    rectifier.ts             builds any topology × load (single- and three-phase); assumed-state search
+    rectifier.ts             builds any topology × load (single- and three-phase); assumed-state search;
+                             shared SCR gate pulses; source windings (for TUF)
+    devices.ts               which devices are SCRs, display names (T1…, D1…)
     circuitModel.ts          CircuitModel interface
     registry.ts              topologies, loads, model cache
   measurements/
@@ -163,7 +212,10 @@ src/
     theory/index.ts          dispatch; single-phase closed-form theory per load (+ approximations)
     theory/waveform.ts       shared: analytic waveform → measurements by quadrature
     theory/threePhase.ts     three-phase theory: envelopes, firing angle, periodic RL, overlap approx.
-    theory/freewheel.ts      half-wave RL + freewheeling diode: closed-form periodic solution
+    theory/freewheel.ts      RL with a clamp path (freewheeling diode / semi-controlled leg), any α
+    theory/controlled.ts     single-phase controlled RL (half-wave, center-tap, fully controlled bridge)
+    overlap.ts               commutation overlap μ: measured vs the overlap relation, with assumptions
+    formulaNotes.ts          concept + explanation per compared quantity
     compare.ts               simulation vs theory, tolerance, steady-state gating
   explanations/
     concise.ts               short WHY (5 steps), current-path card, state line
@@ -172,6 +224,7 @@ src/
     freewheel.ts             freewheeling diode: mode, why Dfw is ON/OFF, freewheel intervals, step-through
     lens.ts                  Physics Lens stages built from the same explanation (10 for the freewheel circuit)
   inspect/                   Inspect mode: one component's values from the trace
+  compare/                   Compare mode: two simulations on a declared basis, metrics, why/advice
   experiment/                before/after snapshots, measured differences, WHY per change, freewheel experiments
   reverse/                   reverse-engineering tasks (hidden circuit)
   learning/                  lessons (Phase 8), facts read from the simulation, cursor targets
@@ -181,14 +234,15 @@ src/
   state/                     reducer, playback, stepping, mode logic (useModes)
   components/                Header, CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
                              ChannelBar, FreewheelPanel, CompareView, StepThrough, ui/Drawer,
-                             panels/* (State, Why, Learn, Path, Inspect, Measurements, Theory, Events),
-                             PhysicsLens, Scope, Transport, StatePanel, EnergyPanel, ParameterPanel,
-                             MeasurementTable, EventPanels, modes/*
+                             panels/* (State, Why, Learn, Path, Inspect, Measurements, Theory, Events,
+                             Firing, Overlap), compare/CompareLab, PhysicsLens, Scope, Transport,
+                             EnergyPanel, ParameterPanel, MeasurementTable, EventPanels, modes/*
   styles/index.css           design tokens + layout
-tests/                       Vitest suites (physics, theory, limits, three-phase, modes, lessons, challenges)
+tests/                       Vitest suites (physics, theory, limits, three-phase, controlled, freewheel, compare, UI, modes)
 scripts/smoke.mjs            Playwright end-to-end check (single-phase)
 scripts/smoke3.mjs           Playwright end-to-end check (three-phase)
 scripts/smoke-fw.mjs         Playwright end-to-end check (freewheeling diode)
+scripts/smoke-ctl.mjs        Playwright end-to-end check (controlled rectifiers, μ, Compare)
 docs/simulation.md           the mathematical model
 ```
 
@@ -279,6 +333,8 @@ Circuits are netlists. To add, say, a half-wave rectifier with a freewheeling di
 Freewheeling-diode feature (phases 1–10): topology, switching, RL validation, current-path animation,
 waveforms, WHY engine, energy view, with/without comparison, prediction/experiments, tests. ✅
 
-Possible next steps: a freewheeling diode for the other single-phase rectifiers (one line in
-`supportsFreewheel`, plus their theory), single-phase controlled rectifiers, a closed-form theory for commutation
+Controlled single-phase rectifiers, single-phase freewheeling, measured commutation overlap and
+Compare mode: ✅
+
+Possible next steps: a back-EMF load (battery, DC motor), a closed-form theory for commutation
 overlap (it is shown only as an approximation now), and twelve-pulse arrangements.

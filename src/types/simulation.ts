@@ -14,18 +14,23 @@
  * Three-phase: 3-pulse midpoint (half-wave), 6-pulse bridge, and the half-controlled
  * bridge (upper SCRs, lower diodes). Diode or SCR devices are chosen by `control.device`.
  */
-export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge' | '3ph-half-wave' | '3ph-bridge' | '3ph-half-controlled'
+export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge' | 'semi-bridge' | '3ph-half-wave' | '3ph-bridge' | '3ph-half-controlled'
+
+/** Topologies whose definition includes SCRs (they are always controlled). */
+export const alwaysControlled = (t: RectifierTopology) => t === 'semi-bridge' || t === '3ph-half-controlled'
+/** Bridges: two devices in every conduction path. */
+export const isBridge = (t: RectifierTopology) => t === 'bridge' || t === 'semi-bridge' || t === '3ph-bridge' || t === '3ph-half-controlled'
 
 export const THREE_PHASE_TOPOLOGIES: readonly RectifierTopology[] = ['3ph-half-wave', '3ph-bridge', '3ph-half-controlled']
 export const isThreePhase = (t: RectifierTopology) => t.startsWith('3ph')
 
 /**
  * Circuits that accept a freewheeling diode across the load (anode on the − output,
- * cathode on the + output). Every three-phase rectifier, and the single-phase half-wave
- * rectifier with an RL load. Extending the feature to another circuit only needs this rule:
+ * cathode on the + output): every three-phase rectifier, and every single-phase rectifier
+ * except with a capacitor-input (RC) filter, where the capacitor already holds the output up. Extending the feature to another circuit only needs this rule:
  * the netlist, solver, events, measurements and explanations are already generic.
  */
-export const supportsFreewheel = (t: RectifierTopology, load: LoadType) => isThreePhase(t) || (t === 'half-wave' && load === 'RL')
+export const supportsFreewheel = (t: RectifierTopology, load: LoadType) => isThreePhase(t) || load !== 'RC'
 
 /** Fault injection for the three-phase experiments. */
 export interface FaultSpec {
@@ -296,6 +301,10 @@ export type EventKind =
   | 'current-transfer'
   /** Local minimum of the energy stored in the inductor. */
   | 'energy-min'
+  /** Three-phase commutation overlap: incoming device starts sharing the current… */
+  | 'commutation-start'
+  /** …and the outgoing device's current reaches zero (the incoming one conducts fully). */
+  | 'commutation-end'
 
 /** An automatically detected event, located to sub-timestep precision. */
 export interface CircuitEvent {

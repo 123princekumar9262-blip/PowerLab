@@ -6,7 +6,7 @@ import type { ChannelPreset } from '../visualization/presets.ts'
 import type { StepMode } from './stepping.ts'
 import { loadJSON, saveJSON } from '../utils/storage.ts'
 
-export type AppMode = 'lab' | 'learn' | 'experiment' | 'predict' | 'challenge' | 'reverse'
+export type AppMode = 'lab' | 'learn' | 'experiment' | 'predict' | 'challenge' | 'reverse' | 'compare'
 
 /** Single-phase or three-phase rectifiers. Each section keeps its own parameter set. */
 export type Section = 'single' | 'three'
@@ -121,6 +121,8 @@ export type LabAction =
   | { type: 'setSection'; section: Section }
   | { type: 'setLens'; stage: number | null }
   | { type: 'chooseTopology'; topology: RectifierTopology }
+  /** Pick a rectifier from the catalog: its topology AND its switching devices (diodes / SCRs). */
+  | { type: 'chooseRectifier'; topology: RectifierTopology; device: 'diode' | 'scr' }
   | { type: 'chooseLoad'; load: LoadType }
   | { type: 'run'; cursorTime: number }
   | { type: 'setParams'; params: LabParams }
@@ -187,6 +189,17 @@ export function labReducer(state: LabState, action: LabAction): LabState {
     case 'setLens':
       // The Physics Lens lives in the WHY tab (or the WHY drawer in focus mode).
       return action.stage === null ? { ...state, lensStage: null } : { ...state, lensStage: action.stage, rightTab: state.focus ? state.rightTab : 'why', drawer: state.focus ? { kind: 'why' } : state.drawer }
+    case 'chooseRectifier': {
+      const ctl = state.params.control ?? { device: 'diode' as const, alphaDeg: 30, freewheel: false }
+      return {
+        ...state,
+        topology: action.topology,
+        params: { ...state.params, control: { ...ctl, device: action.device, alphaDeg: ctl.alphaDeg ?? 30 } },
+        selectedEventGroupId: null,
+        viewport: null,
+        drawer: state.drawer?.kind === 'inspect' ? null : state.drawer,
+      }
+    }
     case 'chooseTopology':
       return { ...state, topology: action.topology, selectedEventGroupId: null, viewport: null, drawer: state.drawer?.kind === 'inspect' ? null : state.drawer }
     case 'chooseLoad':

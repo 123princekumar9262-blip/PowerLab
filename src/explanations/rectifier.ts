@@ -4,6 +4,8 @@ import type { CircuitEvent, DiodeBias, DiodeId, SimulationResult, SimulationSamp
 import { formatA, formatDeg, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
 import { trendAt, type Trend } from './trend.ts'
 import type { FreewheelInsight } from './freewheel.ts'
+import { firingInsight, type FiringInsight } from './firing.ts'
+import { deviceName } from '../circuits/devices.ts'
 
 /** Stages of the causal chain, in the order the physics happens. */
 export type CausalStage = 'source' | 'condition' | 'diode' | 'inductor' | 'freewheel' | 'path' | 'energy' | 'output' | 'waveform'
@@ -61,6 +63,10 @@ export interface StateExplanation {
   threePhase?: ThreePhaseInsight
   /** Freewheeling-diode circuits: Dfw state, inductor energy, why Dfw is ON/OFF. */
   freewheel?: FreewheelInsight
+  /** Controlled rectifiers: each SCR's state, why it is OFF, why it turned ON. */
+  firing?: FiringInsight
+  /** Display name per device id (SCRs are T1, T2…). */
+  names?: Record<string, string>
 }
 
 const V = (v: number) => formatV(v)
@@ -96,6 +102,8 @@ export function explainState(result: SimulationResult, index: number): StateExpl
   const vC = hasC ? vout : 0
   const on = s.diodes.filter((d) => d.on).map((d) => d.id)
   const anyOn = on.length > 0
+  const nm = (id: string) => deviceName(p, id as DiodeId)
+  const fire = firingInsight(result, s)
 
   // Trends from neighbouring samples
   const vinTrend = trendAt(trace.time, trace.signals.vin!, i, p.omega * p.vm)
@@ -119,18 +127,18 @@ export function explainState(result: SimulationResult, index: number): StateExpl
   if (topo === 'bridge') sourceText += ` Bridge terminal "a" is ${polarity === 'negative' ? 'negative' : 'positive'} with respect to "b".`
 
   // ── Which diodes conduct, and why ──────────────────────────────────────────────
-  const pairText = on.length === 0 ? 'no diode' : on.join(' and ')
+  const pairText = on.length === 0 ? (fire ? 'no device' : 'no diode') : on.map(nm).join(' and ')
   let conditionText = ''
   let pathNodes: string[] | null = null
   const loadNode = load === 'R' ? 'R' : load === 'RL' ? 'L → R' : load === 'RC' ? 'C ∥ R' : 'L → C ∥ R'
 
   if (anyOn) {
-    if (topo === 'half-wave') pathNodes = ['Source (+)', 'D1', ...loadNode.split(' → '), 'Source (−)']
-    else if (topo === 'center-tap') pathNodes = on.includes('D1') ? ['Upper winding (+vin)', 'D1', ...loadNode.split(' → '), 'Center tap'] : ['Lower winding (−vin)', 'D2', ...loadNode.split(' → '), 'Center tap']
-    else if (on.length === 4) pathNodes = ['Load', 'D3 ∥ D4', 'D1 ∥ D2', 'Load (freewheeling)']
-    else if (on.includes('D1') && on.includes('D3')) pathNodes = ['Load', 'D3', 'D1', 'Load (freewheeling)']
-    else if (on.includes('D2') && on.includes('D4')) pathNodes = ['Load', 'D4', 'D2', 'Load (freewheeling)']
-    else pathNodes = on.includes('D1') ? ['Terminal a (+)', 'D1', ...loadNode.split(' → '), 'D4', 'Terminal b'] : ['Terminal b (+)', 'D2', ...loadNode.split(' → '), 'D3', 'Terminal a']
+    if (topo === 'half-wave') pathNodes = ['Source (+)', nm('D1'), ...loadNode.split(' → '), 'Source (−)']
+    else if (topo === 'center-tap') pathNodes = on.includes('D1') ? ['Upper winding (+vin)', nm('D1'), ...loadNode.split(' → '), 'Center tap'] : ['Lower winding (−vin)', nm('D2'), ...loadNode.split(' → '), 'Center tap']
+    else if (on.length === 4) pathNodes = ['Load', `${nm('D3')} ∥ ${nm('D4')}`, `${nm('D1')} ∥ ${nm('D2')}`, 'Load (freewheeling)']
+    else if (on.includes('D1') && on.includes('D3')) pathNodes = ['Load', nm('D3'), nm('D1'), 'Load (freewheeling)']
+    else if (on.includes('D2') && on.includes('D4')) pathNodes = ['Load', nm('D4'), nm('D2'), 'Load (freewheeling)']
+    else pathNodes = on.includes('D1') ? ['Terminal a (+)', nm('D1'), ...loadNode.split(' → '), nm('D4'), 'Terminal b'] : ['Terminal b (+)', nm('D2'), ...loadNode.split(' → '), nm('D3'), 'Terminal a']
   } else if (hasC && Math.abs(io) > 0) {
     pathNodes = ['C (discharging)', 'R', 'C']
   }
@@ -166,9 +174,15 @@ export function explainState(result: SimulationResult, index: number): StateExpl
     }
   }
 
+  // Controlled rectifiers: the SCR's own conditions (forward bias AND gate) decide.
+  if (fire) {
+    const diodesText = s.diodes.filter((d) => d.id !== 'Dfw' && !fire.scrs.some((x) => x.id === d.id)).map((d) => `${nm(d.id)} ${d.on ? 'ON' : 'OFF'} (diode, vD = ${V(d.voltage)})`)
+    conditionText = [...fire.scrs.map((x) => x.text), diodesText.length ? `Diodes: ${diodesText.join('; ')}.` : ''].filter(Boolean).join(' ') + (lHolding ? ` ${conditionText}` : '')
+  }
+
   // ── DIODE ──────────────────────────────────────────────────────────────────────
   const biasLabel = (b: DiodeBias) => (b === 'forward-conducting' ? 'conducting' : b === 'forward-below-threshold' ? 'forward, below Vf' : b === 'reverse' ? 'reverse biased' : 'zero bias')
-  const diodeText = s.diodes.map((d) => `${d.id} ${d.on ? 'ON' : 'OFF'} (${biasLabel(d.bias)}, vD = ${V(d.voltage)})`).join('; ') + '.'
+  const diodeText = s.diodes.map((d) => `${nm(d.id)} ${d.on ? 'ON' : 'OFF'} (${biasLabel(d.bias)}, vD = ${V(d.voltage)})`).join('; ') + '.'
   const blockMax = Math.max(0, ...s.diodes.filter((d) => !d.on).map((d) => -d.voltage))
   const diodeDetail = anyOn
     ? `${diodeText} A conducting ${ideal ? 'ideal diode is a closed switch (vD = 0)' : `real diode holds about Vf${p.diode.ron > 0 ? ' + Ron·iD' : ''}`}.` + (blockMax > 0 ? ` The blocking diode(s) hold up to ${V(-blockMax)} in reverse.` : '')
@@ -245,11 +259,15 @@ export function explainState(result: SimulationResult, index: number): StateExpl
   } else if (hasC && Math.abs(io) > 0) {
     headline = 'All diodes OFF — the capacitor feeds the load'
     summary = `The capacitor voltage (${V(vC)}) is above what the source can reach through the diodes, so they block. C supplies R: Vout decays from its peak — the ripple.`
+  } else if (fire && fire.scrs.some((x) => x.state === 'blocking-forward')) {
+    const x = fire.scrs.find((y) => y.state === 'blocking-forward')!
+    headline = `${x.name} OFF — forward biased, waiting for its gate (α = ${formatDeg(fire.alphaDeg)})`
+    summary = `${x.name} has vAK = ${V(x.voltage)} across it but has not been fired yet: an SCR blocks forward voltage until its gate pulse arrives, α = ${formatDeg(fire.alphaDeg)} after its natural point. Until then Io = ${formatA(io)}, Vout = ${V(vout)}.`
   } else if (topo === 'half-wave' && s.bias === 'forward-below-threshold') {
     headline = 'D1 OFF — Vin is below Vf'
     summary = `Vin is positive (${V(vin)}) but below the diode's forward voltage Vf = ${vfText}, so the diode cannot conduct yet. Io = 0, Vout = ${V(vout)}.`
   } else {
-    headline = polarity === 'negative' && topo === 'half-wave' ? 'D1 OFF — reverse biased, blocking' : 'All diodes OFF — no current'
+    headline = polarity === 'negative' && topo === 'half-wave' ? `${nm('D1')} OFF — reverse biased, blocking` : fire ? 'All devices OFF — no current' : 'All diodes OFF — no current'
     summary =
       polarity === 'negative' && topo === 'half-wave'
         ? `Vin is negative (${V(vin)}), so the diode is reverse biased. It blocks current, therefore Io = 0 and the output voltage is 0 V; the diode itself holds the full ${V(s.vd)}.`
@@ -263,6 +281,8 @@ export function explainState(result: SimulationResult, index: number): StateExpl
     source: { polarity, trend: vinTrend, text: sourceText },
     diode: { on: s.diodes[0].on, bias: s.diodes[0].bias, text: diodeDetail },
     diodes: s.diodes.map((d) => ({ id: d.id, on: d.on, bias: d.bias })),
+    firing: fire ?? undefined,
+    names: Object.fromEntries(s.diodes.map((d) => [d.id, nm(d.id)])),
     current: { flowing: anyOn || Math.abs(io) > 0, trend: currentTrend, text: pathText },
     output: { conducting: Math.abs(io) > 0, text: outputText },
     path: pathNodes,
@@ -300,11 +320,16 @@ const EVENT_TITLES: Record<CircuitEvent['kind'], string> = {
   'phase-crossing': 'Phase voltages cross',
   'current-transfer': 'takes over the current',
   'energy-min': 'Inductor energy minimum',
+  'commutation-start': 'commutation begins',
+  'commutation-end': 'fully conducting (commutation ends)',
 }
 
-export function eventTitle(e: CircuitEvent): string {
-  return e.device ? `${e.device} ${EVENT_TITLES[e.kind]}` : EVENT_TITLES[e.kind]
+/** Event title; `names` maps device ids to display names (SCRs shown as T1…). */
+export function eventTitle(e: CircuitEvent, names?: Record<string, string>): string {
+  return e.device ? `${names?.[e.device] ?? e.device} ${EVENT_TITLES[e.kind]}` : EVENT_TITLES[e.kind]
 }
+
+const isScrDev = (p: SimulationResult['params'], id: DiodeId) => deviceName(p, id) !== id
 
 /** Explain a detected event using the circuit solution at the event instant. */
 export function explainEvent(result: SimulationResult, e: CircuitEvent): EventExplanation {
@@ -322,8 +347,15 @@ export function explainEvent(result: SimulationResult, e: CircuitEvent): EventEx
   const vft = topo === 'bridge' ? 2 * vf : vf
   const partner = topo === 'bridge' ? (e.device === 'D1' ? ' together with D4' : e.device === 'D2' ? ' together with D3' : e.device === 'D4' ? ' together with D1' : e.device === 'D3' ? ' together with D2' : '') : ''
 
+  const scrEvent = e.device ? isScrDev(p, e.device) : false
   switch (e.kind) {
     case 'diode-on':
+      if (scrEvent)
+        return {
+          title: `${deviceName(p, e.device!)} fired — turns ON`,
+          what: `${deviceName(p, e.device!)} starts conducting ${at}. Vin = ${formatV(v.vin ?? 0)}.`,
+          why: `An SCR needs two things: forward bias AND a gate pulse. Its gate is fired α = ${formatDeg((p.control.alpha * 180) / Math.PI)} after its natural point; it was forward biased then, so it latched ON${(v.io ?? 0) > 1e-9 ? ' and took over the load current from the previous devices' : ''}.`,
+        }
       return {
         title,
         what: `${e.device} switches from blocking to conducting${partner} ${at}. Vin = ${formatV(v.vin ?? 0)}${hasC ? `, Vout = ${formatV(v.vout ?? 0)}` : ''}.`,
@@ -408,6 +440,9 @@ export function explainEvent(result: SimulationResult, e: CircuitEvent): EventEx
       }
     case 'energy-min':
       return { title, what: `The energy stored in L reaches a minimum, ½·L·i² = ${formatSI(v.wl ?? 0, 'J')}, ${at}.`, why: 'Here the inductor stops giving energy back and starts storing it again — the load current is at its lowest.' }
+    case 'commutation-start':
+    case 'commutation-end':
+      return { title, what: `${title} ${at}.`, why: 'Commutation overlap: source inductance makes the current transfer between devices take time.' }
     case 'vout-max':
       return {
         title,

@@ -11,13 +11,15 @@ interface Props {
   onLens: () => void
   /** The Physics Lens, when it is open (it replaces the short answer). */
   lens: ReactNode
+  /** Circuit-specific panel shown under the short answer (e.g. the firing angle α). */
+  extra?: ReactNode
 }
 
 /**
  * WHY IS THIS HAPPENING? — five short steps (source → decision → path → output → load) with
  * the simulated values; the full causal chain only on request.
  */
-export function WhyPanel({ result, ex, detailed, onToggleDetailed, onLens, lens }: Props) {
+export function WhyPanel({ result, ex, detailed, onToggleDetailed, onLens, lens, extra }: Props) {
   const steps = useMemo(() => conciseWhy(result, ex), [result, ex])
   if (lens) return <>{lens}</>
   const fi = ex.freewheel
@@ -34,6 +36,7 @@ export function WhyPanel({ result, ex, detailed, onToggleDetailed, onLens, lens 
           </li>
         ))}
       </ol>
+      {extra}
       <div className="why-actions">
         <button className="text-btn" aria-expanded={detailed} aria-controls="why-chain" onClick={onToggleDetailed}>
           {detailed ? 'Hide detailed explanation' : 'Show detailed explanation'}

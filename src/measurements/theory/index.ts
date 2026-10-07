@@ -2,7 +2,8 @@ import { isThreePhase, type ResolvedParams } from '../../types/simulation.ts'
 import { bisectRoot, firstRoot } from './numeric.ts'
 import { deg, finish, fromWaveform, none, pathDrops, pivAt, TWO_PI, type Theory, type Waveform } from './waveform.ts'
 import { threePhaseTheory } from './threePhase.ts'
-import { freewheelTheory } from './freewheel.ts'
+import { freewheelTheory, NOT_APPLICABLE } from './freewheel.ts'
+import { controlledRL } from './controlled.ts'
 
 export type { MeasureKey, Theory, TheoryValue } from './waveform.ts'
 
@@ -26,30 +27,39 @@ function resistive(p: ResolvedParams): Theory {
   const k = R / (R + ront)
   const ideal = p.diode.kind === 'ideal'
   if (!(vm > vft)) return none(p, ['The source peak never exceeds the diode drop: no conduction, all outputs are zero.'])
+  const scr = p.control.device === 'scr'
+  const α = scr ? p.control.alpha : 0
   const θ1 = Math.asin(vft / vm)
   const θ2 = Math.PI - θ1
-  // One pulse (θ₁..θ₂) per half period; i = (Vm·sinθ − Vft)/(R + Ront), vo = R·i.
+  // SCRs: conduction starts at the later of the firing angle and the forward-bias angle θ₁.
+  const θs = Math.max(θ1, α)
+  if (θs >= θ2) return none(p, [`The SCRs are fired at α = ${deg(α).toFixed(1)}°, when the source can no longer forward bias them: no conduction.`])
+  // One pulse (θs..θ₂) per half period; i = (Vm·sinθ − Vft)/(R + Ront), vo = R·i.
   const pulse = (θ: number) => {
     const t = ((θ % TWO_PI) + TWO_PI) % TWO_PI
     const u = n === 2 ? Math.abs(Math.sin(t)) : Math.sin(t)
     const half = n === 2 ? t % Math.PI : t
-    if (half <= θ1 || half >= θ2) return 0
+    if (half <= θs || half >= θ2) return 0
     return Math.max(0, (vm * u - vft) / (R + ront))
   }
   const w: Waveform = {
     a: 0,
-    breaks: [θ1, θ2, Math.PI, Math.PI + θ1, Math.PI + θ2],
+    breaks: [θs, θ2, Math.PI, Math.PI + θs, Math.PI + θ2],
     vout: (θ) => R * pulse(θ),
     io: pulse,
     iD1: (θ) => (Math.sin(θ) > 0 ? pulse(θ) : 0),
     irect: pulse,
     piv: (θ) => pivAt(p, θ, R * pulse(θ), pulse(θ)),
-    turnOn: θ1,
+    turnOn: θs,
     turnOff: θ2,
   }
   const fw = n === 2
   const vals = fromWaveform(p, w, {
-    voutAvg: ideal ? (fw ? 'Vdc = 2Vm/π' : 'Vdc = Vm/π') : `Vdc = ${fw ? '' : '½·'}k/π·[2Vm·cosθ₁ − Vft(π − 2θ₁)]`,
+    voutAvg: scr
+      ? ideal
+        ? fw ? 'Vdc = (Vm/π)·(1 + cos α)' : 'Vdc = (Vm/2π)·(1 + cos α)'
+        : `Vdc = ${fw ? '' : '½·'}k/π·[Vm·(cosθs + cosθ₁) − Vft(π − θ₁ − θs)],  θs = max(α, θ₁)`
+      : ideal ? (fw ? 'Vdc = 2Vm/π' : 'Vdc = Vm/π') : `Vdc = ${fw ? '' : '½·'}k/π·[2Vm·cosθ₁ − Vft(π − 2θ₁)]`,
     voutRms: ideal ? (fw ? 'Vo,rms = Vm/√2' : 'Vo,rms = Vm/2') : 'Vo,rms = √(n/2π ∫θ₁..θ₂ vo² dθ)',
     voutPeak: ideal ? 'Vo,pk = Vm' : 'Vo,pk = (Vm − Vft)·R/(R + Ront)',
     voutMin: 'Vo,min = 0',
@@ -59,12 +69,15 @@ function resistive(p: ResolvedParams): Theory {
     ioPeak: 'Io,pk = (Vm − Vft)/(R + Ront)',
     idAvg: fw ? 'ID,avg = Idc/2' : 'ID,avg = Idc',
     piv: p.topology === 'center-tap' ? 'PIV = Vm + Vo,pk  (≈ 2Vm)' : p.topology === 'bridge' ? 'PIV = Vo,pk + Vf + Ron·Ipk (≈ Vm)' : 'PIV = Vm',
-    conductionAngleDeg: ideal ? 'γ = 180°' : 'γ = 180° − 2·asin(Vft/Vm)',
-    turnOnAngleDeg: 'θ₁ = asin(Vft/Vm)',
+    conductionAngleDeg: scr ? 'γ = 180° − θ₁ − max(α, θ₁)' : ideal ? 'γ = 180°' : 'γ = 180° − 2·asin(Vft/Vm)',
+    turnOnAngleDeg: scr ? 'θon = max(α, θ₁): the gate fires the forward-biased SCR' : 'θ₁ = asin(Vft/Vm)',
     turnOffAngleDeg: 'θ₂ = 180° − θ₁',
     efficiency: 'η = Po / (Po + Vft·Idc + Ront·Irms²)',
   })
-  return finish(p, vals, [], [k < 1 ? `Ron = ${p.diode.ron} Ω per diode acts as a series resistance (k = R/(R + Ront) = ${k.toFixed(4)}).` : ''])
+  return finish(p, vals, [], [
+    `Assumptions: R load (the current follows the voltage, so it is zero between pulses); ideal sinusoidal source with no source inductance; ${ideal ? 'ideal devices' : `constant device drop Vf = ${p.diode.vf} V`}${scr ? `; SCRs fired at α = ${deg(α).toFixed(1)}°` : ''}.`,
+    k < 1 ? `Ron = ${p.diode.ron} Ω per diode acts as a series resistance (k = R/(R + Ront) = ${k.toFixed(4)}).` : '',
+  ])
 }
 
 // ─── RL load ──────────────────────────────────────────────────────────────────────
@@ -160,6 +173,7 @@ function inductive(p: ResolvedParams): Theory {
     turnOnAngleDeg: 'θon = 0° (commutation)',
     turnOffAngleDeg: 'θoff = 180° (commutation)',
   })
+  approxIfRon(p, vals, notes)
   return finish(p, vals, [], notes, 'continuous')
 }
 
@@ -259,17 +273,30 @@ function lcFilter(p: ResolvedParams): Theory {
   return finish(p, values, approximations, notes, continuous ? 'continuous' : 'discontinuous')
 }
 
+/**
+ * With Ron > 0 the outgoing and incoming paths share the current for a moment around each
+ * commutation (|vin| < Ron·i); the instantaneous-commutation formulas then only approximate.
+ */
+export function approxIfRon(p: ResolvedParams, vals: Theory['values'], notes: string[]) {
+  if (!(p.diode.ron > 0)) return
+  for (const v of Object.values(vals)) if (v) v.kind = 'approx'
+  notes.push(`With Ron = ${p.diode.ron} Ω both device paths conduct for a moment at each commutation; the formulas assume an instantaneous hand-over, so the rows are approximations.`)
+}
+
 export function theoryFor(p: ResolvedParams): Theory {
   if (isThreePhase(p.topology)) return threePhaseTheory(p)
-  if (p.control.freewheel) return freewheelTheory(p)
+  const scr = p.control.device === 'scr'
+  // A clamp path (freewheeling diode, or the semi-controlled bridge's own leg) changes the RL waveform.
+  const clamp = p.control.freewheel || p.topology === 'semi-bridge'
   switch (p.load) {
     case 'R':
+      // The current follows the voltage: it is zero before any clamp could conduct.
       return resistive(p)
     case 'RL':
-      return inductive(p)
+      return clamp ? freewheelTheory(p) : scr ? controlledRL(p) : inductive(p)
     case 'RC':
-      return capacitive(p)
+      return scr ? none(p, [NOT_APPLICABLE, 'A capacitor filter fed by SCRs has no closed-form steady state here.']) : capacitive(p)
     case 'RLC':
-      return lcFilter(p)
+      return scr || clamp ? none(p, [NOT_APPLICABLE, `An LC filter ${scr ? 'fed by SCRs' : 'with a freewheeling diode'} has no closed-form steady state here.`]) : lcFilter(p)
   }
 }

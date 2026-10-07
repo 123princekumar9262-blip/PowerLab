@@ -53,6 +53,7 @@
   --scope-conduction: rgba(47, 194, 141, 0.07);
   --scope-conduction-2: rgba(110, 168, 255, 0.07);
   --scope-conduction-fw: rgba(144, 133, 233, 0.11);
+  --scope-overlap: rgba(250, 178, 25, 0.22);
   --scope-cursor: #f2f5f9;
 
   --font-ui: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
@@ -2220,3 +2221,59 @@ tr.row-approx td {
 /* The scope spans the parameter column's second row: parameters must not be sticky (they would
    slide over the scope); long content scrolls inside the column instead. */
 .lab:not(.lab--focus) .col-params { position: static; max-height: calc(100vh - 150px); overflow: auto; }
+.pick-group { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pick-group + .pick-group { padding-left: 8px; border-left: 1px solid var(--border); }
+.pick-group-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); margin-right: 2px; }
+.firing-panel { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 8px; }
+.firing-facts { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.firing-answer { background: var(--surface-2); border-radius: 10px; padding: 8px 12px; font-size: 13px; line-height: 1.5; color: var(--text-1); }
+.firing-answer p { margin: 4px 0; }
+
+/* ══ Compare rectifiers ═════════════════════════════════════════════════════ */
+.compare-lab { display: grid; gap: 14px; padding-top: 16px; max-width: 1180px; margin: 0 auto; }
+.cmp-setup, .cmp-empty, .cmp-basis-note, .cmp-metrics, .cmp-why, .cmp-waves, .cmp-advice { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 10px; }
+.cmp-choose { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.cmp-pick { display: grid; gap: 6px; }
+.cmp-pick select, .cmp-basis select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-1); font-size: 13px; }
+.cmp-vs { font-weight: 700; color: var(--text-3); padding-bottom: 6px; }
+.cmp-basis, .cmp-conditions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; }
+.cmp-field { display: grid; gap: 4px; font-size: 12px; color: var(--text-2); }
+.cmp-field .num-input { width: 120px; }
+.cmp-field--wide select { min-width: 250px; }
+.cmp-basis-note p { margin: 0; }
+.cmp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.cmp-card { background: var(--surface-1); border: 1px solid var(--border); border-top: 3px solid; border-radius: var(--radius); padding: 12px 14px; }
+.cmp-card--a { border-top-color: #3987e5; }
+.cmp-card--b { border-top-color: #d95926; }
+.cmp-card h3 { margin: 0 0 8px; font-size: 14px; }
+.cmp-card dl { margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; }
+.cmp-card dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+.cmp-card dd { margin: 0; font-family: var(--font-mono); font-size: 14px; color: var(--text-1); }
+.cmp-badge { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #06101f; background: #3987e5; }
+.cmp-card--b .cmp-badge { background: #d95926; }
+.cmp-table td, .cmp-table th { vertical-align: middle; }
+.cmp-bars-h { width: 160px; }
+.cmp-bars { display: grid; gap: 3px; width: 150px; }
+.cmp-bar { display: block; height: 6px; border-radius: 3px; min-width: 2px; }
+.cmp-bar--a { background: #3987e5; }
+.cmp-bar--b { background: #d95926; }
+.tag { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-2); white-space: nowrap; }
+.tag--sim { border-color: rgba(47, 194, 141, 0.6); }
+.tag--theory { border-color: var(--warning); color: var(--warning); }
+.cmp-wave-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.cmp-trace--a { stroke: #3987e5; }
+.cmp-trace--b { stroke: #d95926; stroke-dasharray: 6 3; }
+.cmp-trace--d { stroke: var(--text-1); }
+.cmp-key--a::before { background: #3987e5; }
+.cmp-key--b::before { background: #d95926; }
+.cmp-key--d::before { background: var(--text-1); }
+@media (max-width: 700px) {
+  .cmp-bars-h, .cmp-table td:nth-child(4) { display: none; }
+  .cmp-field--wide select { min-width: 0; width: 100%; }
+}
+
+/* Compare mode has its own selectors: the main lab's circuit pickers step aside. */
+.setup--compare > :not(.density-seg) { display: none; }
+/* Greek symbols must never be upper-cased (α → Α reads as "A", μ → Μ as "M"). */
+.no-case, th.no-case { text-transform: none; }
+.firing-title { margin: 0; font-size: 13px; font-weight: 650; color: var(--text-1); }

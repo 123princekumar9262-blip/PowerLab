@@ -8,6 +8,8 @@ interface Props {
   selectedId: string | null
   angleOf: (t: number) => number
   onSelect: (g: EventGroup) => void
+  /** Device display names (SCRs are T1…). */
+  names?: Record<string, string>
 }
 
 const FILTERS: Array<{ id: 'diode' | 'source' | 'output' | 'all'; label: string }> = [
@@ -18,7 +20,7 @@ const FILTERS: Array<{ id: 'diode' | 'source' | 'output' | 'all'; label: string 
 ]
 
 /** EVENTS view — the detected events in the visible window; click one for what & why. */
-export function EventsView({ groups, selectedId, angleOf, onSelect }: Props) {
+export function EventsView({ groups, selectedId, angleOf, onSelect, names }: Props) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['id']>('diode')
   const list = groups.filter((g) => filter === 'all' || g.category === filter)
   return (
@@ -43,7 +45,7 @@ export function EventsView({ groups, selectedId, angleOf, onSelect }: Props) {
                 <span className="event-row-time">
                   {formatTime(g.time)} · θ = {formatDeg(angleOf(g.time))}
                 </span>
-                <span>{g.events.map(eventTitle).join(' · ')}</span>
+                <span>{g.events.map((e) => eventTitle(e, names)).join(' · ')}</span>
               </button>
             </li>
           ))}

@@ -1,4 +1,5 @@
 import type { SignalId, SimulationResult } from '../types/simulation.ts'
+import { detectCommutations } from '../simulation/commutation.ts'
 import { integrateWindow, lowerIndex } from './integrate.ts'
 
 /** Relative cycle-to-cycle change of Vdc below which the run counts as steady state. */
@@ -42,6 +43,8 @@ export interface Measurements {
   /** Energy stored in the inductor ½·L·i², max / min over the window (null without L). */
   wlMax: number | null
   wlMin: number | null
+  /** Three-phase: mean commutation overlap μ of the last cycle, from the switching events [°]. */
+  overlapDeg: number | null
   /** D1 current statistics. */
   idPeak: number
   idAvg: number
@@ -54,7 +57,12 @@ export interface Measurements {
   diodeLoss: number
   /** Change of stored energy (L + C) over the window [J] — zero in steady state. */
   storedEnergyChange: number
-  /** η = P_load / P_source. */
+  /**
+   * η = P_load / (P_load + P_devices): useful power over useful power plus the measured device
+   * (and source-impedance) losses. Equal to P_load / P_source for the circuit itself, but it does
+   * not count the integrator's own numerical dissipation (backward Euler, ~Δt/τ of the reactive
+   * energy) as a loss — ideal devices give exactly 100 %.
+   */
   efficiency: number | null
   /** D1 conduction per cycle [degrees], from the refined ON/OFF event times. */
   conductionAngleDeg: number
@@ -234,6 +242,10 @@ export function measure(result: SimulationResult): Measurements {
     ifwPeak: ifw ? maxOf(ifw) : null,
     wlMax: wl ? maxOf(wl) : null,
     wlMin: wl ? minOf(wl) : null,
+    overlapDeg: (() => {
+      const cs = detectCommutations(p, result.diodeIds, trace, events).filter((c) => c.tStart >= t0 - 1e-12)
+      return cs.length ? cs.reduce((s, c) => s + c.muDeg, 0) / cs.length : null
+    })(),
     idPeak: maxOf(d1.current),
     idAvg: avg(d1.current),
     idRms: rms(d1.current),
@@ -242,7 +254,7 @@ export function measure(result: SimulationResult): Measurements {
     loadPower,
     diodeLoss: avg(sig('pd')),
     storedEnergyChange: storedAt(i1) - storedAt(i0),
-    efficiency: sourcePower > 1e-15 ? loadPower / sourcePower : null,
+    efficiency: loadPower > 1e-15 ? loadPower / (loadPower + avg(sig('pd'))) : null,
     conductionAngleDeg: (conducting / T) * 360,
     turnOnAngleDeg,
     turnOffAngleDeg,

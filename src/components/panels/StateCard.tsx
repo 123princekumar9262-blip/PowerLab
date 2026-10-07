@@ -25,7 +25,7 @@ export function StateCard({ ex, signalIds, topology, density }: Props) {
   const tp = ex.threePhase
   const meta = (id: SignalId) => metaFor(id, topology)
   const readings = signalIds.filter((id) => !meta(id).advanced)
-  const names = tp?.names ?? {}
+  const names = tp?.names ?? ex.names ?? {}
 
   return (
     <section className="state state--card" aria-labelledby="state-title">

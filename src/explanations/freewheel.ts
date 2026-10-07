@@ -1,6 +1,7 @@
 import { indexAtTime, sampleAt } from '../simulation/engine.ts'
 import { sineSource } from '../simulation/source.ts'
-import type { CircuitEvent, DiodeBias, SimulationResult, SimulationSample } from '../types/simulation.ts'
+import type { CircuitEvent, DiodeBias, DiodeId, SimulationResult, SimulationSample } from '../types/simulation.ts'
+import { deviceName } from '../circuits/devices.ts'
 import { formatA, formatDeg, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
 import { explainEvent, explainState, type CausalStep, type EventExplanation, type StateExplanation } from './rectifier.ts'
 
@@ -21,7 +22,7 @@ export interface FreewheelInterval {
   tOn: number
   /** End of the interval (Dfw turned off), or null if it was still conducting at the end of the run. */
   tOff: number | null
-  /** How it ended: the current reached zero, or D1 took the current back. */
+  /** How it ended: the current reached zero, or the rectifier ('D1' = any main device) took it back. */
   endedBy: 'zero' | 'D1' | null
   iStart: number
   iEnd: number
@@ -36,6 +37,8 @@ export interface FreewheelInsight {
   mode: FreewheelMode
   modeLabel: string
   d1: { on: boolean; bias: DiodeBias; current: number; voltage: number }
+  /** The main rectifier: which devices conduct and the current it delivers. */
+  main: { label: string; on: boolean; current: number }
   fw: { on: boolean; bias: DiodeBias; current: number; voltage: number }
   il: number
   vl: number
@@ -84,7 +87,7 @@ export function freewheelIntervals(result: SimulationResult): FreewheelInterval[
     }
     const iEnd = off ? (off.values.io ?? 0) : (trace.signals.io![i1] ?? 0)
     // Ended by D1 taking over if D1 turned on at the same instant; otherwise the current died.
-    const d1Back = off ? events.some((e) => e.device === 'D1' && e.kind === 'diode-on' && Math.abs(e.time - off.time) < p.period * 1e-6) : false
+    const d1Back = off ? events.some((e) => e.device && e.device !== 'Dfw' && e.kind === 'diode-on' && Math.abs(e.time - off.time) < p.period * 1e-6) : false
     out.push({
       tOn: on.time,
       tOff: off?.time ?? null,
@@ -122,69 +125,79 @@ export function freewheelInsight(result: SimulationResult, s: SimulationSample):
   const R = p.resistance
   const vf = p.diode.vf
   const ideal = p.diode.kind === 'ideal'
-  const d1 = s.diodes[0]
+  const nm = (id: DiodeId) => deviceName(p, id)
+  const devs = s.diodes.filter((d) => d.id !== 'Dfw')
+  const onMain = devs.filter((d) => d.on)
   const fw = s.diodes.find((d) => d.id === 'Dfw')!
-  const il = x.io ?? 0
+  const d1 = devs[0]
+  const io = x.io ?? 0
+  // Inductor current: the load current for RL, the choke current for RLC.
+  const il = x.il ?? (p.load === 'RL' ? io : 0)
   const vl = x.vl ?? 0
   const wl = x.wl ?? 0.5 * L * il * il
   const vin = x.vin ?? 0
   const vout = x.vout ?? 0
   const pL = vl * il
-  const pR = x.pload ?? R * il * il
+  const pR = x.pload ?? R * io * io
   const pDfw = fw.voltage * fw.current
-  const mode: FreewheelMode = d1.on && fw.on ? 'overlap' : fw.on ? 'freewheel' : d1.on ? 'source' : 'off'
+  const mainOn = onMain.length > 0
+  const mode: FreewheelMode = mainOn && fw.on ? 'overlap' : fw.on ? 'freewheel' : mainOn ? 'source' : 'off'
+  const mainLabel = onMain.length ? onMain.map((d) => nm(d.id)).join(' + ') : devs.length === 1 ? nm(d1.id) : 'the rectifier devices'
+  const irect = Math.max(0, il - fw.current)
   const interval = intervalNear(intervalsOf(result), s.time)
   const energyTrend = il <= 0 ? 'empty' : pL >= 0 ? 'storing' : 'releasing'
   const wlEq = `E_L = ½·L·i² = ½ × ${formatSI(L, 'H')} × (${formatA(il)})² = ${formatSI(wl, 'J')}`
+  const scr = devs.some((d) => nm(d.id) !== d.id)
+  const loadLoop = p.load === 'RLC' ? 'L → C ∥ R' : p.load === 'RL' ? 'L → R' : 'R'
 
   let energyText: string
   if (energyTrend === 'empty') energyText = `${wlEq}: the inductor holds no energy — there is no current to keep going.`
   else if (mode === 'freewheel')
     energyText = `${wlEq}, falling. The source is cut off, so L is the only supplier: it releases ${formatW(-pL)}, of which R turns ${formatW(pR)} into heat and Dfw loses ${formatW(pDfw)} (Vf·i${p.diode.ron > 0 ? ' + Ron·i²' : ''}).`
   else if (energyTrend === 'storing') energyText = `${wlEq}, rising. The source drives more current than flows now, so L absorbs ${formatW(pL)} into its magnetic field (vL = L·di/dt = ${V(vl)} > 0).`
-  else energyText = `${wlEq}, falling. vin is now below Vf + R·i, so the current falls and L gives back ${formatW(-pL)} (vL = ${V(vl)} < 0) — to R and, through D1, back to the source.`
+  else energyText = `${wlEq}, falling. The source voltage is now below Vout + R·i, so the current falls and L gives back ${formatW(-pL)} (vL = ${V(vl)} < 0) — to R and back to the source.`
 
-  // ── Why is Dfw ON / OFF? ────────────────────────────────────────────────────────
+  // ── Why is Dfw ON / OFF? (main path → iL → E_L → continuity → bias → path → voltage) ──
   const why: string[] = []
   let whyTitle: string
-  const d1Rev = `vD1 = vin − Vout = ${V(d1.voltage)}`
+  const mainOff = devs.map((d) => `${nm(d.id)}: vAK = ${V(d.voltage)}${d.voltage < 0 ? ' (reverse biased)' : d.voltage > vf && nm(d.id) !== d.id ? ' (forward biased but not fired)' : ''}`).join(', ')
   if (mode === 'freewheel' || mode === 'overlap') {
-    whyTitle = 'Why is the freewheeling diode ON?'
+    whyTitle = 'Why is the freewheeling diode conducting?'
     why.push(
       mode === 'overlap'
-        ? `The source path is handing over: vin = ${V(vin)} is close to zero, so D1 and Dfw both conduct for a moment (each drops Vf${p.diode.ron > 0 ? ' + Ron·i, which splits the current' : ''}).`
-        : `The source/rectifier path has stopped supplying the load: vin = ${V(vin)}, so D1's anode sits below its cathode (${d1Rev}${d1.voltage < 0 ? ', reverse biased' : ', not above Vf'}). D1 carries no current.`,
-      `The inductor still contains stored energy: ${wlEq}.`,
-      `The current through an ideal inductor cannot change instantaneously: dropping ${formatA(il)} to zero at once would need L·di/dt → −∞. Instead the inductor reverses its voltage (vL = L·di/dt = ${V(vl)}) and acts as the source of the loop.`,
-      `So the inductor drives its current through the only available path: down through R and back up through the freewheeling diode.`,
-      `That pulls the + output below the − output: Vout = ${V(vout)}, so Dfw's anode is ${V(fw.voltage)} above its cathode${ideal ? '' : ` (= Vf = ${formatSI(vf, 'V')})`} — forward biased, conducting ${formatA(fw.current)}.`,
-      `The current circulates L → R → Dfw → back to L: io = iDfw = ${formatA(fw.current)}, while the source current is iD1 = ${formatA(d1.current)}.`,
-      interval
-        ? `The stored magnetic energy is dissipated: since Dfw turned on (θ = ${formatDeg(sineSource(p).angleDeg(interval.tOn))}) E_L has fallen from ${formatSI(interval.wlStart, 'J')} to ${formatSI(wl, 'J')} — now ${formatW(pR)} heats R and ${formatW(pDfw)} is lost in Dfw.`
-        : `The stored magnetic energy is dissipated in R (${formatW(pR)}) and Dfw (${formatW(pDfw)}).`,
+        ? `1 · Main rectifier path: handing over — ${mainLabel} and Dfw both conduct for a moment around vin = ${V(vin)} (each path drops its own Vf${p.diode.ron > 0 ? ' + Ron·i, which splits the current' : ''}).`
+        : `1 · Main rectifier path: OFF. vin = ${V(vin)} can no longer drive the load through the rectifier${scr ? ' (or the next SCR has not been fired yet)' : ''} — ${mainOff}. The rectifier current is 0 A.`,
+      `2 · Inductor current: iL = ${formatA(il)} is still flowing.`,
+      `3 · Inductor energy: ${wlEq}.`,
+      `4 · Current continuity: the current through an ideal inductor cannot change instantaneously — dropping ${formatA(il)} to zero at once would need L·di/dt → −∞. Instead the inductor reverses its voltage (vL = L·di/dt = ${V(vl)}) and keeps pushing the current on.`,
+      `5 · Freewheel diode forward bias: that pulls the + output below the − output, Vout = ${V(vout)}, so Dfw's anode is ${V(fw.voltage)} above its cathode${ideal ? '' : ` (= Vf = ${formatSI(vf, 'V')})`} — forward biased, conducting ${formatA(fw.current)}.`,
+      `6 · Resulting current path: ${loadLoop} → Dfw → back to L — LOAD → FREEWHEEL DIODE → LOAD, without the source.` +
+        (interval
+          ? ` Since Dfw turned on (θ = ${formatDeg(sineSource(p).angleDeg(interval.tOn))}) E_L has fallen from ${formatSI(interval.wlStart, 'J')} to ${formatSI(wl, 'J')}: ${formatW(pR)} heats R, ${formatW(pDfw)} is lost in Dfw.`
+          : ''),
+      `7 · Resulting load voltage: Vout = −Vf${p.diode.ron > 0 ? ' − Ron·i' : ''} = ${V(vout)} (clamped by Dfw) instead of following the source.`,
     )
   } else if (mode === 'source') {
     whyTitle = 'Why is the freewheeling diode OFF?'
     why.push(
-      `The source is supplying the load through D1: vin = ${V(vin)}, D1 conducts ${formatA(d1.current)} and Vout = vin − Vf${p.diode.ron > 0 ? ' − Ron·i' : ''} = ${V(vout)}.`,
+      `1 · Main rectifier path: ON — ${mainLabel} conduct${onMain.length > 1 ? '' : 's'} ${formatA(irect)} from the source; Vout = ${V(vout)}.`,
+      `2 · Inductor current: iL = ${formatA(il)} flows through the rectifier — it needs no other path.`,
+      `3 · Inductor energy: ${wlEq}, ${energyTrend === 'storing' ? 'being stored' : 'being given back'}.`,
       vout > -vf
-        ? `Dfw sits across the load with its anode on the − output, so its voltage is −Vout = ${V(fw.voltage)} — ${fw.voltage < 0 ? 'reverse biased' : `below its knee Vf = ${formatSI(vf, 'V')}`}. It blocks: i = 0 A.`
-        : `Dfw's voltage is −Vout = ${V(fw.voltage)}, not above Vf — it blocks: i = 0 A.`,
-      `The inductor current needs no other path while D1 is closed: io = iD1 = ${formatA(il)}${energyTrend === 'storing' ? ', and L is storing energy' : ', and L is giving energy back'} (${formatSI(wl, 'J')} stored).`,
+        ? `4 · Dfw sits across the load with its anode on the − output, so its voltage is −Vout = ${V(fw.voltage)} — ${fw.voltage < 0 ? 'reverse biased' : `below its knee Vf = ${formatSI(vf, 'V')}`}. It blocks: i = 0 A.`
+        : `4 · Dfw's voltage is −Vout = ${V(fw.voltage)}, not above Vf — it blocks: i = 0 A.`,
       interval
-        ? `Dfw will take over when vin falls below zero: D1 would then have to drive Vout below −Vf, but Dfw clamps it there and takes the current instead.`
-        : `In this run the current dies out before vin reverses (L is too small to matter), so Dfw never gets to conduct.`,
+        ? `5 · Dfw will take over when the rectifier can no longer hold Vout above −Vf (vin near or below zero${scr ? ', before the next SCR is fired' : ''}).`
+        : `5 · In this run the current dies out before the source reverses, so Dfw never gets to conduct.`,
     )
   } else {
     whyTitle = 'Why is the freewheeling diode OFF?'
     why.push(
-      `No current flows: iL = 0, so E_L = 0 — the inductor has nothing left to push through Dfw.`,
-      vin > 0
-        ? `vin = ${V(vin)} is below Vf = ${formatSI(vf, 'V')}, so D1 cannot start conducting yet.`
-        : `vin = ${V(vin)} reverse biases D1, and with no inductor current there is no reason for Dfw to conduct: its voltage is ${V(fw.voltage)}.`,
+      `1 · Main rectifier path: OFF — ${mainOff}.`,
+      `2 · Inductor current: iL = 0 — nothing is left to push through Dfw (E_L = 0).`,
       interval && interval.endedBy === 'zero' && s.time > interval.tOn
-        ? `The last freewheel interval ended at θ = ${formatDeg(sineSource(p).angleDeg(interval.tOff!))} when the current reached zero: the stored energy (${formatSI(interval.wlStart, 'J')}) had all been dissipated — ${formatSI(interval.eR, 'J')} in R and ${formatSI(interval.eDfw, 'J')} in Dfw. This is discontinuous conduction.`
-        : 'The current starts when vin exceeds Vf.',
+        ? `3 · The last freewheel interval ended at θ = ${formatDeg(sineSource(p).angleDeg(interval.tOff!))} when the current reached zero: the stored energy (${formatSI(interval.wlStart, 'J')}) had all been dissipated — ${formatSI(interval.eR, 'J')} in R and ${formatSI(interval.eDfw, 'J')} in Dfw. This is discontinuous conduction.`
+        : `3 · The current starts again when the rectifier is forward biased${scr ? ' and fired' : ''}.`,
     )
   }
 
@@ -193,6 +206,7 @@ export function freewheelInsight(result: SimulationResult, s: SimulationSample):
     mode,
     modeLabel,
     d1: { on: d1.on, bias: d1.bias, current: d1.current, voltage: d1.voltage },
+    main: { label: mainLabel, on: mainOn, current: irect },
     fw: { on: fw.on, bias: fw.bias, current: fw.current, voltage: fw.voltage },
     il,
     vl,
@@ -219,22 +233,23 @@ export function explainFreewheelState(result: SimulationResult, index: number): 
   const vin = x.vin ?? 0
   const vout = x.vout ?? 0
   const src = base.chain.find((c) => c.stage === 'source')!
+  const loadNodes = p.load === 'RLC' ? ['L', 'C ∥ R'] : p.load === 'RL' ? ['L', 'R'] : ['R']
 
   const path =
     fi.mode === 'freewheel'
-      ? ['L', 'R', 'Dfw', 'back to L']
+      ? [...loadNodes, 'Dfw', p.load === 'R' ? 'back to R' : 'back to L']
       : fi.mode === 'source'
-        ? ['Source (+)', 'D1', 'L', 'R', 'Source (−)']
+        ? base.path
         : fi.mode === 'overlap'
-          ? ['Source (+)', 'D1 ∥ Dfw', 'L', 'R', 'Source (−) / Dfw']
+          ? [...(base.path ?? []), '+ Dfw (hand-over)']
           : null
 
   const mainText =
     fi.mode === 'freewheel'
-      ? `D1 OFF (${fi.d1.bias === 'reverse' ? 'reverse biased' : 'not above Vf'}, vD1 = ${V(fi.d1.voltage)}): with the output clamped at ${V(vout)}, D1 would need vin above ${V(vout + vf)} to conduct.`
+      ? `Main rectifier OFF (${fi.main.label}): with the output clamped at ${V(vout)} by Dfw, the rectifier would need to drive the output above that through its own drops${base.firing ? ', and the next SCR has not been fired yet' : ''}.`
       : fi.mode === 'source' || fi.mode === 'overlap'
-        ? `D1 ON (vD1 = ${V(fi.d1.voltage)}, iD1 = ${formatA(fi.d1.current)}): vin is above Vout + Vf, so staying OFF would leave more than Vf across it — impossible.`
-        : `D1 OFF: vin = ${V(vin)} ${vin > 0 ? `has not reached Vf = ${formatSI(vf, 'V')}` : 'reverse biases it'} and no inductor current is flowing.`
+        ? `Main rectifier ON: ${fi.main.label} carr${fi.main.label.includes('+') ? 'y' : 'ies'} ${formatA(fi.main.current)} from the source.`
+        : `Main rectifier OFF: vin = ${V(vin)} ${base.firing ? 'has not fired a forward-biased SCR' : `cannot forward bias it (Vf = ${formatSI(vf, 'V')})`} and no inductor current is flowing.`
   const inductorText =
     fi.il > 0
       ? `iL = ${formatA(fi.il)} must keep flowing — an inductor's current cannot change instantly. vL = L·di/dt = ${V(fi.vl)}: the current is ${fi.vl > 0 ? 'rising (L stores energy)' : 'falling (L releases energy)'}.`
@@ -243,26 +258,26 @@ export function explainFreewheelState(result: SimulationResult, index: number): 
     fi.mode === 'freewheel' || fi.mode === 'overlap'
       ? `Dfw ON — forward biased: vDfw = ${V(fi.fw.voltage)}, iDfw = ${formatA(fi.fw.current)}. It is the only path left for the inductor current.`
       : `Dfw OFF — ${fi.fw.bias === 'reverse' ? 'reverse biased' : 'not above Vf'}: vDfw = −Vout = ${V(fi.fw.voltage)}, iDfw = 0 A.`
-  const pathText = path ? `Current flows ${path.join(' → ')}${fi.mode === 'freewheel' ? ' — a closed loop that no longer includes the source (iD1 = 0)' : ''}. io = ${formatA(s.io)}.` : 'No current flows anywhere.'
+  const pathText = path ? `Current flows ${path.join(' → ')}${fi.mode === 'freewheel' ? ' — a closed loop that no longer includes the source' : ''}. io = ${formatA(s.io)}.` : 'No current flows anywhere.'
   const outputText =
     fi.mode === 'freewheel'
-      ? `Vout = −Vf${p.diode.ron > 0 ? ' − Ron·i' : ''} = ${V(vout)} (clamped by Dfw) — not vin = ${V(vin)}, which is what the load would see if D1 were held on instead.`
+      ? `Vout = −Vf${p.diode.ron > 0 ? ' − Ron·i' : ''} = ${V(vout)} (clamped by Dfw) — not the source voltage, which is what the load would see if the rectifier were held on instead.`
       : fi.mode === 'off'
         ? 'Vout = 0 V (no current, no di/dt).'
-        : `Vout = vin − Vf${p.diode.ron > 0 ? ' − Ron·i' : ''} = ${V(vout)} = R·io + vL = ${V(p.resistance * s.io)} + ${V(fi.vl)}.`
+        : `Vout = ${V(vout)} — the source voltage minus the conducting devices' drops.`
   const waveformText =
     fi.mode === 'freewheel'
-      ? `The output stays at −Vf instead of following vin negative, so no negative area is subtracted from Vdc. The current decays exponentially with τ = L/R = ${formatTime(p.inductance / p.resistance)} instead of being forced to zero.`
+      ? `The output stays at −Vf instead of following the source negative, so no negative area is subtracted from Vdc. The current decays with τ = L/R = ${formatTime(p.inductance / p.resistance)} instead of being forced to zero.`
       : fi.mode === 'source'
-        ? `Vout follows vin (minus Vf). Io lags it: the inductor slows every change, so the current keeps rising after vin's peak.`
-        : 'Nothing changes until vin exceeds Vf again.'
+        ? `Vout follows the source (minus the drops). Io lags it: the inductor slows every change.`
+        : 'Nothing changes until the rectifier conducts again.'
 
   const chain: CausalStep[] = [
     { stage: 'source', title: 'Source condition', text: src.text, equation: 'vin = Vm·sin(ωt + φ)' },
-    { stage: 'diode', title: 'Main rectifier (D1)', text: mainText, equation: 'ON: iD1 > 0     OFF: vD1 ≤ Vf' },
+    { stage: 'diode', title: 'Main rectifier', text: mainText, equation: base.firing ? 'SCR ON: forward biased AND fired; then latched while i > 0' : 'ON: iD > 0     OFF: vD ≤ Vf' },
     { stage: 'inductor', title: 'Inductor current requirement', text: inductorText, equation: 'vL = L·di/dt   ⇒   i cannot jump' },
     { stage: 'freewheel', title: 'Freewheeling diode (Dfw)', text: fwText, equation: 'vDfw = −Vout;  ON when Vout would fall below −Vf' },
-    { stage: 'path', title: 'Current path', text: pathText, equation: 'io = iD1 + iDfw' },
+    { stage: 'path', title: 'Current path', text: pathText, equation: 'iL = i_rectifier + iDfw' },
     { stage: 'output', title: 'Load voltage', text: outputText, equation: fi.mode === 'freewheel' ? 'Vout = −Vf' : 'Vout = R·i + L·di/dt' },
     { stage: 'energy', title: 'Energy', text: fi.energyText, equation: 'E_L = ½·L·i²,   p_L = vL·i' },
     { stage: 'waveform', title: 'Waveform', text: waveformText },
@@ -272,18 +287,18 @@ export function explainFreewheelState(result: SimulationResult, index: number): 
     fi.mode === 'freewheel'
       ? 'Dfw ON — the inductor freewheels the load current'
       : fi.mode === 'source'
-        ? 'D1 ON — the source supplies the load (Dfw blocks)'
+        ? `${fi.main.label} ON — the source supplies the load (Dfw blocks)`
         : fi.mode === 'overlap'
-          ? 'D1 and Dfw share the current — hand-over'
-          : 'Both diodes OFF — no current'
+          ? `${fi.main.label} and Dfw share the current — hand-over`
+          : base.headline
   const summary =
     fi.mode === 'freewheel'
-      ? `The source has reversed (vin = ${V(vin)}), so D1 is off. The inductor keeps ${formatA(s.io)} flowing round L → R → Dfw, clamping Vout at ${V(vout)} while its stored energy (${formatSI(fi.wl, 'J')}) drains into R.`
+      ? `The rectifier has stopped supplying the load (vin = ${V(vin)}). The inductor keeps ${formatA(fi.il)} flowing round the load and Dfw, clamping Vout at ${V(vout)} while its stored energy (${formatSI(fi.wl, 'J')}) drains into R.`
       : fi.mode === 'source'
-        ? `D1 is forward biased by the source, so current flows Source → D1 → L → R. Vout = ${V(vout)}, Io = ${formatA(s.io)}; Dfw is reverse biased by the output voltage.`
+        ? `${fi.main.label} supply the load from the source. Vout = ${V(vout)}, Io = ${formatA(s.io)}; Dfw is reverse biased by the output voltage.`
         : fi.mode === 'overlap'
-          ? `At the zero crossing both diodes conduct for an instant while the current moves from one path to the other; io = ${formatA(s.io)} flows on uninterrupted.`
-          : `No current: the inductor is empty and vin cannot forward bias D1. Vout = ${V(vout)}.`
+          ? `At the hand-over both paths conduct for an instant while the current moves from one to the other; io = ${formatA(s.io)} flows on uninterrupted.`
+          : base.summary
 
   return {
     ...base,
@@ -312,36 +327,40 @@ export function explainFreewheelEvent(result: SimulationResult, e: CircuitEvent)
         return {
           title: 'Dfw turns ON',
           what: `The freewheeling diode starts conducting ${at}, taking over io = ${formatA(i)}.`,
-          why: `vin has reversed, so D1 can no longer carry the current. The inductor (E_L = ${formatSI(wl, 'J')}) keeps the current flowing, which pushes the output below the − rail; at Vout = −Vf Dfw becomes forward biased and closes the loop L → R → Dfw.`,
+          why: `The rectifier can no longer carry the current (vin = ${formatV(v.vin ?? 0)}${deviceName(p, 'D1') !== 'D1' ? ', and the next SCR is not fired yet' : ''}). The inductor (E_L = ${formatSI(wl, 'J')}) keeps the current flowing, which pushes the output below the − rail; at Vout = −Vf Dfw becomes forward biased and closes the loop L → R → Dfw.`,
         }
-      if (i > 0)
+      if (i > 0) {
+        const n = deviceName(p, e.device!)
         return {
-          title: 'D1 turns ON — takes the current back',
-          what: `D1 starts conducting again ${at} while ${formatA(i)} is still freewheeling.`,
-          why: 'vin has turned positive. With Dfw conducting the output sits at −Vf, so D1 now sees vin + Vf > Vf across it and conducts; the current transfers from Dfw to D1 without a break.',
+          title: `${n} turns ON — takes the current back`,
+          what: `${n} starts conducting ${at} while ${formatA(i)} is still freewheeling.`,
+          why: `${n !== e.device ? `${n} was fired and` : 'The source has turned the rectifier forward again:'} with Dfw conducting the output sits at −Vf, so the rectifier path now has enough forward voltage and takes the current; it transfers from Dfw without a break.`,
         }
+      }
       return base
     case 'diode-off':
       if (e.device === 'Dfw')
         return i > 1e-9
-          ? { title: 'Dfw turns OFF — D1 has the current', what: `Dfw stops conducting ${at}.`, why: `D1 has taken the full ${formatA(i)}; the output rises above −Vf, which reverse biases Dfw.` }
+          ? { title: 'Dfw turns OFF — the rectifier has the current', what: `Dfw stops conducting ${at}.`, why: `The rectifier has taken the full ${formatA(i)}; the output rises above −Vf, which reverse biases Dfw.` }
           : {
               title: 'Dfw turns OFF — the current reached zero',
               what: `The freewheel current reached zero ${at}.`,
               why: 'All the energy the inductor stored has been dissipated in R and Dfw, so nothing drives current any more — discontinuous conduction. A diode cannot carry reverse current, so Dfw turns off.',
             }
-      if (e.device === 'D1')
+      if (e.device && i > 1e-9) {
+        const n = deviceName(p, e.device)
         return {
-          title: 'D1 turns OFF — at the zero crossing, not at β',
-          what: `D1 stops conducting ${at}; io = ${formatA(i)} is still flowing.`,
-          why: 'Without Dfw the inductor would hold D1 on and drag the output negative until its energy was spent (the extinction angle β). With Dfw fitted, the moment vin goes below zero the output is clamped at −Vf and Dfw takes the current — so D1 turns off right at the zero crossing.',
+          title: `${n} turns OFF — Dfw takes the current`,
+          what: `${n} stops conducting ${at}; io = ${formatA(i)} is still flowing.`,
+          why: `Without Dfw the inductor would hold the rectifier on and drag the output negative${p.topology === 'half-wave' ? ' until its energy was spent (the extinction angle β)' : ' until the next device is fired or forward biased'}. With Dfw fitted, as soon as the rectifier can no longer hold the output above −Vf, Dfw clamps it there and takes the current — so ${n} turns off early.`,
         }
+      }
       return base
     case 'current-transfer':
       return {
-        title: e.device === 'Dfw' ? 'Current continuity: D1 → Dfw' : 'Current continuity: Dfw → D1',
+        title: e.device === 'Dfw' ? 'Current continuity: rectifier → Dfw' : `Current continuity: Dfw → ${deviceName(p, e.device!)}`,
         what: `The load current ${formatA(i)} changes path ${at} — ${e.device === 'Dfw' ? 'from the source loop to the freewheel loop' : 'from the freewheel loop back to the source loop'} — without changing value.`,
-        why: 'The current through an ideal inductor cannot change instantaneously. Only the path changes; the scope shows io continuous across the switch while iD1 and iDfw swap.',
+        why: 'The current through an ideal inductor cannot change instantaneously. Only the path changes; the scope shows io continuous across the switch while the device currents swap.',
       }
     case 'energy-min':
       return {

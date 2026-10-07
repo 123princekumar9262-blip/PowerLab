@@ -1,4 +1,4 @@
-import { isThreePhase, supportsFreewheel, type CircuitId, type FaultSpec, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
+import { alwaysControlled, isBridge, isThreePhase, supportsFreewheel, type CircuitId, type FaultSpec, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
 
 /**
  * Educational defaults. 12 V RMS is a typical step-down transformer secondary —
@@ -117,7 +117,7 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
   const duration = cycles * period
 
   // A bridge puts two diode drops in the path.
-  const vfPath = topology === 'bridge' || topology === '3ph-bridge' || topology === '3ph-half-controlled' ? 2 * vf : vf
+  const vfPath = isBridge(topology) ? 2 * vf : vf
   if (kind === 'real' && vfPath >= vm) {
     issues.push({
       field: 'vf',
@@ -172,8 +172,9 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
     ls: isThreePhase(topology) && tp ? num('ls', 'Source inductance', tp.ls, 0) : 0,
   }
   const ctl = input.control
-  // The half-controlled bridge always has SCRs (upper) — that is what defines it.
-  const device = topology === '3ph-half-controlled' ? ('scr' as const) : isThreePhase(topology) && ctl?.device === 'scr' ? ('scr' as const) : ('diode' as const)
+  // Half-controlled / semi-controlled bridges always have SCRs — that is what defines them.
+  // Every other rectifier uses SCRs when the student chooses the controlled version.
+  const device = alwaysControlled(topology) || ctl?.device === 'scr' ? ('scr' as const) : ('diode' as const)
   const alphaDeg = device === 'scr' && ctl ? num('alphaDeg', 'Firing angle α', ctl.alphaDeg, 30) : 0
   const control = { device, alpha: alphaDeg * DEG, freewheel: supportsFreewheel(topology, load) && !!ctl?.freewheel }
   const faults: FaultSpec = isThreePhase(topology) ? { ...(input.faults ?? {}) } : {}

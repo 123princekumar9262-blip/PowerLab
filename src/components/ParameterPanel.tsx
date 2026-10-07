@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { LIMITS } from '../simulation/params.ts'
 import type { FieldKey } from '../challenges/challenges.ts'
 import type { Density } from '../state/labState.ts'
-import { isThreePhase, supportsFreewheel, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
+import { alwaysControlled, isThreePhase, supportsFreewheel, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
 import { THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import { formatSI } from '../utils/format.ts'
 
@@ -24,15 +24,15 @@ interface Props {
 
 export function ParameterPanel({ topology, load, params, resolved, issues, computeMs, samples, onChange, onReset, editable, density }: Props) {
   // Advanced parameters: open for engineers, or when a challenge unlocks one of them.
-  const ADV_KEYS: FieldKey[] = ['inductance', 'capacitance', 'alpha', 'diode', 'phase', 'vf', 'ron', 'cycles', 'timestep']
+  const ADV_KEYS: FieldKey[] = ['inductance', 'capacitance', 'diode', 'phase', 'vf', 'ron', 'cycles', 'timestep']
   const advDefault = density === 'engineer' || !!editable?.some((k) => ADV_KEYS.includes(k))
   const [advOpen, setAdvOpen] = useState(advDefault)
   useEffect(() => setAdvOpen(advDefault), [advDefault])
   const three = isThreePhase(topology)
   const tp = params.threePhase ?? THREE_PHASE_DEFAULTS.threePhase!
   const ctl = params.control ?? THREE_PHASE_DEFAULTS.control!
-  const scrPossible = three && topology !== '3ph-half-controlled'
-  const scr = topology === '3ph-half-controlled' || (three && ctl.device === 'scr')
+  const scrPossible = !alwaysControlled(topology)
+  const scr = alwaysControlled(topology) || ctl.device === 'scr'
   // Three-way diode model on top of the engine's (ideal | real with Vf + Ron).
   const diodeMode = params.diode.model === 'ideal' ? 'ideal' : params.diode.ron > 0 ? 'pwl' : 'vf'
   const locked = (k: FieldKey) => editable !== undefined && !editable.includes(k)
@@ -61,9 +61,21 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
         <NumberField disabled={locked('vrms')} label={three ? 'Phase voltage' : 'Vrms'} hint={three ? `RMS per phase · VLL = √3·Vph = ${(Math.sqrt(3) * params.source.vrms).toFixed(2)} V` : 'Source RMS voltage'} unit="V" value={params.source.vrms} limits={LIMITS.vrms} slider={{ min: 1, max: 50, step: 0.5 }} onCommit={(v) => set('source', { vrms: v })} />
         <NumberField disabled={locked('frequency')} label="Frequency" hint="Source frequency f" unit="Hz" value={params.source.frequency} limits={LIMITS.frequency} slider={{ min: 1, max: 1000, log: true }} onCommit={(v) => set('source', { frequency: v })} />
         <NumberField disabled={locked('resistance')} label="Resistance" hint="Load resistance R" unit="Ω" value={params.load.resistance} limits={LIMITS.resistance} slider={{ min: 0.1, max: 100000, log: true }} onCommit={(v) => set('load', { resistance: v })} />
-        {!advOpen && (hasL || hasC || scr) && (
+        {scr && (
+          <NumberField
+            disabled={locked('alpha')}
+            label="Firing angle α"
+            hint="Gate delay after each natural turn-on point"
+            unit="°"
+            value={ctl.alphaDeg}
+            limits={LIMITS.alphaDeg}
+            slider={{ min: 0, max: 180, step: 1 }}
+            onCommit={(v) => set('control', { ...ctl, alphaDeg: v })}
+          />
+        )}
+        {!advOpen && (hasL || hasC) && (
           <p className="adv-summary muted small">
-            {[hasL && `L = ${roundSig(params.load.inductance * 1e3)} mH`, hasC && `C = ${roundSig(params.load.capacitance * 1e6)} µF`, scr && `α = ${ctl.alphaDeg}°`].filter(Boolean).join(' · ')} — in Advanced
+            {[hasL && `L = ${roundSig(params.load.inductance * 1e3)} mH`, hasC && `C = ${roundSig(params.load.capacitance * 1e6)} µF`].filter(Boolean).join(' · ')} — in Advanced
           </p>
         )}
       </div>
@@ -129,7 +141,7 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
           </div>
           <NumberField label="Forward voltage Vf" hint={ideal ? 'Ideal diode uses 0 V' : 'Knee voltage of D1'} unit="V" value={params.diode.vf} limits={LIMITS.vf} slider={{ min: 0, max: 2, step: 0.05 }} disabled={ideal || locked('vf')} onCommit={(v) => set('diode', { vf: v })} />
           <NumberField label="On-resistance Ron" hint={ideal ? 'Ideal diode uses 0 Ω' : 'Bulk resistance of D1'} unit="Ω" value={params.diode.ron} limits={LIMITS.ron} slider={{ min: 0, max: 10, step: 0.1 }} disabled={ideal || locked('ron')} onCommit={(v) => set('diode', { ron: v })} />
-          {three && scrPossible && (
+          {scrPossible && (
             <div className="field">
               <span className="field-label">Switching devices</span>
               <div className="seg seg--full" role="radiogroup" aria-label="Switching devices">
@@ -140,18 +152,6 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
                 ))}
               </div>
             </div>
-          )}
-          {scr && (
-            <NumberField
-              disabled={locked('alpha')}
-              label="Firing angle α"
-              hint="Delay after each natural commutation point"
-              unit="°"
-              value={ctl.alphaDeg}
-              limits={LIMITS.alphaDeg}
-              slider={{ min: 0, max: 180, step: 1 }}
-              onCommit={(v) => set('control', { ...ctl, alphaDeg: v })}
-            />
           )}
           {(three || supportsFreewheel(topology, load)) && (
             <div className="field">

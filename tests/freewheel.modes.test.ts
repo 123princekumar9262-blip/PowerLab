@@ -26,7 +26,7 @@ describe('Phase 6 — WHY engine is state-aware', () => {
       if (fi.mode === 'freewheel') {
         expect(e.path).toEqual(['L', 'R', 'Dfw', 'back to L'])
         expect(e.headline).toMatch(/Dfw ON/)
-        expect(fi.whyTitle).toMatch(/ON\?/)
+        expect(fi.whyTitle).toMatch(/conducting\?/)
         expect(fi.energyTrend).toBe('releasing')
       }
       if (fi.mode === 'source') {
@@ -52,9 +52,12 @@ describe('Phase 6 — WHY engine is state-aware', () => {
     const e = ex.state(r, k)
     const fi = e.freewheel!
     expect(fi.mode).toBe('freewheel')
+    // Main path → iL → E_L → continuity → Dfw bias → path → load voltage
     expect(fi.why).toHaveLength(7)
-    expect(fi.why[1]).toMatch(/E_L = ½·L·i²/)
-    expect(fi.why[2]).toMatch(/cannot change instantaneously/)
+    expect(fi.why[0]).toMatch(/Main rectifier path: OFF/)
+    expect(fi.why[2]).toMatch(/E_L = ½·L·i²/)
+    expect(fi.why[3]).toMatch(/cannot change instantaneously/)
+    expect(fi.why[5]).toMatch(/LOAD → FREEWHEEL DIODE → LOAD/)
   })
 
   it('discontinuous case: after the current dies the WHY says the energy was all dissipated', () => {
@@ -70,7 +73,7 @@ describe('Phase 6 — WHY engine is state-aware', () => {
     const last = r.events.filter((e) => e.time > r.params.duration - r.params.period)
     for (const e of last) expect(JSON.stringify(ex.event(r, e))).not.toMatch(BAD)
     const d1off = ex.event(r, last.find((e) => e.kind === 'diode-off' && e.device === 'D1')!)
-    expect(d1off.why).toMatch(/zero crossing/)
+    expect(d1off.why).toMatch(/Dfw clamps it/)
     expect(ex.event(r, last.find((e) => e.kind === 'current-transfer')!).why).toMatch(/cannot change instantaneously/)
   })
 
@@ -157,9 +160,11 @@ describe('Phase 9 — guided experiments', () => {
 })
 
 describe('regression — existing circuits are unchanged', () => {
-  it('other single-phase circuits keep their rows (no ripple/energy rows added)', () => {
+  it('ripple/energy rows only for RL loads; Dfw rows only when Dfw is fitted', () => {
+    expect(compareWithTheory(runSimulation(fwParams(false), 'bridge:RC')).rows.some((r) => r.key === 'wlMax')).toBe(false)
     const c = compareWithTheory(runSimulation(fwParams(false), 'bridge:RL'))
-    expect(c.rows.some((r) => r.key === 'wlMax' || r.key === 'ifwAvg')).toBe(false)
+    expect(c.rows.some((r) => r.key === 'wlMax')).toBe(true)
+    expect(c.rows.some((r) => r.key === 'ifwAvg')).toBe(false)
   })
   it('three-phase freewheeling diode now also exposes its current as Ifw (= the Dfw device current)', () => {
     const p = { ...THREE_PHASE_DEFAULTS, control: { device: 'scr' as const, alphaDeg: 90, freewheel: true } }

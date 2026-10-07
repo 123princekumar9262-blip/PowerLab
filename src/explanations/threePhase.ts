@@ -296,6 +296,18 @@ export function explainEventThreePhase(result: SimulationResult, e: CircuitEvent
         what: `${name} takes over the load current (${formatA(v.io ?? 0)}) ${at}.`,
         why: 'The load inductance keeps the current flowing, so it changes path without being interrupted — the inductor current is continuous across the switch.',
       }
+    case 'commutation-start':
+      return {
+        title: `Commutation begins — ${name} starts sharing the current`,
+        what: `${name} turns on ${at} while the outgoing device of its group still carries the load current: both conduct (commutation overlap). ${ph}.`,
+        why: `The source inductance Ls cannot let the current jump from one phase to the other. During the overlap the two phases are short-circuited through Ls and the devices: 2·Ls·di/dt = the line voltage between them, so the incoming current rises and the outgoing one falls at the same rate — their sum (the load current) stays continuous. The output voltage follows the average of the two phases, losing a notch.`,
+      }
+    case 'commutation-end':
+      return {
+        title: `Commutation ends — ${name} fully conducting`,
+        what: `The outgoing device's current reaches zero ${at}; ${name} now carries the whole load current ${formatA(v.io ?? 0)}.`,
+        why: 'The overlap angle μ is the time from the start of this transfer to here (measured from these two events). A larger Ls or load current, or a firing angle near 0° (smaller commutating voltage at the start), makes μ longer.',
+      }
     case 'energy-min':
       return { title: 'Inductor energy minimum', what: `½·L·i² = ${formatSI(v.wl ?? 0, 'J')} ${at}.`, why: 'Here the inductor stops returning energy and starts storing it again: the load current is at its lowest.' }
     case 'vout-max':

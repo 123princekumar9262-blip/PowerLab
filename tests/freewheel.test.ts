@@ -15,9 +15,10 @@ const lastCycle = (r: ReturnType<typeof run>) => {
 describe('Phase 1 — freewheeling diode topology', () => {
   it('is offered only where supported; the toggle adds Dfw and its channels', () => {
     expect(sanitizeParams(fwParams(true), 'half-wave:RL').params.control.freewheel).toBe(true)
-    // Not (yet) for other single-phase circuits: the flag is ignored there.
-    expect(sanitizeParams(fwParams(true), 'bridge:RL').params.control.freewheel).toBe(false)
-    expect(sanitizeParams(fwParams(true), 'half-wave:R').params.control.freewheel).toBe(false)
+    // Center-tap and bridge accept it too; a capacitor-input (RC) filter does not.
+    expect(sanitizeParams(fwParams(true), 'bridge:RL').params.control.freewheel).toBe(true)
+    expect(sanitizeParams(fwParams(true), 'center-tap:RLC').params.control.freewheel).toBe(true)
+    expect(sanitizeParams(fwParams(true), 'bridge:RC').params.control.freewheel).toBe(false)
     const off = run(false)
     const on = run(true)
     expect(off.diodeIds).toEqual(['D1'])

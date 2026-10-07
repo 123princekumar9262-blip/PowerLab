@@ -22,7 +22,7 @@ const firstSentence = (t: string) => {
 
 /** Conducting devices with their display names, phases and currents. */
 function conducting(ex: StateExplanation) {
-  const names = ex.threePhase?.names ?? {}
+  const names = ex.threePhase?.names ?? ex.names ?? {}
   return ex.sample.diodes
     .filter((d) => d.on)
     .map((d) => ({ id: d.id, name: names[d.id] ?? d.id, current: d.current, map: DEVICE_MAP[d.id] }))
@@ -62,7 +62,7 @@ export function conciseWhy(result: SimulationResult, ex: StateExplanation): WhyS
     const cond = ex.chain.find((c) => c.stage === 'condition')?.text ?? ''
     decision.push(on.length ? `${on.map((d) => d.name).join(' + ')} ON` : 'All diodes OFF', firstSentence(cond))
   }
-  steps.push({ title: tp && (result.params.control.device === 'scr' || result.params.topology === '3ph-half-controlled') ? 'Device decision' : 'Diode decision', lines: decision.filter(Boolean) })
+  steps.push({ title: ex.firing || (tp && (result.params.control.device === 'scr' || result.params.topology === '3ph-half-controlled')) ? 'Device decision' : 'Diode decision', lines: decision.filter(Boolean) })
 
   // 3 · Current path
   steps.push({ title: 'Current path', lines: [ex.path ? ex.path.join(' → ') : 'No closed path — no current'] })
@@ -130,7 +130,10 @@ export function stateLine(ex: StateExplanation): string {
     const p = ex.threePhase.pairLabel
     return p === 'none' ? 'No device conducting' : `${p.replace(/ & /g, ' + ')} conducting`
   }
-  if (ex.freewheel) return ex.freewheel.mode === 'freewheel' ? 'Dfw conducting (freewheeling)' : ex.freewheel.mode === 'source' ? 'D1 conducting' : ex.freewheel.mode === 'overlap' ? 'D1 + Dfw conducting (hand-over)' : 'No diode conducting'
-  const on = ex.diodes.filter((d) => d.on).map((d) => d.id)
-  return on.length ? `${on.join(' + ')} conducting` : 'No diode conducting'
+  if (ex.freewheel) {
+    const f = ex.freewheel
+    return f.mode === 'freewheel' ? 'Dfw conducting (freewheeling)' : f.mode === 'source' ? `${f.main.label} conducting` : f.mode === 'overlap' ? `${f.main.label} + Dfw conducting (hand-over)` : 'No device conducting'
+  }
+  const on = ex.diodes.filter((d) => d.on).map((d) => ex.names?.[d.id] ?? d.id)
+  return on.length ? `${on.join(' + ')} conducting` : ex.firing ? 'No device conducting' : 'No diode conducting'
 }

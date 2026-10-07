@@ -32,6 +32,7 @@ export interface ScopeColors {
   conduction: string
   conduction2: string
   conductionFw: string
+  overlap: string
   cursor: string
   marker: string
   markerDiode: string
@@ -89,6 +90,7 @@ export function readColors(el: Element): ScopeColors {
     conduction: v('--scope-conduction'),
     conduction2: v('--scope-conduction-2'),
     conductionFw: v('--scope-conduction-fw'),
+    overlap: v('--scope-overlap'),
     cursor: v('--scope-cursor'),
     marker: v('--text-3'),
     markerDiode: v('--text-1'),
@@ -210,6 +212,19 @@ export function drawBase(ctx: CanvasRenderingContext2D, L: ScopeLayout, result: 
           }
         }
       })
+    }
+
+    // Commutation overlap (three-phase with source inductance): shade each transfer interval.
+    if (showConduction) {
+      ctx.fillStyle = colors.overlap
+      for (const e of result.events) {
+        if (e.kind !== 'commutation-start' || e.time > vp.t1) continue
+        const end = result.events.find((f) => f.kind === 'commutation-end' && f.device === e.device && f.time >= e.time)
+        if (!end || end.time < vp.t0) continue
+        const xa = Math.max(L.plotLeft, timeToX(L, vp, e.time))
+        const xb = Math.min(L.plotRight, timeToX(L, vp, end.time))
+        if (xb > xa) ctx.fillRect(xa, lane.top, Math.max(1, xb - xa), lane.height)
+      }
     }
 
     // Vertical (time) grid

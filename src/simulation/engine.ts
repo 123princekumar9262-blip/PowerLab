@@ -19,6 +19,7 @@ import {
 import { sanitizeParams } from './params.ts'
 import { isThreePhase } from '../types/simulation.ts'
 import { sineSource, threePhaseSource, type Phase } from './source.ts'
+import { detectCommutations } from './commutation.ts'
 
 /** Safety limit on switching events handled inside one timestep. */
 const MAX_SWITCHES_PER_STEP = 8
@@ -146,6 +147,22 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
 
   events.sort((x, y) => x.time - y.time)
   const trace: SimulationTrace = { length: n, time, signals, diodes }
+  // Commutation overlap (three-phase): markers where a transfer between two devices of the same
+  // group begins and ends — only when it takes a finite time (source inductance).
+  if (isThreePhase(p.topology)) {
+    for (const c of detectCommutations(p, ids, trace, events)) {
+      if (c.muDeg < 1e-6) continue
+      const valuesAt = (t: number): SignalValues => {
+        const i = Math.min(n - 1, Math.max(0, Math.round(t / p.dt)))
+        const v: SignalValues = {}
+        for (const [id, arr] of Object.entries(signals) as Array<[SignalId, Float64Array]>) v[id] = arr[i]
+        return v
+      }
+      pushEvent('commutation-start', c.tStart, valuesAt(c.tStart), c.incoming)
+      pushEvent('commutation-end', c.tEnd, valuesAt(c.tEnd), c.incoming)
+    }
+    events.sort((x, y) => x.time - y.time)
+  }
   return { trace, events, fallbacks }
 }
 
@@ -344,6 +361,7 @@ export function sampleAt(result: SimulationResult, index: number): SimulationSam
     bias: DIODE_BIAS_CODES[d.bias[i]],
     current: d.current[i],
     voltage: d.voltage[i],
+    ...(d.gate ? { gate: d.gate[i] === 1 } : {}),
   }))
   return {
     index: i,
