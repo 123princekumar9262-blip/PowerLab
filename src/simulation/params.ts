@@ -1,4 +1,4 @@
-import type { LabParams, ParamIssue, ResolvedParams } from '../types/simulation.ts'
+import type { CircuitId, LabParams, LoadType, ParamIssue, RectifierTopology, ResolvedParams } from '../types/simulation.ts'
 
 /**
  * Educational defaults. 12 V RMS is a typical step-down transformer secondary —
@@ -8,7 +8,9 @@ import type { LabParams, ParamIssue, ResolvedParams } from '../types/simulation.
 export const DEFAULT_PARAMS: LabParams = {
   source: { vrms: 12, frequency: 50, phaseDeg: 0 },
   diode: { model: 'real', vf: 0.7, ron: 0 },
-  load: { resistance: 10 },
+  // L = 50 mH with R = 10 Ω gives ωL/R ≈ 1.6 — a strongly inductive load (clear extinction angle).
+  // C = 1000 µF with R = 10 Ω gives ωRC ≈ 3.1 — visible but clearly reduced ripple.
+  load: { resistance: 10, inductance: 0.05, capacitance: 1000e-6 },
   sim: { cycles: 4, timestepMode: 'auto', timestepUs: 10 },
 }
 
@@ -20,6 +22,8 @@ export const LIMITS = {
   vf: { min: 0, max: 5, unit: 'V' },
   ron: { min: 0, max: 1000, unit: 'Ω' },
   resistance: { min: 1e-3, max: 1e7, unit: 'Ω' },
+  inductance: { min: 1e-6, max: 10, unit: 'H' },
+  capacitance: { min: 1e-9, max: 0.1, unit: 'F' },
   cycles: { min: 1, max: 20, unit: 'cycles' },
   timestepUs: { min: 0.01, max: 1e5, unit: 'µs' },
 } as const
@@ -45,7 +49,8 @@ const DEG = Math.PI / 180
  * Validate user parameters and convert them to SI, producing a parameter set the
  * engine can trust (finite, in range). Every correction is reported as an issue.
  */
-export function sanitizeParams(input: LabParams): { params: ResolvedParams; issues: ParamIssue[] } {
+export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wave:R'): { params: ResolvedParams; issues: ParamIssue[] } {
+  const [topology, load] = circuitId.split(':') as [RectifierTopology, LoadType]
   const issues: ParamIssue[] = []
 
   const num = (field: keyof typeof LIMITS, label: string, value: number, fallback: number): number => {
@@ -70,6 +75,11 @@ export function sanitizeParams(input: LabParams): { params: ResolvedParams; issu
   const frequency = num('frequency', 'Frequency', input.source.frequency, d.source.frequency)
   const phaseDeg = num('phaseDeg', 'Phase', input.source.phaseDeg, d.source.phaseDeg)
   const resistance = num('resistance', 'Resistance', input.load.resistance, d.load.resistance)
+  const hasL = load === 'RL' || load === 'RLC'
+  const hasC = load === 'RC' || load === 'RLC'
+  // Only validate the elements this load actually has (an unused field must not raise warnings).
+  const inductance = hasL ? num('inductance', 'Inductance', input.load.inductance, d.load.inductance) : d.load.inductance
+  const capacitance = hasC ? num('capacitance', 'Capacitance', input.load.capacitance, d.load.capacitance) : d.load.capacitance
   const cycles = Math.round(num('cycles', 'Duration', input.sim.cycles, d.sim.cycles))
   const kind = input.diode.model === 'ideal' ? 'ideal' : 'real'
   // An ideal diode is the limiting case Vf → 0, Ron → 0 of the real model.
@@ -90,11 +100,13 @@ export function sanitizeParams(input: LabParams): { params: ResolvedParams; issu
   const period = 1 / frequency
   const duration = cycles * period
 
-  if (kind === 'real' && vf >= vm) {
+  // A bridge puts two diode drops in the path.
+  const vfPath = topology === 'bridge' ? 2 * vf : vf
+  if (kind === 'real' && vfPath >= vm) {
     issues.push({
       field: 'vf',
       severity: 'warning',
-      message: `Vf (${vf} V) ≥ peak source voltage Vm (${vm.toFixed(2)} V): the diode can never be forward biased enough to conduct.`,
+      message: `${topology === 'bridge' ? '2·Vf' : 'Vf'} (${vfPath} V) ≥ peak source voltage Vm (${vm.toFixed(2)} V): the diodes can never be forward biased enough to conduct.`,
     })
   }
 
@@ -125,8 +137,21 @@ export function sanitizeParams(input: LabParams): { params: ResolvedParams; issu
   }
   dt = duration / steps
 
+  // Energy-storage time constants far below Δt cannot be resolved (the solver stays stable —
+  // backward Euler — but the fast transient is smeared). Tell the student instead of hiding it.
+  const tauL = inductance / resistance
+  const tauC = resistance * capacitance
+  if (hasL && tauL < 5 * dt) {
+    issues.push({ field: 'inductance', severity: 'info', message: `L/R = ${(tauL * 1e6).toPrecision(3)} µs is shorter than 5·Δt — the inductor's fast transient is not resolved. Reduce the timestep for detail.` })
+  }
+  if (hasC && tauC < 5 * dt) {
+    issues.push({ field: 'capacitance', severity: 'info', message: `R·C = ${(tauC * 1e6).toPrecision(3)} µs is shorter than 5·Δt — the capacitor's fast transient is not resolved. Reduce the timestep for detail.` })
+  }
+
   return {
     params: {
+      topology,
+      load,
       vrms,
       vm,
       frequency,
@@ -135,6 +160,8 @@ export function sanitizeParams(input: LabParams): { params: ResolvedParams; issu
       phase: phaseDeg * DEG,
       diode: { kind, vf, ron },
       resistance,
+      inductance,
+      capacitance,
       cycles,
       duration,
       dt,

@@ -119,7 +119,7 @@ describe('7. full-period waveform consistency', () => {
       const R = r.params.resistance
       forEachSample(r, (s) => {
         expect(s.vin).toBeCloseTo(s.vd + s.vout, 10) // KVL around the loop
-        expect(s.id).toBe(s.io) // KCL: one series loop
+        expect(s.id).toBeCloseTo(s.io, 12) // KCL: one series loop
         expect(s.vout).toBeCloseTo(s.io * R, 10) // Ohm's law
         expect(s.io).toBeGreaterThanOrEqual(0) // a diode never conducts backwards
       })
@@ -129,7 +129,9 @@ describe('7. full-period waveform consistency', () => {
         const a = sampleAt(r, i)
         const b = sampleAt(r, i + perPeriod)
         expect(b.vout).toBeCloseTo(a.vout, 9)
-        expect(b.diodeState).toBe(a.diodeState)
+        // Exactly at a zero crossing (|vin| ~ 1e-15 V, zero current) an ideal diode's state is
+        // genuinely ambiguous — floating-point sin(2πk) lands on either side. Skip that boundary.
+        if (Math.abs(a.vin) > 1e-9 * r.params.vm) expect(b.diodeState).toBe(a.diodeState)
       }
     })
   }

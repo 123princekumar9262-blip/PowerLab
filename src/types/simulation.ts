@@ -4,14 +4,20 @@
  * Data flow (each stage only depends on the stages above it):
  *
  *   LabParams ─► sanitizeParams ─► ResolvedParams
- *        ─► CircuitModel.step (per timestep) ─► SimulationTrace + CircuitEvent[]
- *        ─► measurements / explanations ─► UI
+ *        ─► CircuitModel.step (per timestep, event-located) ─► SimulationTrace + CircuitEvent[]
+ *        ─► measurements / theory / explanations ─► UI
  */
 
-/** Rectifier topology. Only 'half-wave' is implemented in Phase 1. */
-export type RectifierTopology = 'half-wave' | 'full-wave'
+/** Rectifier topology. Full-wave comes in its two classic forms. */
+export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge'
 
-/** Load type. Only 'R' is implemented in Phase 1. */
+/**
+ * Load type (all loads are driven between the rectifier's + and − output):
+ *   R   — resistor
+ *   RL  — resistor in series with an inductor
+ *   RC  — resistor with a smoothing capacitor in parallel (capacitor-input filter)
+ *   RLC — series inductor, then capacitor ∥ resistor (choke-input / LC filter)
+ */
 export type LoadType = 'R' | 'RL' | 'RC' | 'RLC'
 
 export type CircuitId = `${RectifierTopology}:${LoadType}`
@@ -23,7 +29,7 @@ export type TimestepMode = 'auto' | 'manual'
 /** User-facing parameters, exactly as entered (may be invalid — see sanitizeParams). */
 export interface LabParams {
   source: {
-    /** RMS value of the sinusoidal source [V]. */
+    /** RMS value of the sinusoidal source [V] (for the center-tap: of EACH half winding). */
     vrms: number
     /** Source frequency [Hz]. */
     frequency: number
@@ -40,6 +46,10 @@ export interface LabParams {
   load: {
     /** Load resistance [Ω]. */
     resistance: number
+    /** Load / filter inductance [H] (RL, RLC). */
+    inductance: number
+    /** Filter capacitance [F] (RC, RLC). */
+    capacitance: number
   }
   sim: {
     /** Simulated duration, in source cycles. */
@@ -60,6 +70,8 @@ export interface DiodeModel {
 
 /** Parameters after validation/clamping, in SI units, guaranteed finite. */
 export interface ResolvedParams {
+  topology: RectifierTopology
+  load: LoadType
   vrms: number
   /** Peak source voltage Vm = √2·Vrms [V]. */
   vm: number
@@ -72,6 +84,8 @@ export interface ResolvedParams {
   phase: number
   diode: DiodeModel
   resistance: number
+  inductance: number
+  capacitance: number
   cycles: number
   /** Total simulated time [s]. */
   duration: number
@@ -94,10 +108,10 @@ export interface ParamIssue {
 
 /**
  * Bias condition of a diode, derived from the circuit (not from the sign of the source).
- * - forward-conducting:       voltage available to the diode exceeds Vf → ON
- * - forward-below-threshold:  0 < available voltage ≤ Vf → OFF (the real-diode "dead zone")
- * - reverse:                  available voltage < 0 → OFF, blocking
- * - zero:                     exactly zero available voltage → OFF
+ * - forward-conducting:       the diode conducts (ON)
+ * - forward-below-threshold:  0 < vAK ≤ Vf while OFF (the real-diode "dead zone")
+ * - reverse:                  vAK < 0 → OFF, blocking
+ * - zero:                     vAK = 0 → OFF
  */
 export type DiodeBias = 'forward-conducting' | 'forward-below-threshold' | 'reverse' | 'zero'
 
@@ -108,21 +122,61 @@ export const DIODE_BIAS_CODES: readonly DiodeBias[] = [
   'zero',
 ]
 
-/** Signals a circuit can produce. Later phases add e.g. 'vl', 'vc', 'ic'. */
-export type SignalId = 'vin' | 'vout' | 'vd' | 'io' | 'id'
+/**
+ * Signals a circuit can produce. Each circuit declares the subset it produces.
+ *   vin   source voltage (center-tap: upper half winding)
+ *   vrect rectifier output voltage (shown separately only when it differs from vout: RLC)
+ *   vout  load voltage (R, RL: across the whole load; RC, RLC: across R ∥ C)
+ *   vd/id   diode D1 voltage (anode − cathode) / current;  vd2/id2: diode D2
+ *   vl/il   inductor voltage / current;  ic: capacitor current
+ *   io    current in the load resistor R
+ *   wl/wc energy stored in L / C;  ps / pload / pd: source, load-resistor and total diode power
+ */
+export type SignalId =
+  | 'vin'
+  | 'vrect'
+  | 'vout'
+  | 'vd'
+  | 'vd2'
+  | 'vl'
+  | 'io'
+  | 'id'
+  | 'id2'
+  | 'il'
+  | 'ic'
+  | 'wl'
+  | 'wc'
+  | 'ps'
+  | 'pload'
+  | 'pd'
 
-export type DiodeId = 'D1'
+export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4'
+
+export type SignalValues = Partial<Record<SignalId, number>>
+
+export interface DiodeSolution {
+  id: DiodeId
+  on: boolean
+  bias: DiodeBias
+  /** Anode → cathode current [A]. */
+  current: number
+  /** Anode − cathode voltage [V]. */
+  voltage: number
+}
 
 /** The electrical solution of the circuit at one instant. */
 export interface CircuitSolution {
-  signals: Record<SignalId, number>
-  diodes: Array<{ id: DiodeId; on: boolean; bias: DiodeBias }>
+  signals: SignalValues
+  diodes: DiodeSolution[]
 }
 
 /** One instant of the simulation, in convenient object form (see sampleAt). */
 export interface SimulationSample {
   index: number
   time: number
+  values: SignalValues
+  diodes: DiodeSolution[]
+  // Shorthands (D1 and the main signals), present for every circuit:
   vin: number
   vout: number
   vd: number
@@ -138,6 +192,8 @@ export interface DiodeTrace {
   on: Uint8Array
   /** Index into DIODE_BIAS_CODES, per sample. */
   bias: Uint8Array
+  current: Float64Array
+  voltage: Float64Array
 }
 
 /**
@@ -148,7 +204,8 @@ export interface DiodeTrace {
 export interface SimulationTrace {
   length: number
   time: Float64Array
-  signals: Record<SignalId, Float64Array>
+  /** Only the signals the circuit produces are present. */
+  signals: Partial<Record<SignalId, Float64Array>>
   diodes: DiodeTrace[]
 }
 
@@ -161,17 +218,19 @@ export type EventKind =
   | 'diode-off'
   | 'current-start'
   | 'current-stop'
+  | 'vout-max'
+  | 'vout-min'
 
 /** An automatically detected event, located to sub-timestep precision. */
 export interface CircuitEvent {
   id: string
   kind: EventKind
-  /** Event time [s], refined between samples (bisection / golden-section search). */
+  /** Event time [s], refined between samples. */
   time: number
   /** Device involved, if any. */
   device?: DiodeId
-  /** Exact circuit solution at the event time. */
-  values: Record<SignalId, number>
+  /** Circuit solution at the event time. */
+  values: SignalValues
 }
 
 export interface SimulationDiagnostics {
@@ -179,11 +238,16 @@ export interface SimulationDiagnostics {
   computeMs: number
   samplesPerCycle: number
   issues: ParamIssue[]
+  /** Steps where no diode combination was exactly self-consistent (should be ~0). */
+  solverFallbacks: number
 }
 
 export interface SimulationResult {
   circuitId: CircuitId
   params: ResolvedParams
+  /** Signals this circuit produces, in display order. */
+  signalIds: readonly SignalId[]
+  diodeIds: readonly DiodeId[]
   trace: SimulationTrace
   events: CircuitEvent[]
   diagnostics: SimulationDiagnostics

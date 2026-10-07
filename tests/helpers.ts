@@ -1,5 +1,5 @@
 import { DEFAULT_PARAMS } from '../src/simulation/params.ts'
-import type { LabParams } from '../src/types/simulation.ts'
+import type { CircuitId, LabParams } from '../src/types/simulation.ts'
 
 type DeepPartial<T> = { [K in keyof T]?: Partial<T[K]> }
 
@@ -15,3 +15,9 @@ export function params(over: DeepPartial<LabParams> = {}): LabParams {
 
 export const ideal = (over: DeepPartial<LabParams> = {}) => params({ ...over, diode: { ...over.diode, model: 'ideal' } })
 export const real = (over: DeepPartial<LabParams> = {}) => params({ ...over, diode: { model: 'real', vf: 0.7, ron: 0, ...over.diode } })
+
+export const ALL_CIRCUITS: CircuitId[] = [
+  'half-wave:R', 'half-wave:RL', 'half-wave:RC', 'half-wave:RLC',
+  'center-tap:R', 'center-tap:RL', 'center-tap:RC', 'center-tap:RLC',
+  'bridge:R', 'bridge:RL', 'bridge:RC', 'bridge:RLC',
+]

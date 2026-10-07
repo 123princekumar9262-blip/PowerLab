@@ -19,7 +19,8 @@ function expectAllFinite(r: SimulationResult) {
   }
   const c = compareWithTheory(r)
   for (const row of c.rows) {
-    expect(Number.isFinite(row.theory), row.key).toBe(true)
+    // null = no closed form for this row (shown as "—"); anything present must be finite.
+    if (row.theory !== null) expect(Number.isFinite(row.theory), row.key).toBe(true)
     if (row.simulated !== null) expect(Number.isFinite(row.simulated), row.key).toBe(true)
   }
   // Explanations at a spread of instants must not contain NaN/Infinity/undefined.

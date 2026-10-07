@@ -1,26 +1,17 @@
 import type { CircuitEvent, CircuitId, SimulationResult } from '../types/simulation.ts'
-import {
-  explainEventHalfWaveR,
-  explainHalfWaveR,
-  type EventExplanation,
-  type StateExplanation,
-} from './halfWaveR.ts'
+import { explainEvent, explainState, type EventExplanation, type StateExplanation } from './rectifier.ts'
 
-export type { CausalStep, CausalStage, EventExplanation, StateExplanation } from './halfWaveR.ts'
-export { eventTitle } from './halfWaveR.ts'
+export type { CausalStage, CausalStep, EventExplanation, StateExplanation } from './rectifier.ts'
+export { eventTitle } from './rectifier.ts'
 
 interface Explainer {
   state(result: SimulationResult, index: number): StateExplanation
   event(result: SimulationResult, e: CircuitEvent): EventExplanation
 }
 
-/** One explainer per circuit; later phases register their own here. */
-const EXPLAINERS: Partial<Record<CircuitId, Explainer>> = {
-  'half-wave:R': { state: explainHalfWaveR, event: explainEventHalfWaveR },
-}
+/** One explainer covers every rectifier × load: it reads the topology and load from the result. */
+const RECTIFIER_EXPLAINER: Explainer = { state: explainState, event: explainEvent }
 
-export function getExplainer(id: CircuitId): Explainer {
-  const e = EXPLAINERS[id]
-  if (!e) throw new Error(`No explainer for ${id}`)
-  return e
+export function getExplainer(_id: CircuitId): Explainer {
+  return RECTIFIER_EXPLAINER
 }
