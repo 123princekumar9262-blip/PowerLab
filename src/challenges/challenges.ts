@@ -1,11 +1,11 @@
 import type { Comparison } from '../measurements/compare.ts'
 import type { Measurements } from '../measurements/measurements.ts'
-import { DEFAULT_PARAMS } from '../simulation/params.ts'
+import { DEFAULT_PARAMS, THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import type { LabParams, LoadType, RectifierTopology, ResolvedParams } from '../types/simulation.ts'
 import { formatA, formatDeg, formatSI, formatV, formatCapacitance } from '../utils/format.ts'
 
 /** Parameters a challenge may unlock (everything else is fixed by the challenge). */
-export type FieldKey = 'vrms' | 'frequency' | 'resistance' | 'inductance' | 'capacitance' | 'vf' | 'ron' | 'phase' | 'diode' | 'cycles' | 'timestep'
+export type FieldKey = 'alpha' | 'vrms' | 'frequency' | 'resistance' | 'inductance' | 'capacitance' | 'vf' | 'ron' | 'phase' | 'diode' | 'cycles' | 'timestep'
 
 export interface Criterion {
   label: string
@@ -16,6 +16,8 @@ export interface Criterion {
 
 export interface Challenge {
   id: string
+  /** Section the challenge belongs to (defaults to single-phase). */
+  section?: 'single' | 'three'
   title: string
   story: string
   topology: RectifierTopology
@@ -26,8 +28,17 @@ export interface Challenge {
   bonus: [Criterion, Criterion]
   hint: string
   /** A known 3-star design (used by the tests to prove the challenge is solvable; never shown). */
-  solution: Partial<LabParams['load'] & LabParams['source'] & LabParams['diode']>
+  solution: Partial<LabParams['load'] & LabParams['source'] & LabParams['diode'] & { alphaDeg: number }>
 }
+
+type P3 = { source?: Partial<LabParams['source']>; load?: Partial<LabParams['load']>; control?: Partial<NonNullable<LabParams['control']>>; cycles?: number }
+const params3 = (o: P3): LabParams => ({
+  ...THREE_PHASE_DEFAULTS,
+  source: { ...THREE_PHASE_DEFAULTS.source, ...o.source },
+  load: { ...THREE_PHASE_DEFAULTS.load, ...o.load },
+  control: { ...THREE_PHASE_DEFAULTS.control!, ...o.control },
+  sim: { ...THREE_PHASE_DEFAULTS.sim, cycles: o.cycles ?? 10 },
+})
 
 type P = { source?: Partial<LabParams['source']>; diode?: Partial<LabParams['diode']>; load?: Partial<LabParams['load']>; cycles?: number }
 const params = (o: P): LabParams => ({
@@ -135,6 +146,57 @@ export const CHALLENGES: Challenge[] = [
     hint: 'A little series resistance flattens the charging spike; too much wastes power.',
     solution: { ron: 0.7, capacitance: 2200e-6 },
   },
+  {
+    id: '3ph-24v',
+    section: 'three',
+    title: '24 V from a six-pulse bridge',
+    story: 'A 6-pulse diode bridge (silicon diodes) must supply 24 V DC to a 10 Ω load. Choose the phase voltage — and keep the diodes’ reverse stress low.',
+    topology: '3ph-bridge',
+    load: 'R',
+    params: params3({ source: { vrms: 8 } }),
+    editable: ['vrms'],
+    goal: { label: 'Vdc = 24 V ± 1 %', check: (m) => Math.abs(m.voutAvg - 24) <= 0.24, show: (m) => formatV(m.voutAvg, false) },
+    bonus: [
+      { label: 'Vdc = 24 V ± 0.25 %', check: (m) => Math.abs(m.voutAvg - 24) <= 0.06, show: (m) => formatV(m.voutAvg, false) },
+      { label: 'PIV ≤ 26 V', check: (m) => m.piv <= 26, show: (m) => formatV(m.piv, false) },
+    ],
+    hint: 'Vdc = 1.35·VLL − 2Vf with VLL = √3·Vph. The diodes block the peak line voltage.',
+    solution: { vrms: 10.87 },
+  },
+  {
+    id: '3ph-smooth',
+    section: 'three',
+    title: 'A smooth DC current',
+    story: 'A DC motor fed by a 6-pulse bridge needs a nearly constant current: ripple at most 2.5 % of the average. Pick the smoothing inductance.',
+    topology: '3ph-bridge',
+    load: 'RL',
+    params: params3({ load: { inductance: 0.005 } }),
+    editable: ['inductance'],
+    goal: { label: 'Current ripple ≤ 2.5 % of Idc', check: (m) => m.ioRipplePP <= 0.025 * m.ioAvg, show: (m) => `${((100 * m.ioRipplePP) / Math.max(1e-12, m.ioAvg)).toFixed(2)} %` },
+    bonus: [
+      { label: 'L ≤ 30 mH (cost)', check: (_m, p) => p.inductance <= 0.03, show: (_m, p) => formatSI(p.inductance, 'H') },
+      { label: 'Current ripple ≤ 2.2 %', check: (m) => m.ioRipplePP <= 0.022 * m.ioAvg, show: (m) => `${((100 * m.ioRipplePP) / Math.max(1e-12, m.ioAvg)).toFixed(2)} %` },
+    ],
+    hint: 'The ripple is mostly at 6f; the inductor’s reactance there is 6ωL.',
+    solution: { inductance: 0.029 },
+  },
+  {
+    id: '3ph-alpha',
+    section: 'three',
+    title: 'Half power with α',
+    story: 'An SCR bridge with a large inductive load must deliver HALF of the DC voltage it gives at α = 0°. Find the firing angle (mind the diode drops!).',
+    topology: '3ph-bridge',
+    load: 'RL',
+    params: params3({ control: { device: 'scr', alphaDeg: 10 }, load: { inductance: 0.1 } }),
+    editable: ['alpha'],
+    goal: { label: 'Vdc = 50 % of the α = 0 value ± 2 %', check: (m) => Math.abs(m.voutAvg / 26.67 - 0.5) <= 0.01, show: (m) => `${((100 * m.voutAvg) / 26.67).toFixed(1)} %` },
+    bonus: [
+      { label: '± 0.5 %', check: (m) => Math.abs(m.voutAvg / 26.67 - 0.5) <= 0.0025, show: (m) => `${((100 * m.voutAvg) / 26.67).toFixed(2)} %` },
+      { label: 'Current stays continuous', check: (m) => (m.rectCurrentMin ?? 0) > 0, show: (m) => formatA(m.rectCurrentMin ?? 0) + ' min' },
+    ],
+    hint: 'Vdc = 1.35·VLL·cos α − 2Vf: the 2Vf part does not scale with cos α, so the answer is not exactly 60°.',
+    solution: { alphaDeg: 58.3 },
+  },
 ]
 
 export interface ChallengeResult {
@@ -161,6 +223,7 @@ export function withOverrides(base: LabParams, o: Challenge['solution']): LabPar
     ...base,
     source: { ...base.source, ...(o.vrms !== undefined ? { vrms: o.vrms } : {}), ...(o.frequency !== undefined ? { frequency: o.frequency } : {}) },
     diode: { ...base.diode, ...(o.ron !== undefined ? { ron: o.ron } : {}), ...(o.vf !== undefined ? { vf: o.vf } : {}) },
+    control: o.alphaDeg !== undefined && base.control ? { ...base.control, alphaDeg: o.alphaDeg } : base.control,
     load: { ...base.load, ...(o.resistance !== undefined ? { resistance: o.resistance } : {}), ...(o.inductance !== undefined ? { inductance: o.inductance } : {}), ...(o.capacitance !== undefined ? { capacitance: o.capacitance } : {}) },
   }
 }

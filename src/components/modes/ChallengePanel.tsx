@@ -1,6 +1,7 @@
 import { CHALLENGES, type Challenge, type ChallengeResult } from '../../challenges/challenges.ts'
 
 interface Props {
+  section: 'single' | 'three'
   challenge: Challenge | null
   result: ChallengeResult | null
   best: Record<string, number>
@@ -12,14 +13,14 @@ interface Props {
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n)
 
 /** Phase 10 — design challenges, checked live against the simulation. */
-export function ChallengePanel({ challenge, result, best, onStart, onExit, onSubmit }: Props) {
+export function ChallengePanel({ section, challenge, result, best, onStart, onExit, onSubmit }: Props) {
   if (!challenge) {
     return (
       <section className="mode-panel" aria-labelledby="ch-title">
         <h2 id="ch-title" className="eyebrow">Challenge · design tasks</h2>
         <p className="muted small">Each task fixes a circuit and unlocks a few parameters. The simulation checks your design: one star for the goal, one for each bonus.</p>
         <ol className="lesson-list">
-          {CHALLENGES.map((c) => (
+          {CHALLENGES.filter((c) => (c.section ?? 'single') === section).map((c) => (
             <li key={c.id}>
               <button className="lesson-card" onClick={() => onStart(c)}>
                 <span className="lesson-n lesson-n--stars" aria-label={`${best[c.id] ?? 0} of 3 stars`}>

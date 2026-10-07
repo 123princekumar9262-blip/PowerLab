@@ -46,6 +46,12 @@ export function Scope(props: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [colors, setColors] = useState<ScopeColors | null>(null)
   const [hover, setHover] = useState<{ group: EventGroup; x: number } | null>(null)
+  // Progressive disclosure: optional channels (diode currents, line voltages) behind a toggle,
+  // unless one of them is already switched on.
+  const optional = channels.filter((sid) => metaFor(sid, result.params.topology).optional)
+  const [showMore, setShowMore] = useState(false)
+  const moreOpen = showMore || optional.some((sid) => visible[sid])
+  const legendChannels = channels.filter((sid) => moreOpen || !metaFor(sid, result.params.topology).optional)
   const drag = useRef<{ mode: 'cursor' | 'pan'; startX: number; startVp: Viewport } | null>(null)
 
   // Track container size (canvas is sized in device pixels for crisp lines).
@@ -196,7 +202,7 @@ export function Scope(props: Props) {
     <div className="scope">
       <div className="scope-toolbar">
         <div className="legend" role="group" aria-label="Waveform visibility">
-          {channels.map((sid) => (
+          {legendChannels.map((sid) => (
             <button
               key={sid}
               className={`chip ${visible[sid] ? 'chip--on' : ''}`}
@@ -208,6 +214,11 @@ export function Scope(props: Props) {
               {metaFor(sid, result.params.topology).label}
             </button>
           ))}
+          {optional.length > 0 && (
+            <button className="chip chip--more" onClick={() => setShowMore((v) => !v)} aria-expanded={moreOpen}>
+              {moreOpen ? '− fewer' : `+ ${optional.length} more channels`}
+            </button>
+          )}
         </div>
         <div className="seg seg--layout" role="radiogroup" aria-label="Graph layout">
           {(

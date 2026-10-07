@@ -266,7 +266,7 @@ export function renderLoad(c: LoadCtx): number {
     </g>
   )
   const capFill = !idle ? Math.sqrt(Math.min(1, (x.wc ?? 0) / scale.wc)) : 0
-  const outBracket = (bx: number, y0: number, y1: number, value: number | null, name = 'Vout') => (
+  const outBracket = (bx: number, y0: number, y1: number, value: number | null, name = isThreePhase(params.topology) ? 'Vo' : 'Vout') => (
     <g key={`br-${name}`}>
       <path className="bracket" d={`M${bx},${y0} h8 V${y1} h-8`} />
       <text className={`polarity ${value !== null && value > 0 ? '' : 'polarity--dim'}`} x={bx + 18} y={y0 + 6}>+</text>

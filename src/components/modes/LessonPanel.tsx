@@ -3,6 +3,7 @@ import { fill } from '../../learning/facts.ts'
 import { LESSONS, type Lesson } from '../../learning/lessons.ts'
 
 interface Props {
+  section: 'single' | 'three'
   lesson: Lesson | null
   step: number
   facts: Record<string, string>
@@ -14,7 +15,7 @@ interface Props {
 }
 
 /** Phase 8 — guided lessons: a list, then one step at a time, narrated from the simulation. */
-export function LessonPanel({ lesson, step, facts, completed, onStart, onStep, onExit, onComplete }: Props) {
+export function LessonPanel({ section, lesson, step, facts, completed, onStart, onStep, onExit, onComplete }: Props) {
   const [answer, setAnswer] = useState<number | null>(null)
 
   if (!lesson) {
@@ -23,7 +24,7 @@ export function LessonPanel({ lesson, step, facts, completed, onStart, onStep, o
         <h2 id="learn-title" className="eyebrow">Learn · guided lessons</h2>
         <p className="muted small">Each lesson sets up a circuit and walks you through it one instant at a time. Every number quoted comes from the simulation.</p>
         <ol className="lesson-list">
-          {LESSONS.map((l, k) => (
+          {LESSONS.filter((l) => (l.section ?? 'single') === section).map((l, k) => (
             <li key={l.id}>
               <button className="lesson-card" onClick={() => onStart(l)}>
                 <span className="lesson-n">{completed.includes(l.id) ? '✓' : k + 1}</span>

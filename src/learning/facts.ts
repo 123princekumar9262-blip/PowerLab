@@ -24,6 +24,9 @@ export function factsFor(result: SimulationResult, comparison: Comparison, sampl
     gamma: formatDeg(m.conductionAngleDeg),
     theta1: m.turnOnAngleDeg === null ? '—' : formatDeg(m.turnOnAngleDeg),
     beta: m.turnOffAngleDeg === null ? '—' : formatDeg(m.turnOffAngleDeg),
+    vll: formatSI(Math.sqrt(3) * p.vrms, 'V'),
+    alpha: formatDeg((p.control.alpha * 180) / Math.PI),
+    iripple: formatA(m.ioRipplePP),
     fr: m.rippleFrequency === null ? '—' : formatSI(m.rippleFrequency, 'Hz', { digits: 0 }),
     eff: m.efficiency === null ? '—' : `${(m.efficiency * 100).toFixed(1)} %`,
     ilmin: m.rectCurrentMin === null ? '—' : formatA(m.rectCurrentMin),
@@ -41,6 +44,10 @@ export function factsFor(result: SimulationResult, comparison: Comparison, sampl
     f.vl = formatV(sample.values.vl ?? 0)
     f.il = formatA(sample.values.il ?? sample.io)
     f.ic = formatA(sample.values.ic ?? 0, true)
+    f.va = formatV(sample.vin)
+    f.vb = formatV(sample.values.vb ?? 0)
+    f.vc = formatV(sample.values.vc ?? 0)
+    f.pair = sample.diodes.filter((d) => d.on).map((d) => d.id).join(' + ') || 'none'
   }
   return f
 }

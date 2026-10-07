@@ -1,4 +1,4 @@
-import { DEFAULT_PARAMS } from '../simulation/params.ts'
+import { DEFAULT_PARAMS, THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import type { DiodeId, EventKind, LabParams, LoadType, RectifierTopology } from '../types/simulation.ts'
 
 /** Where a lesson step puts the time cursor — always resolved against the simulation. */
@@ -25,6 +25,8 @@ export interface LessonStep {
 
 export interface Lesson {
   id: string
+  /** Section the lesson belongs to (defaults to single-phase). */
+  section?: 'single' | 'three'
   title: string
   summary: string
   topology: RectifierTopology
@@ -32,6 +34,17 @@ export interface Lesson {
   params: LabParams
   steps: LessonStep[]
 }
+
+type P3 = { source?: Partial<LabParams['source']>; diode?: Partial<LabParams['diode']>; load?: Partial<LabParams['load']>; control?: Partial<NonNullable<LabParams['control']>>; faults?: LabParams['faults']; cycles?: number }
+const params3 = (o: P3): LabParams => ({
+  ...THREE_PHASE_DEFAULTS,
+  source: { ...THREE_PHASE_DEFAULTS.source, ...o.source },
+  diode: { ...THREE_PHASE_DEFAULTS.diode, ...o.diode },
+  load: { ...THREE_PHASE_DEFAULTS.load, ...o.load },
+  control: { ...THREE_PHASE_DEFAULTS.control!, ...o.control },
+  faults: o.faults ?? {},
+  sim: { ...THREE_PHASE_DEFAULTS.sim, cycles: o.cycles ?? 4 },
+})
 
 type P = { source?: Partial<LabParams['source']>; diode?: Partial<LabParams['diode']>; load?: Partial<LabParams['load']>; cycles?: number }
 const params = (o: P): LabParams => ({
@@ -310,6 +323,130 @@ export const LESSONS: Lesson[] = [
         title: 'Per cycle',
         energy: true,
         body: 'Over a whole cycle the capacitor only borrows and repays. What the source delivers ends up in R or in the diodes: efficiency {eff}.',
+      },
+    ],
+  },
+  {
+    id: '3ph-source',
+    section: 'three',
+    title: 'Three phases, 120° apart',
+    summary: 'The balanced three-phase source and its line voltages.',
+    topology: '3ph-bridge',
+    load: 'R',
+    params: params3({ diode: { model: 'ideal' } }),
+    steps: [
+      {
+        title: 'Phase a at its crest',
+        at: { angleDeg: 90 },
+        body: 'At θ = 90° VaN = {va} is at its crest while VbN = {vb} and VcN = {vc}: the three phases always sum to zero, so when one is at +Vm the other two share −Vm.',
+      },
+      {
+        title: 'Two phases equal',
+        at: { angleDeg: 30 },
+        body: 'At θ = 30°, VaN and VcN are equal ({va}, {vc}). Points like this, where two phase voltages cross, are where the highest or lowest phase changes. They come every 60°.',
+      },
+      {
+        title: 'Line voltages',
+        body: 'Between two lines the voltage is √3 larger than a phase voltage: VLL = √3·{vrms} = {vll} RMS. Open "+ more channels" on the scope and show Vab, Vbc and Vca.',
+        quiz: { question: 'How often does the order of the three phases change?', options: ['every 120°', 'every 60°', 'every 180°'], answer: 1, explain: 'Three phases give six crossings per cycle, one every 60°. These are the natural commutation points of a three-phase rectifier.' },
+      },
+    ],
+  },
+  {
+    id: '3ph-halfwave',
+    section: 'three',
+    title: 'The 3-pulse rectifier',
+    summary: 'Three diodes on one cathode bus: the highest phase wins.',
+    topology: '3ph-half-wave',
+    load: 'R',
+    params: params3({ diode: { model: 'ideal' } }),
+    steps: [
+      {
+        title: 'The highest phase conducts',
+        at: { angleDeg: 75 },
+        whyOpen: true,
+        body: 'VaN = {va} is the highest phase, so Da conducts ({pair}): all three cathodes share the + output, and only the diode on the most positive phase can be forward biased. Vo = VaN.',
+      },
+      {
+        title: 'Hand-over at 150°',
+        at: { event: 'diode-on', device: 'Db' },
+        body: 'Phase b has just become the highest: Db turns on and Da is immediately reverse biased. There is no gap: the output simply follows the top envelope of the three phases.',
+      },
+      {
+        title: 'Three pulses per cycle',
+        body: 'Each diode conducts for 120°, the output has 3 pulses per cycle (ripple frequency {fr}) and Vdc = 1.17·Vph = {vdc}. The idle diodes must block up to the line voltage: PIV = {piv}.',
+        quiz: { question: 'Compared with a 6-pulse bridge, the 3-pulse rectifier has…', options: ['less ripple', 'more ripple', 'the same ripple'], answer: 1, explain: 'With only 3 pulses the output drops further between pulses (down to Vm/2). The bridge uses the highest AND the lowest phase and gets 6 shallower pulses.' },
+      },
+    ],
+  },
+  {
+    id: '3ph-bridge',
+    section: 'three',
+    title: 'The six-pulse bridge',
+    summary: 'Upper diode on the highest phase, lower diode on the lowest.',
+    topology: '3ph-bridge',
+    load: 'R',
+    params: params3({ diode: { model: 'ideal' } }),
+    steps: [
+      {
+        title: 'Highest to lowest',
+        at: { angleDeg: 60 },
+        whyOpen: true,
+        body: 'VaN = {va} is highest and VbN = {vb} lowest: {pair} conduct. Current path: phase A → D1 → load → D6 → phase B, so Vo = Vab = {vout}.',
+      },
+      {
+        title: 'One device changes every 60°',
+        at: { angleDeg: 120 },
+        body: 'Now phase C has become the lowest: the lower diode changed from D6 to D2 while D1 stays on ({pair}). Vo = Vac = {vout}. Every 60° exactly one device hands over.',
+      },
+      {
+        title: 'Six pulses',
+        body: 'Sequence D1D2 → D2D3 → D3D4 → D4D5 → D5D6 → D6D1. Each diode conducts 120°, the output has six pulses per cycle (ripple frequency {fr}) and Vdc = 1.35·VLL = {vdc}.',
+        quiz: { question: 'How many diodes of the bridge conduct at any instant (away from commutation)?', options: ['1', '2', '3'], answer: 1, explain: 'One upper (on the highest phase) and one lower (on the lowest phase): the load sees their line voltage.' },
+      },
+    ],
+  },
+  {
+    id: '3ph-rl',
+    section: 'three',
+    title: 'Smoothing with inductance',
+    summary: 'An RL load turns six voltage pulses into an almost flat current.',
+    topology: '3ph-bridge',
+    load: 'RL',
+    params: params3({ load: { inductance: 0.03 }, cycles: 6 }),
+    steps: [
+      {
+        title: 'Current lags and flattens',
+        at: { angleDeg: 60 },
+        energy: true,
+        body: 'Vo still has six pulses, but the inductor only lets the current change slowly (v = L·di/dt): io = {io}, with a ripple of only {iripple} p-p. The energy view shows L storing and returning energy every pulse.',
+      },
+      {
+        title: 'Same Vdc',
+        body: 'Vdc = {vdc}, exactly as with an R load. The bridge sets the voltage; the inductor only smooths the current (its average voltage is zero).',
+        quiz: { question: 'If L is doubled, the current ripple…', options: ['roughly halves', 'doubles', 'stays the same'], answer: 0, explain: 'At the ripple frequency (6f) the inductor dominates the impedance: current ripple ≈ voltage ripple / (6ωL).' },
+      },
+    ],
+  },
+  {
+    id: '3ph-scr',
+    section: 'three',
+    title: 'Firing angle α (SCR bridge)',
+    summary: 'Delaying the switching lowers the average output.',
+    topology: '3ph-bridge',
+    load: 'RL',
+    params: params3({ control: { device: 'scr', alphaDeg: 45 }, load: { inductance: 0.1 }, cycles: 8 }),
+    steps: [
+      {
+        title: 'Waiting for the gate',
+        at: { event: 'diode-on', device: 'D1' },
+        whyOpen: true,
+        body: 'T1 does not start at 30° (where phase a becomes highest) but α = {alpha} later, when its gate pulse arrives. Until then the previous SCR stays latched. Watch the gate dots in the schematic and the gate bars in the angle view.',
+      },
+      {
+        title: 'Vdc ∝ cos α',
+        body: 'Each segment now uses a later part of the line voltage: Vdc = 1.35·VLL·cos α − 2Vf = {vdc}. At α = 90° the average would reach zero; beyond that a bridge can invert.',
+        quiz: { question: 'At α = 90° with a large inductance, Vdc is about…', options: ['the same as α = 0', 'half', 'zero'], answer: 2, explain: 'cos 90° = 0: the positive and negative parts of the output cancel on average while the inductor keeps the current flowing.' },
       },
     ],
   },

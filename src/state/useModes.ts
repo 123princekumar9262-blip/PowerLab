@@ -5,6 +5,9 @@ import { LESSONS, type Lesson } from '../learning/lessons.ts'
 import { resolveTarget } from '../learning/target.ts'
 import type { Comparison } from '../measurements/compare.ts'
 import { randomTask, type PredictionTask } from '../prediction/prediction.ts'
+import type { WhatIf } from '../prediction/whatIf.ts'
+import { randomReverseTask, reverseAnswers, type ReverseTask } from '../reverse/reverse.ts'
+import type { Snapshot } from '../experiment/experiment.ts'
 import { indexAtOrAfter } from '../simulation/engine.ts'
 import type { SimulationResult, SimulationSample } from '../types/simulation.ts'
 import { loadJSON, saveJSON } from '../utils/storage.ts'
@@ -19,6 +22,9 @@ const KEY_PREDICT = 'rectifier-lab.predict'
  * cursor — every number they show is read from the simulation result.
  */
 export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result: SimulationResult | null, comparison: Comparison | null, sample: SimulationSample | null) {
+  // Predict sub-mode: "what if?" questions (default) or sketching the output.
+  const [predictTab, setPredictTab] = useState<'whatif' | 'sketch'>('whatif')
+
   // ── Learn ────────────────────────────────────────────────────────────────────
   const [lessonRef, setLessonRef] = useState<{ id: string; step: number } | null>(null)
   const [completed, setCompleted] = useState<string[]>(() => loadJSON(KEY_LESSONS, { done: [] as string[] }).done)
@@ -86,13 +92,13 @@ export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result:
   const [prediction, setPrediction] = useState<{ task: PredictionTask; revealed: boolean } | null>(null)
   const [bestPredict, setBestPredict] = useState<number | null>(() => loadJSON(KEY_PREDICT, { best: null as number | null }).best)
   const newPrediction = useCallback(() => {
-    const task = randomTask()
+    const task = randomTask(Math.random, undefined, state.section)
     setPrediction({ task, revealed: false })
     dispatch({ type: 'applyPreset', topology: task.topology, load: task.load, params: task.params, whyOpen: false, showEnergy: false })
-  }, [dispatch])
+  }, [dispatch, state.section])
   useEffect(() => {
-    if (state.mode === 'predict' && !prediction) newPrediction()
-  }, [state.mode, prediction, newPrediction])
+    if (state.mode === 'predict' && predictTab === 'sketch' && !prediction) newPrediction()
+  }, [state.mode, predictTab, prediction, newPrediction])
   const revealPrediction = useCallback((score: number) => {
     setPrediction((p) => (p ? { ...p, revealed: true } : p))
     setBestPredict((b) => {
@@ -102,9 +108,51 @@ export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result:
     })
   }, [])
 
+  // ── Experiment (before / after) ────────────────────────────────────────────────
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const captureBefore = useCallback(() => {
+    if (result && comparison) setSnapshot({ circuitId: result.circuitId, params: state.params, m: comparison.measurements })
+  }, [result, comparison, state.params])
+
+  // ── Predict: "what if?" (default for three-phase) or sketch ──────────────────────
+  const showWhatIfInLab = useCallback(
+    (q: WhatIf) => {
+      const id = q.after.circuit ?? q.circuit
+      const [topology, load] = id.split(':') as [typeof state.topology & string, typeof state.load & string]
+      dispatch({ type: 'applyPreset', topology, load, params: q.after.params, whyOpen: true })
+      dispatch({ type: 'setMode', mode: 'lab' })
+    },
+    [dispatch, state],
+  )
+
+  // ── Reverse engineering ──────────────────────────────────────────────────────────
+  const [reverse, setReverse] = useState<{ task: ReverseTask; revealed: boolean } | null>(null)
+  const newReverse = useCallback(() => {
+    const task = randomReverseTask(state.section)
+    setReverse({ task, revealed: false })
+    dispatch({ type: 'applyPreset', topology: task.topology, load: task.load, params: task.params, whyOpen: false, showEnergy: false })
+  }, [dispatch, state.section])
+  useEffect(() => {
+    if (state.mode === 'reverse' && (!reverse || reverse.task.section !== state.section)) newReverse()
+  }, [state.mode, state.section, reverse, newReverse])
+  // Put the cursor on the probe angle once the puzzle's circuit is simulated.
+  const probed = useRef<ReverseTask | null>(null)
+  useEffect(() => {
+    if (state.mode !== 'reverse' || !reverse || !result || probed.current === reverse.task) return
+    if (result.circuitId !== `${reverse.task.topology}:${reverse.task.load}`) return
+    probed.current = reverse.task
+    dispatch({ type: 'setCursor', time: resolveTarget(result, { angleDeg: reverse.task.probeDeg }) })
+  }, [state.mode, reverse, result, dispatch])
+  const reverseAns = useMemo(
+    () => (reverse && result && comparison && result.circuitId === `${reverse.task.topology}:${reverse.task.load}` ? reverseAnswers(reverse.task, result, comparison.measurements.rippleFrequency) : null),
+    [reverse, result, comparison],
+  )
+
   const facts = useMemo(() => (result && comparison ? factsFor(result, comparison, sample) : {}), [result, comparison, sample])
   /** In Predict mode, waveforms and measurements stay hidden until the reveal. */
-  const hideAnswers = state.mode === 'predict' && !!prediction && !prediction.revealed
+  const hideAnswers = state.mode === 'predict' && predictTab === 'sketch' && !!prediction && !prediction.revealed
+  /** Reverse engineering hides everything except the source and output waveforms. */
+  const hideCircuit = state.mode === 'reverse' && !!reverse && !reverse.revealed
 
   return {
     lesson,
@@ -129,5 +177,16 @@ export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result:
     revealPrediction,
     facts,
     hideAnswers,
+    hideCircuit,
+    snapshot,
+    captureBefore,
+    clearSnapshot: () => setSnapshot(null),
+    predictTab,
+    setPredictTab,
+    showWhatIfInLab,
+    reverse,
+    reverseAns,
+    newReverse,
+    revealReverse: () => setReverse((r) => (r ? { ...r, revealed: true } : r)),
   }
 }

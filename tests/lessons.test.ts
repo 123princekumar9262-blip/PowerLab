@@ -96,3 +96,23 @@ describe('Phase 8 — every lesson step is true in the simulation', () => {
     expect(s.values.ic!).toBeLessThan(0)
   })
 })
+
+describe('three-phase lessons are true in the simulation', () => {
+  it('six-pulse bridge: D1+D6 at 60°, D1+D2 at 120°; 3-pulse: Da at 75°', () => {
+    const b = runLesson('3ph-bridge').r
+    expect(at(b, { angleDeg: 60 }).diodes.filter((d) => d.on).map((d) => d.id).sort()).toEqual(['D1', 'D6'])
+    expect(at(b, { angleDeg: 120 }).diodes.filter((d) => d.on).map((d) => d.id).sort()).toEqual(['D1', 'D2'])
+    const h = runLesson('3ph-halfwave').r
+    expect(at(h, { angleDeg: 75 }).diodes.filter((d) => d.on).map((d) => d.id)).toEqual(['Da'])
+  })
+  it('SCR lesson: D1 turns on α = 45° after its natural point (θ = 75°)', () => {
+    const { r } = runLesson('3ph-scr')
+    const t = resolveTarget(r, { event: 'diode-on', device: 'D1' })
+    expect((((r.params.omega * t * 180) / Math.PI) % 360 + 360) % 360).toBeCloseTo(75, 1)
+  })
+  it('RL lesson: same Vdc as the R load (inductor average voltage is zero)', () => {
+    const { c } = runLesson('3ph-rl')
+    const rload = compareWithTheory(runSimulation({ ...LESSONS.find((l) => l.id === '3ph-rl')!.params }, '3ph-bridge:R'))
+    expect(c.measurements.voutAvg).toBeCloseTo(rload.measurements.voutAvg, 2)
+  })
+})

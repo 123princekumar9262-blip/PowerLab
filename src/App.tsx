@@ -12,6 +12,14 @@ import { ChallengePanel } from './components/modes/ChallengePanel.tsx'
 import { LessonPanel } from './components/modes/LessonPanel.tsx'
 import { PredictPanel } from './components/modes/PredictPanel.tsx'
 import { useModes } from './state/useModes.ts'
+import { ExperimentPanel } from './components/modes/ExperimentPanel.tsx'
+import { WhatIfPanel } from './components/modes/WhatIfPanel.tsx'
+import { ReversePanel } from './components/modes/ReversePanel.tsx'
+import { AngleView } from './components/AngleView.tsx'
+import { PhysicsLens } from './components/PhysicsLens.tsx'
+import { lensStages } from './explanations/lens.ts'
+import { resolveTarget } from './learning/target.ts'
+import { isThreePhase } from './types/simulation.ts'
 import { getExplainer } from './explanations/index.ts'
 import { compareWithTheory } from './measurements/compare.ts'
 import { indexAtTime, runSimulation } from './simulation/engine.ts'
@@ -50,7 +58,11 @@ export function App() {
 
   const setCursor = useCallback((time: number, byUser = false) => dispatch({ type: 'setCursor', time, byUser }), [])
   const modes = useModes(state, dispatch, result, comparison, explanation?.sample ?? null)
+  const lens = useMemo(() => (result && explanation && state.lensStage !== null ? lensStages(result, explanation) : null), [result, explanation, state.lensStage])
   const hide = modes.hideAnswers
+  const hideCircuit = modes.hideCircuit
+  // Reverse engineering: only the source and output channels.
+  const shownChannels = hideCircuit ? channels.filter((sid) => sid === 'vin' || sid === 'vb' || sid === 'vc' || sid === 'vout') : channels
 
   usePlayback({
     playing: state.playing,
@@ -146,7 +158,7 @@ export function App() {
         onRun={onRun}
         onMode={(mode) => dispatch({ type: 'setMode', mode })}
         onSection={(section) => dispatch({ type: 'setSection', section })}
-        circuitLocked={(state.mode === 'learn' && !!modes.lesson) || (state.mode === 'challenge' && !!modes.challenge) || state.mode === 'predict'}
+        circuitLocked={(state.mode === 'learn' && !!modes.lesson) || (state.mode === 'challenge' && !!modes.challenge) || (state.mode === 'predict' && modes.predictTab === 'sketch') || state.mode === 'reverse'}
       />
 
       {!result || !explanation || !viewport || !comparison ? (
@@ -174,6 +186,12 @@ export function App() {
       ) : (
         <main className="lab">
           <aside className="col-params">
+            {hideCircuit ? (
+              <section className="params params--hidden">
+                <h2 className="eyebrow">Parameters</h2>
+                <p className="muted small">Hidden until you reveal the answer — the circuit is the puzzle.</p>
+              </section>
+            ) : (
             <ParameterPanel
               topology={result.params.topology}
               load={result.params.load}
@@ -186,9 +204,16 @@ export function App() {
               onReset={() => dispatch({ type: 'resetParams' })}
               editable={state.mode === 'challenge' && modes.challenge ? modes.challenge.editable : undefined}
             />
+            )}
           </aside>
 
           <div className="col-main">
+            {hideCircuit ? (
+              <section className="bench instrument--hidden" aria-label="Circuit (hidden)">
+                <p className="intro-lead">The circuit is hidden.</p>
+                <p className="muted">Read the waveforms below and answer the questions on the right.</p>
+              </section>
+            ) : (
             <section className="bench" aria-label="Circuit">
               <div className="bench-bar">
                 <h2 className="bench-title">{getModel(circuitId).name}</h2>
@@ -196,10 +221,22 @@ export function App() {
                   ⚡ Energy view
                 </button>
               </div>
-              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={hide ? null : explanation.sample} result={hide ? null : result} params={result.params} lens={state.lensStage === null ? null : (explanation.chain[state.lensStage]?.stage ?? null)} />
+              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={hide ? null : explanation.sample} result={hide ? null : result} params={result.params} lens={lens && state.lensStage !== null ? lens[state.lensStage].highlight : null} />
             </section>
+            )}
 
-            {state.showEnergy && !hide && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
+            {isThreePhase(result.params.topology) && !hide && !hideCircuit && (
+              <AngleView
+                result={result}
+                angleDeg={explanation.angleDeg}
+                onAngle={(deg) => {
+                  dispatch({ type: 'pause' })
+                  setCursor(resolveTarget(result, { angleDeg: deg }), true)
+                }}
+              />
+            )}
+
+            {state.showEnergy && !hide && !hideCircuit && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
 
             {hide ? (
               <section className="instrument instrument--hidden" aria-label="Oscilloscope (hidden)">
@@ -233,12 +270,12 @@ export function App() {
                   if (state.selectedEventGroupId) dispatch({ type: 'selectEventGroup', id: null })
                 }}
                 visible={state.visible}
-                channels={channels}
+                channels={shownChannels}
                 layoutMode={state.layoutMode}
                 onLayoutMode={(mode) => dispatch({ type: 'setLayoutMode', mode })}
                 onToggleSignal={(signal) => dispatch({ type: 'toggleSignal', signal })}
                 showConduction={state.showConduction}
-                groups={groups}
+                groups={hideCircuit ? [] : groups}
                 selectedGroupId={state.selectedEventGroupId}
                 onSelectGroup={selectGroup}
               />
@@ -247,17 +284,21 @@ export function App() {
                   <input type="checkbox" checked={state.showConduction} onChange={() => dispatch({ type: 'toggleConduction' })} />
                   Shade D1 conduction
                 </label>
-                <EventStrip groups={visibleGroups} selectedId={state.selectedEventGroupId} onSelect={selectGroup} />
+                <EventStrip groups={hideCircuit ? [] : visibleGroups} selectedId={state.selectedEventGroupId} onSelect={selectGroup} />
               </div>
             </section>
             )}
 
-            {!hide && <MeasurementTable comparison={comparison} />}
+            {!hide && !hideCircuit && <MeasurementTable comparison={comparison} />}
           </div>
 
           <aside className="col-state">
+            {lens && state.lensStage !== null && !hide && !hideCircuit && (
+              <PhysicsLens stages={lens} stage={state.lensStage} onStage={(k) => dispatch({ type: 'setLens', stage: k })} onClose={() => dispatch({ type: 'setLens', stage: null })} />
+            )}
             {state.mode === 'learn' && (
               <LessonPanel
+                section={state.section}
                 lesson={modes.lesson}
                 step={modes.lessonStep}
                 facts={modes.facts}
@@ -270,6 +311,7 @@ export function App() {
             )}
             {state.mode === 'challenge' && (
               <ChallengePanel
+                section={state.section}
                 challenge={modes.challenge}
                 result={modes.challengeResult}
                 best={modes.bestStars}
@@ -278,7 +320,40 @@ export function App() {
                 onSubmit={modes.submitChallenge}
               />
             )}
-            {state.mode === 'predict' && modes.prediction && (
+            {state.mode === 'experiment' && (
+              <ExperimentPanel
+                circuitId={result.circuitId}
+                topology={result.params.topology}
+                params={state.params}
+                measurements={comparison.measurements}
+                steady={comparison.measurements.steady.reached}
+                snapshot={modes.snapshot}
+                onCapture={modes.captureBefore}
+                onClearSnapshot={modes.clearSnapshot}
+                onFaults={(faults) => dispatch({ type: 'setParams', params: { ...state.params, faults } })}
+              />
+            )}
+            {state.mode === 'predict' && (
+              <div className="seg seg--full predict-tabs" role="tablist" aria-label="Prediction type">
+                {(['whatif', 'sketch'] as const).map((t) => (
+                  <button key={t} role="tab" aria-selected={modes.predictTab === t} className={modes.predictTab === t ? 'on' : ''} onClick={() => modes.setPredictTab(t)}>
+                    {t === 'whatif' ? 'What if…?' : 'Sketch the output'}
+                  </button>
+                ))}
+              </div>
+            )}
+            {state.mode === 'predict' && modes.predictTab === 'whatif' && <WhatIfPanel section={state.section} onShowInLab={modes.showWhatIfInLab} />}
+            {state.mode === 'reverse' && modes.reverse && modes.reverseAns && (
+              <ReversePanel
+                task={modes.reverse.task}
+                answers={modes.reverseAns}
+                revealed={modes.reverse.revealed}
+                onReveal={modes.revealReverse}
+                onNext={modes.newReverse}
+                onExplore={() => dispatch({ type: 'setMode', mode: 'lab' })}
+              />
+            )}
+            {state.mode === 'predict' && modes.predictTab === 'sketch' && modes.prediction && (
               <PredictPanel
                 task={modes.prediction.task}
                 result={result}
@@ -290,7 +365,7 @@ export function App() {
                 onExplore={() => dispatch({ type: 'setMode', mode: 'lab' })}
               />
             )}
-            {selectedGroup && !hide && (
+            {selectedGroup && !hide && !hideCircuit && (
               <EventDetail
                 group={selectedGroup}
                 angleDeg={sineSource(result.params).angleDeg(selectedGroup.time)}
@@ -298,7 +373,7 @@ export function App() {
                 onClose={() => dispatch({ type: 'selectEventGroup', id: null })}
               />
             )}
-            {!hide && <StatePanel
+            {!hide && !hideCircuit && <StatePanel
                 ex={explanation}
                 signalIds={result.signalIds}
                 topology={result.params.topology}

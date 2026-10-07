@@ -28,6 +28,8 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
   // Three-way diode model on top of the engine's (ideal | real with Vf + Ron).
   const diodeMode = params.diode.model === 'ideal' ? 'ideal' : params.diode.ron > 0 ? 'pwl' : 'vf'
   const locked = (k: FieldKey) => editable !== undefined && !editable.includes(k)
+  // Controls that are never challenge parameters are simply locked during a challenge.
+  const lockAll = editable !== undefined
   const hasL = load === 'RL' || load === 'RLC'
   const hasC = load === 'RC' || load === 'RLC'
   const set = <K extends keyof LabParams>(group: K, patch: Partial<LabParams[K]>) => onChange({ ...params, [group]: { ...params[group], ...patch } })
@@ -109,7 +111,7 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
               <span className="field-label">Devices</span>
               <div className="seg seg--full" role="radiogroup" aria-label="Switching devices">
                 {(['diode', 'scr'] as const).map((d) => (
-                  <button key={d} role="radio" aria-checked={ctl.device === d} className={ctl.device === d ? 'on' : ''} onClick={() => set('control', { ...ctl, device: d })}>
+                  <button key={d} role="radio" disabled={lockAll} aria-checked={ctl.device === d} className={ctl.device === d ? 'on' : ''} onClick={() => set('control', { ...ctl, device: d })}>
                     {d === 'diode' ? 'Diodes (uncontrolled)' : 'SCRs (controlled)'}
                   </button>
                 ))}
@@ -118,6 +120,7 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
           )}
           {scr && (
             <NumberField
+              disabled={locked('alpha')}
               label="Firing angle α"
               hint="Delay after each natural commutation point"
               unit="°"
@@ -128,7 +131,7 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
             />
           )}
           <label className="check">
-            <input type="checkbox" checked={ctl.freewheel} onChange={() => set('control', { ...ctl, freewheel: !ctl.freewheel })} />
+            <input type="checkbox" disabled={lockAll} checked={ctl.freewheel} onChange={() => set('control', { ...ctl, freewheel: !ctl.freewheel })} />
             Freewheeling diode across the load
           </label>
         </div>
@@ -145,14 +148,14 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
               <span className="field-label">Phase sequence</span>
               <div className="seg seg--full" role="radiogroup" aria-label="Phase sequence">
                 {(['abc', 'acb'] as const).map((q) => (
-                  <button key={q} role="radio" aria-checked={tp.sequence === q} className={tp.sequence === q ? 'on' : ''} onClick={() => set('threePhase', { ...tp, sequence: q })}>
+                  <button key={q} role="radio" disabled={lockAll} aria-checked={tp.sequence === q} className={tp.sequence === q ? 'on' : ''} onClick={() => set('threePhase', { ...tp, sequence: q })}>
                     {q === 'abc' ? 'a → b → c' : 'a → c → b'}
                   </button>
                 ))}
               </div>
             </div>
-            <NumberField label="Source resistance Rs" hint="Per phase" unit="Ω" value={tp.rs} limits={LIMITS.rs} slider={{ min: 0, max: 2, step: 0.01 }} onCommit={(v) => set('threePhase', { ...tp, rs: v })} />
-            <NumberField label="Source inductance Ls" hint="Per phase — commutation overlap" unit="mH" value={roundSig(tp.ls * 1e3)} limits={{ min: 0, max: LIMITS.ls.max * 1e3 }} slider={{ min: 0, max: 5, step: 0.05 }} onCommit={(v) => set('threePhase', { ...tp, ls: v / 1e3 })} />
+            <NumberField disabled={lockAll} label="Source resistance Rs" hint="Per phase" unit="Ω" value={tp.rs} limits={LIMITS.rs} slider={{ min: 0, max: 2, step: 0.01 }} onCommit={(v) => set('threePhase', { ...tp, rs: v })} />
+            <NumberField disabled={lockAll} label="Source inductance Ls" hint="Per phase — commutation overlap" unit="mH" value={roundSig(tp.ls * 1e3)} limits={{ min: 0, max: LIMITS.ls.max * 1e3 }} slider={{ min: 0, max: 5, step: 0.05 }} onCommit={(v) => set('threePhase', { ...tp, ls: v / 1e3 })} />
           </>
         )}
         <NumberField disabled={locked('cycles')} label="Duration" hint="Simulated source cycles" unit="cycles" value={params.sim.cycles} limits={LIMITS.cycles} slider={{ min: 1, max: 20, step: 1 }} onCommit={(v) => set('sim', { cycles: Math.round(v) })} />

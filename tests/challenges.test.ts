@@ -21,7 +21,7 @@ describe('Phase 10 — every challenge is solvable and not pre-solved', () => {
     })
 
     it(`${ch.id}: the solution only touches editable parameters`, () => {
-      const map: Record<string, string> = { vrms: 'vrms', frequency: 'frequency', resistance: 'resistance', inductance: 'inductance', capacitance: 'capacitance', ron: 'ron', vf: 'vf' }
+      const map: Record<string, string> = { vrms: 'vrms', frequency: 'frequency', resistance: 'resistance', inductance: 'inductance', capacitance: 'capacitance', ron: 'ron', vf: 'vf', alphaDeg: 'alpha' }
       for (const k of Object.keys(ch.solution)) expect(ch.editable).toContain(map[k])
     })
   }

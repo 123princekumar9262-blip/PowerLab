@@ -1,6 +1,6 @@
 import type { Comparison } from '../measurements/compare.ts'
 import type { Measurements } from '../measurements/measurements.ts'
-import { DEFAULT_PARAMS } from '../simulation/params.ts'
+import { DEFAULT_PARAMS, THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import { indexAtTime } from '../simulation/engine.ts'
 import type { LabParams, LoadType, RectifierTopology, SimulationResult } from '../types/simulation.ts'
 
@@ -39,14 +39,17 @@ const QUESTIONS: Record<LoadType, NumericQuestion[]> = {
 }
 
 /** A random but sensible prediction task (low-voltage, steady-state durations). */
-export function randomTask(rand: () => number = Math.random, fixed?: { topology: RectifierTopology; load: LoadType }): PredictionTask {
+export function randomTask(rand: () => number = Math.random, fixed?: { topology: RectifierTopology; load: LoadType }, section: 'single' | 'three' = 'single'): PredictionTask {
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)]
-  const topology = fixed?.topology ?? pick(['half-wave', 'center-tap', 'bridge'] as const)
-  const load = fixed?.load ?? pick(['R', 'RL', 'RC', 'RLC'] as const)
+  const three = section === 'three'
+  const topology = fixed?.topology ?? (three ? pick(['3ph-half-wave', '3ph-bridge'] as const) : pick(['half-wave', 'center-tap', 'bridge'] as const))
+  const load = fixed?.load ?? (three ? pick(['R', 'RL'] as const) : pick(['R', 'RL', 'RC', 'RLC'] as const))
+  const base = three ? THREE_PHASE_DEFAULTS : DEFAULT_PARAMS
   const params: LabParams = {
+    ...base,
     source: { ...DEFAULT_PARAMS.source, vrms: pick([6, 9, 12, 15]) },
     diode: { ...DEFAULT_PARAMS.diode, model: pick(['ideal', 'real'] as const) },
-    load: { resistance: pick([10, 22, 47]), inductance: pick([0.02, 0.05, 0.1]), capacitance: pick([470e-6, 1000e-6, 2200e-6]) },
+    load: { resistance: pick([10, 22, 47]), inductance: three ? pick([0.01, 0.03]) : pick([0.02, 0.05, 0.1]), capacitance: pick([470e-6, 1000e-6, 2200e-6]) },
     sim: { ...DEFAULT_PARAMS.sim, cycles: load === 'RLC' ? 14 : 8 },
   }
   return { topology, load, params, questions: QUESTIONS[load] }

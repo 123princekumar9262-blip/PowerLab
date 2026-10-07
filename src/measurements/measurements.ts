@@ -28,6 +28,8 @@ export interface Measurements {
   ioAvg: number
   ioRms: number
   ioPeak: number
+  /** Peak-to-peak load-current ripple over the window. */
+  ioRipplePP: number
   /** D1 current statistics. */
   idPeak: number
   idAvg: number
@@ -202,6 +204,7 @@ export function measure(result: SimulationResult): Measurements {
     ioAvg: avg(io),
     ioRms: rms(io),
     ioPeak: maxOf(io),
+    ioRipplePP: maxOf(io) - minOf(io),
     idPeak: maxOf(d1.current),
     idAvg: avg(d1.current),
     idRms: rms(d1.current),
