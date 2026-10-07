@@ -1,14 +1,22 @@
-import { DEFAULT_PARAMS, sanitizeParams } from '../simulation/params.ts'
+import { DEFAULT_PARAMS, sanitizeParams, THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import type { CircuitId, LabParams, LoadType, RectifierTopology, SignalId } from '../types/simulation.ts'
 import type { Viewport } from '../visualization/scopeRenderer.ts'
 import { SIGNAL_META, type ScopeLayoutMode } from '../visualization/signals.ts'
 import type { StepMode } from './stepping.ts'
 
-export type AppMode = 'lab' | 'learn' | 'predict' | 'challenge'
+export type AppMode = 'lab' | 'learn' | 'experiment' | 'predict' | 'challenge' | 'reverse'
+
+/** Single-phase or three-phase rectifiers. Each section keeps its own parameter set. */
+export type Section = 'single' | 'three'
 
 /** UI state. Physics lives in the simulation result, derived from `params` — never stored here. */
 export interface LabState {
   mode: AppMode
+  section: Section
+  /** Parameters of the section that is not active (restored when switching back). */
+  otherParams: LabParams
+  /** Physics Lens: guided walk through source → decision → path → output → load. */
+  lensStage: number | null
   topology: RectifierTopology | null
   load: LoadType | null
   params: LabParams
@@ -42,10 +50,15 @@ export const SECONDS_PER_CYCLE_AT_1X = 4
  */
 export const RECOMMENDED_CYCLES: Record<LoadType, number> = { R: 4, RL: 6, RC: 6, RLC: 12 }
 
-const defaultVisible = Object.fromEntries((Object.keys(SIGNAL_META) as SignalId[]).map((s) => [s, !SIGNAL_META[s].advanced])) as Record<SignalId, boolean>
+const defaultVisible = Object.fromEntries((Object.keys(SIGNAL_META) as SignalId[]).map((s) => [s, !SIGNAL_META[s].advanced && !SIGNAL_META[s].optional])) as Record<SignalId, boolean>
+/** Three-phase: phases, Vo and Io visible; individual diode currents and line voltages optional. */
+const threePhaseVisible: Record<SignalId, boolean> = { ...defaultVisible, vd: false, id: false, id2: false, vd2: false }
 
 export const initialLabState: LabState = {
   mode: 'lab',
+  section: 'single',
+  otherParams: THREE_PHASE_DEFAULTS,
+  lensStage: null,
   topology: null,
   load: null,
   params: DEFAULT_PARAMS,
@@ -66,6 +79,8 @@ export const initialLabState: LabState = {
 
 export type LabAction =
   | { type: 'setMode'; mode: AppMode }
+  | { type: 'setSection'; section: Section }
+  | { type: 'setLens'; stage: number | null }
   | { type: 'chooseTopology'; topology: RectifierTopology }
   | { type: 'chooseLoad'; load: LoadType }
   | { type: 'run'; cursorTime: number }
@@ -103,6 +118,25 @@ export function labReducer(state: LabState, action: LabAction): LabState {
   switch (action.type) {
     case 'setMode':
       return { ...state, mode: action.mode, playing: false, selectedEventGroupId: null }
+    case 'setSection': {
+      if (action.section === state.section) return state
+      const three = action.section === 'three'
+      return {
+        ...state,
+        section: action.section,
+        params: state.otherParams,
+        otherParams: state.params,
+        topology: three ? '3ph-bridge' : state.hasRun ? 'bridge' : null,
+        load: three ? 'R' : state.hasRun ? 'R' : null,
+        visible: three ? { ...threePhaseVisible, ...advancedOf(state) } : { ...defaultVisible, ...advancedOf(state) },
+        viewport: null,
+        selectedEventGroupId: null,
+        playing: false,
+        lensStage: null,
+      }
+    }
+    case 'setLens':
+      return { ...state, lensStage: action.stage }
     case 'chooseTopology':
       return { ...state, topology: action.topology, selectedEventGroupId: null, viewport: null }
     case 'chooseLoad':
@@ -112,10 +146,15 @@ export function labReducer(state: LabState, action: LabAction): LabState {
     case 'setParams':
       return withRetimedCursor(state, action.params)
     case 'resetParams':
-      return withRetimedCursor(state, withCycles(DEFAULT_PARAMS, state.load ?? 'R'))
-    case 'applyPreset':
+      return withRetimedCursor(state, withCycles(state.section === 'three' ? THREE_PHASE_DEFAULTS : DEFAULT_PARAMS, state.load ?? 'R'))
+    case 'applyPreset': {
+      const section: Section = action.topology.startsWith('3ph') ? 'three' : 'single'
+      const switching = section !== state.section
       return {
         ...state,
+        section,
+        otherParams: switching ? state.params : state.otherParams,
+        visible: switching ? (section === 'three' ? { ...threePhaseVisible, ...advancedOf(state) } : { ...defaultVisible, ...advancedOf(state) }) : state.visible,
         topology: action.topology,
         load: action.load,
         params: action.params,
@@ -127,6 +166,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
         whyOpen: action.whyOpen ?? state.whyOpen,
         showEnergy: action.showEnergy ?? state.showEnergy,
       }
+    }
     case 'setCursor':
       return {
         ...state,
@@ -175,6 +215,11 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       return { ...state, progress: { ...state.progress, [key]: true } }
     }
   }
+}
+
+/** Keep the energy channels' visibility when the default map is replaced. */
+function advancedOf(state: LabState): Partial<Record<SignalId, boolean>> {
+  return Object.fromEntries((Object.keys(SIGNAL_META) as SignalId[]).filter((s) => SIGNAL_META[s].advanced).map((s) => [s, state.showEnergy]))
 }
 
 function withEnergy(state: LabState, on: boolean): LabState {

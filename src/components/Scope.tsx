@@ -13,7 +13,7 @@ import {
   type ScopeLayout,
   type Viewport,
 } from '../visualization/scopeRenderer.ts'
-import { SIGNAL_META, type ScopeLayoutMode } from '../visualization/signals.ts'
+import { metaFor, type ScopeLayoutMode } from '../visualization/signals.ts'
 import { formatTime } from '../utils/format.ts'
 
 interface Props {
@@ -201,11 +201,11 @@ export function Scope(props: Props) {
               key={sid}
               className={`chip ${visible[sid] ? 'chip--on' : ''}`}
               aria-pressed={visible[sid]}
-              title={SIGNAL_META[sid].name}
+              title={metaFor(sid, result.params.topology).name}
               onClick={() => props.onToggleSignal(sid)}
             >
-              <span className={`swatch ${SIGNAL_META[sid].dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${SIGNAL_META[sid].cssVar})` }} />
-              {SIGNAL_META[sid].label}
+              <span className={`swatch ${metaFor(sid, result.params.topology).dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${metaFor(sid, result.params.topology).cssVar})` }} />
+              {metaFor(sid, result.params.topology).label}
             </button>
           ))}
         </div>
@@ -253,7 +253,7 @@ export function Scope(props: Props) {
           ref={overlayRef}
           className="scope-layer scope-layer--overlay"
           role="img"
-          aria-label={`Oscilloscope (${layoutMode} layout): ${shown.map((s) => SIGNAL_META[s].label).join(', ')} on a shared time axis. Click or drag to move the time cursor.`}
+          aria-label={`Oscilloscope (${layoutMode} layout): ${shown.map((s) => metaFor(s, result.params.topology).label).join(', ')} on a shared time axis. Click or drag to move the time cursor.`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}

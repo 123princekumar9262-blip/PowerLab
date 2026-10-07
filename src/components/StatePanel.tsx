@@ -1,23 +1,29 @@
 import type { StateExplanation } from '../explanations/index.ts'
-import type { SignalId } from '../types/simulation.ts'
+import type { RectifierTopology, SignalId } from '../types/simulation.ts'
 import { formatDeg, formatSI, formatTime } from '../utils/format.ts'
-import { SIGNAL_META } from '../visualization/signals.ts'
+import { metaFor } from '../visualization/signals.ts'
 
 interface Props {
   ex: StateExplanation
   /** The circuit's signals (readings shown for the non-advanced ones). */
   signalIds: readonly SignalId[]
+  topology: RectifierTopology
   whyOpen: boolean
   onToggleWhy: () => void
+  /** Physics Lens toggle. */
+  lensOn: boolean
+  onToggleLens: () => void
 }
 
 const TREND_ARROW = { increasing: '↗', decreasing: '↘', 'at peak': '⤒', zero: '' } as const
 const SOURCE_TREND = { rising: 'rising', falling: 'falling', peak: 'at + peak', trough: 'at − peak', flat: 'steady' } as const
 const BIAS = { 'forward-conducting': 'conducting', 'forward-below-threshold': 'below Vf', reverse: 'reverse biased', zero: 'zero bias' } as const
 
-export function StatePanel({ ex, signalIds, whyOpen, onToggleWhy }: Props) {
+export function StatePanel({ ex, signalIds, topology, whyOpen, onToggleWhy, lensOn, onToggleLens }: Props) {
   const s = ex.sample
-  const readings = signalIds.filter((id) => !SIGNAL_META[id].advanced)
+  const meta = (id: SignalId) => metaFor(id, topology)
+  const readings = signalIds.filter((id) => !meta(id).advanced && !meta(id).optional)
+  const tp = ex.threePhase
 
   return (
     <section className="state" aria-labelledby="state-title">
@@ -37,15 +43,39 @@ export function StatePanel({ ex, signalIds, whyOpen, onToggleWhy }: Props) {
         {readings.map((sid) => (
           <div key={sid}>
             <dt>
-              <span className={`swatch ${SIGNAL_META[sid].dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${SIGNAL_META[sid].cssVar})` }} />
-              {SIGNAL_META[sid].label}
+              <span className={`swatch ${meta(sid).dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${meta(sid).cssVar})` }} />
+              {meta(sid).label}
             </dt>
-            <dd>{formatSI(s.values[sid] ?? 0, SIGNAL_META[sid].unit, { signed: SIGNAL_META[sid].unit === 'V' || sid === 'ic' })}</dd>
+            <dd>{formatSI(s.values[sid] ?? 0, meta(sid).unit, { signed: meta(sid).unit === 'V' || sid === 'ic' })}</dd>
           </div>
         ))}
       </dl>
 
       <dl className="facts">
+        {tp && (
+          <>
+            <div>
+              <dt>Phase order</dt>
+              <dd>
+                {tp.order.map((q, k) => (
+                  <span key={q} className={`phase-chip phase-chip--${q}`}>
+                    {k === 0 ? '▲ ' : k === 2 ? '▼ ' : ''}
+                    {q.toUpperCase()}
+                  </span>
+                ))}
+                <span className="muted"> · highest → lowest</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Conducting</dt>
+              <dd>
+                <b>{tp.pairLabel}</b>
+                <span className="muted"> · {tp.region}</span>
+                {tp.overlap && <span className="muted"> · commutation overlap</span>}
+              </dd>
+            </div>
+          </>
+        )}
         <div>
           <dt>Source</dt>
           <dd>
@@ -96,10 +126,15 @@ export function StatePanel({ ex, signalIds, whyOpen, onToggleWhy }: Props) {
 
       <p className="summary">{ex.summary}</p>
 
-      <button className={`why-btn ${whyOpen ? 'why-btn--open' : ''}`} onClick={onToggleWhy} aria-expanded={whyOpen} aria-controls="why-chain">
-        <span>WHY?</span>
-        <span className="why-btn-sub">{whyOpen ? 'Hide the reasoning' : 'Follow the cause → effect chain'}</span>
-      </button>
+      <div className="why-row">
+        <button className={`why-btn ${whyOpen ? 'why-btn--open' : ''}`} onClick={onToggleWhy} aria-expanded={whyOpen} aria-controls="why-chain">
+          <span>WHY?</span>
+          <span className="why-btn-sub">{whyOpen ? 'Hide the reasoning' : 'Follow the cause → effect chain'}</span>
+        </button>
+        <button className={`lens-btn ${lensOn ? 'is-on' : ''}`} onClick={onToggleLens} aria-pressed={lensOn} title="Physics Lens: walk through source → decision → path → output → load, one stage at a time">
+          🔍 Physics Lens
+        </button>
+      </div>
 
       {whyOpen && (
         <ol className="chain" id="why-chain">
@@ -107,6 +142,7 @@ export function StatePanel({ ex, signalIds, whyOpen, onToggleWhy }: Props) {
             <li key={step.stage} className={`chain-step chain-step--${step.stage}`}>
               <h3>{step.title}</h3>
               <p>{step.text}</p>
+              {step.equation && <p className="chain-eq">{step.equation}</p>}
             </li>
           ))}
         </ol>

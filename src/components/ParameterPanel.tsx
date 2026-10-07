@@ -1,10 +1,12 @@
 import { useEffect, useId, useState } from 'react'
 import { LIMITS } from '../simulation/params.ts'
 import type { FieldKey } from '../challenges/challenges.ts'
-import type { LabParams, LoadType, ParamIssue, ResolvedParams } from '../types/simulation.ts'
+import { isThreePhase, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
+import { THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import { formatSI } from '../utils/format.ts'
 
 interface Props {
+  topology: RectifierTopology
   load: LoadType
   params: LabParams
   resolved: ResolvedParams | null
@@ -17,7 +19,14 @@ interface Props {
   editable?: FieldKey[]
 }
 
-export function ParameterPanel({ load, params, resolved, issues, computeMs, samples, onChange, onReset, editable }: Props) {
+export function ParameterPanel({ topology, load, params, resolved, issues, computeMs, samples, onChange, onReset, editable }: Props) {
+  const three = isThreePhase(topology)
+  const tp = params.threePhase ?? THREE_PHASE_DEFAULTS.threePhase!
+  const ctl = params.control ?? THREE_PHASE_DEFAULTS.control!
+  const scrPossible = three && topology !== '3ph-half-controlled'
+  const scr = topology === '3ph-half-controlled' || (three && ctl.device === 'scr')
+  // Three-way diode model on top of the engine's (ideal | real with Vf + Ron).
+  const diodeMode = params.diode.model === 'ideal' ? 'ideal' : params.diode.ron > 0 ? 'pwl' : 'vf'
   const locked = (k: FieldKey) => editable !== undefined && !editable.includes(k)
   const hasL = load === 'RL' || load === 'RLC'
   const hasC = load === 'RC' || load === 'RLC'
@@ -39,7 +48,7 @@ export function ParameterPanel({ load, params, resolved, issues, computeMs, samp
 
       <div className="param-group">
         <h3 className="group-title">Basic</h3>
-        <NumberField disabled={locked('vrms')} label="Vrms" hint="Source RMS voltage" unit="V" value={params.source.vrms} limits={LIMITS.vrms} slider={{ min: 1, max: 50, step: 0.5 }} onCommit={(v) => set('source', { vrms: v })} />
+        <NumberField disabled={locked('vrms')} label={three ? 'Phase voltage' : 'Vrms'} hint={three ? `RMS per phase · VLL = √3·Vph = ${(Math.sqrt(3) * params.source.vrms).toFixed(2)} V` : 'Source RMS voltage'} unit="V" value={params.source.vrms} limits={LIMITS.vrms} slider={{ min: 1, max: 50, step: 0.5 }} onCommit={(v) => set('source', { vrms: v })} />
         <NumberField disabled={locked('frequency')} label="Frequency" hint="Source frequency f" unit="Hz" value={params.source.frequency} limits={LIMITS.frequency} slider={{ min: 1, max: 1000, log: true }} onCommit={(v) => set('source', { frequency: v })} />
         <NumberField disabled={locked('resistance')} label="Resistance" hint="Load resistance R" unit="Ω" value={params.load.resistance} limits={LIMITS.resistance} slider={{ min: 0.1, max: 100000, log: true }} onCommit={(v) => set('load', { resistance: v })} />
         {hasL && (
@@ -69,20 +78,83 @@ export function ParameterPanel({ load, params, resolved, issues, computeMs, samp
         <div className="field">
           <span className="field-label">Diode model</span>
           <div className="seg seg--full" role="radiogroup" aria-label="Diode model">
-            {(['ideal', 'real'] as const).map((m) => (
-              <button key={m} role="radio" disabled={locked('diode')} aria-checked={params.diode.model === m} className={params.diode.model === m ? 'on' : ''} onClick={() => set('diode', { model: m })}>
-                {m === 'ideal' ? 'Ideal' : 'Real (Vf)'}
+            {(
+              [
+                ['ideal', 'Ideal', 'Perfect switch: Vf = 0, Ron = 0'],
+                ['vf', 'Constant Vf', 'Constant forward drop Vf while conducting'],
+                ['pwl', 'Vf + Ron', 'Piecewise linear: vD = Vf + Ron·i'],
+              ] as const
+            ).map(([m, label, title]) => (
+              <button
+                key={m}
+                role="radio"
+                title={title}
+                disabled={locked('diode')}
+                aria-checked={diodeMode === m}
+                className={diodeMode === m ? 'on' : ''}
+                onClick={() => set('diode', m === 'ideal' ? { model: 'ideal' } : m === 'vf' ? { model: 'real', ron: 0 } : { model: 'real', ron: params.diode.ron > 0 ? params.diode.ron : 0.1 })}
+              >
+                {label}
               </button>
             ))}
           </div>
         </div>
       </div>
 
+      {three && (
+        <div className="param-group">
+          <h3 className="group-title">Switching devices</h3>
+          {scrPossible && (
+            <div className="field">
+              <span className="field-label">Devices</span>
+              <div className="seg seg--full" role="radiogroup" aria-label="Switching devices">
+                {(['diode', 'scr'] as const).map((d) => (
+                  <button key={d} role="radio" aria-checked={ctl.device === d} className={ctl.device === d ? 'on' : ''} onClick={() => set('control', { ...ctl, device: d })}>
+                    {d === 'diode' ? 'Diodes (uncontrolled)' : 'SCRs (controlled)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {scr && (
+            <NumberField
+              label="Firing angle α"
+              hint="Delay after each natural commutation point"
+              unit="°"
+              value={ctl.alphaDeg}
+              limits={LIMITS.alphaDeg}
+              slider={{ min: 0, max: 180, step: 1 }}
+              onCommit={(v) => set('control', { ...ctl, alphaDeg: v })}
+            />
+          )}
+          <label className="check">
+            <input type="checkbox" checked={ctl.freewheel} onChange={() => set('control', { ...ctl, freewheel: !ctl.freewheel })} />
+            Freewheeling diode across the load
+          </label>
+        </div>
+      )}
+
       <details className="param-group advanced" open={editable?.some((k) => ['phase', 'vf', 'ron', 'cycles', 'timestep'].includes(k)) || undefined}>
         <summary className="group-title">Advanced</summary>
         <NumberField disabled={locked('phase')} label="Phase φ" hint="vin = Vm·sin(ωt + φ)" unit="°" value={params.source.phaseDeg} limits={LIMITS.phaseDeg} slider={{ min: -180, max: 180, step: 1 }} onCommit={(v) => set('source', { phaseDeg: v })} />
         <NumberField label="Forward voltage Vf" hint={ideal ? 'Ideal diode uses 0 V' : 'Knee voltage of D1'} unit="V" value={params.diode.vf} limits={LIMITS.vf} slider={{ min: 0, max: 2, step: 0.05 }} disabled={ideal || locked('vf')} onCommit={(v) => set('diode', { vf: v })} />
         <NumberField label="On-resistance Ron" hint={ideal ? 'Ideal diode uses 0 Ω' : 'Bulk resistance of D1'} unit="Ω" value={params.diode.ron} limits={LIMITS.ron} slider={{ min: 0, max: 10, step: 0.1 }} disabled={ideal || locked('ron')} onCommit={(v) => set('diode', { ron: v })} />
+        {three && (
+          <>
+            <div className="field">
+              <span className="field-label">Phase sequence</span>
+              <div className="seg seg--full" role="radiogroup" aria-label="Phase sequence">
+                {(['abc', 'acb'] as const).map((q) => (
+                  <button key={q} role="radio" aria-checked={tp.sequence === q} className={tp.sequence === q ? 'on' : ''} onClick={() => set('threePhase', { ...tp, sequence: q })}>
+                    {q === 'abc' ? 'a → b → c' : 'a → c → b'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <NumberField label="Source resistance Rs" hint="Per phase" unit="Ω" value={tp.rs} limits={LIMITS.rs} slider={{ min: 0, max: 2, step: 0.01 }} onCommit={(v) => set('threePhase', { ...tp, rs: v })} />
+            <NumberField label="Source inductance Ls" hint="Per phase — commutation overlap" unit="mH" value={roundSig(tp.ls * 1e3)} limits={{ min: 0, max: LIMITS.ls.max * 1e3 }} slider={{ min: 0, max: 5, step: 0.05 }} onCommit={(v) => set('threePhase', { ...tp, ls: v / 1e3 })} />
+          </>
+        )}
         <NumberField disabled={locked('cycles')} label="Duration" hint="Simulated source cycles" unit="cycles" value={params.sim.cycles} limits={LIMITS.cycles} slider={{ min: 1, max: 20, step: 1 }} onCommit={(v) => set('sim', { cycles: Math.round(v) })} />
         <div className="field">
           <span className="field-label">Timestep Δt</span>

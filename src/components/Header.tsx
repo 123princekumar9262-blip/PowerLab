@@ -1,5 +1,5 @@
 import { LOADS, TOPOLOGIES } from '../circuits/registry.ts'
-import type { AppMode, LabState } from '../state/labState.ts'
+import type { AppMode, LabState, Section } from '../state/labState.ts'
 import type { LoadType, RectifierTopology } from '../types/simulation.ts'
 
 interface Props {
@@ -8,19 +8,23 @@ interface Props {
   onLoad: (l: LoadType) => void
   onRun: () => void
   onMode: (m: AppMode) => void
+  onSection: (s: Section) => void
   /** True while a lesson, challenge or prediction owns the circuit choice. */
   circuitLocked: boolean
 }
 
 const MODES: Array<{ id: AppMode; label: string; title: string }> = [
-  { id: 'lab', label: 'Lab', title: 'Free exploration: any circuit, any parameter' },
+  { id: 'lab', label: 'Explore', title: 'Free exploration: any circuit, any parameter' },
   { id: 'learn', label: 'Learn', title: 'Guided lessons that walk through each circuit instant by instant' },
-  { id: 'predict', label: 'Predict', title: 'Sketch what you expect, then reveal the simulation' },
+  { id: 'experiment', label: 'Experiment', title: 'Before / after comparisons and fault experiments' },
+  { id: 'predict', label: 'Predict', title: 'Predict first — then the simulation shows what really happens' },
   { id: 'challenge', label: 'Challenge', title: 'Design tasks checked by the simulation' },
+  { id: 'reverse', label: 'Reverse', title: 'Reverse engineering: identify the rectifier from its waveforms' },
 ]
 
 /** Product header + the guided flow: choose → run → explore → ask WHY. */
-export function Header({ state, onTopology, onLoad, onRun, onMode, circuitLocked }: Props) {
+export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, circuitLocked }: Props) {
+  const three = state.section === 'three'
   const { progress } = state
   const steps = [
     { label: 'Choose rectifier', done: state.topology !== null },
@@ -61,11 +65,18 @@ export function Header({ state, onTopology, onLoad, onRun, onMode, circuitLocked
       )}
 
       <div className="setup" aria-disabled={lockedCircuit}>
+        <div className="seg section-seg" role="tablist" aria-label="Section">
+          {(['single', 'three'] as const).map((sec) => (
+            <button key={sec} role="tab" aria-selected={state.section === sec} disabled={lockedCircuit} className={state.section === sec ? 'on' : ''} onClick={() => onSection(sec)}>
+              {sec === 'single' ? 'Single-phase' : 'Three-phase'}
+            </button>
+          ))}
+        </div>
         <div className="picker" role="radiogroup" aria-label="Rectifier">
           <span className="picker-label">
             <b>1</b> Rectifier
           </span>
-          {TOPOLOGIES.map((t) => (
+          {TOPOLOGIES.filter((t) => t.phases === (three ? 3 : 1)).map((t) => (
             <button
               key={t.id}
               role="radio"

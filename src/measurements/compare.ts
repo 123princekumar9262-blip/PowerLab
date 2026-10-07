@@ -89,12 +89,16 @@ export function compareWithTheory(result: SimulationResult): Comparison {
     const base = { ...def, ...label, simulated: sim, theory: th, formula: t?.formula ?? null, kind: t?.kind ?? ('none' as const) }
     const noCompare = (skipped?: string): ComparisonRow => ({ ...base, error: null, errorIsAbsolute: false, withinTolerance: true, skipped })
     if (th === null || sim === null) return noCompare()
+    if (t?.kind === 'approx') return noCompare('approximation — shown for reference, not checked')
     // Steady-state formulas are only comparable once the transient has died out.
     if (!measurements.steady.reached && def.group !== 'Source' && def.key !== 'rippleFrequency') return noCompare('not in steady state')
     if (t?.requiresContinuous && continuous === false) return noCompare('discontinuous — formula assumes continuous iL')
-    const errorIsAbsolute = th === 0
+    // Near-zero theoretical values (e.g. Vo,min touching 0 at a commutation) make relative
+    // error meaningless: compare absolutely, within 1 % of the quantity's full scale.
+    const scale = zeroScale[def.unit] ?? 1
+    const errorIsAbsolute = Math.abs(th) < 0.05 * scale
     const error = errorIsAbsolute ? sim - th : (sim - th) / Math.abs(th)
-    const tol = errorIsAbsolute ? 1e-6 * (zeroScale[def.unit] ?? 1) : RELATIVE_TOLERANCE
+    const tol = errorIsAbsolute ? (th === 0 && def.unit !== 'V' && def.unit !== 'A' ? 1e-6 * scale : RELATIVE_TOLERANCE * scale) : RELATIVE_TOLERANCE
     return { ...base, error, errorIsAbsolute, withinTolerance: Math.abs(error) <= tol }
   })
 

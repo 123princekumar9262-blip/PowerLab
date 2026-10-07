@@ -79,3 +79,22 @@ export function hopV(x: number, yFrom: number, yHop: number, yTo: number): strin
   const dir = yTo > yFrom ? 1 : -1
   return `M${x},${yFrom} V${yHop - dir * r} a${r},${r} 0 0 ${dir > 0 ? 1 : 0} 0,${2 * dir * r} V${yTo}`
 }
+
+/** Horizontal wire from x0 to x1 at y that hops over vertical wires at the given x positions. */
+export function hopH(y: number, x0: number, x1: number, hops: number[]): string {
+  const r = 7
+  let d = `M${x0},${y}`
+  for (const hx of hops.filter((h) => h > x0 + r && h < x1 - r).sort((m, n) => m - n)) d += ` H${hx - r} a${r},${r} 0 0 1 ${2 * r},0`
+  return `${d} H${x1}`
+}
+
+/** SCR gate lead: a short line from the cathode side, with a dot that lights while the gate pulse is applied. */
+export function GateLead(props: { x: number; y: number; angle: number; on: boolean | null; size?: number }) {
+  const { x, y, angle, on, size = 16 } = props
+  return (
+    <g className={`gate ${on ? 'gate--on' : ''}`} transform={`translate(${x} ${y}) rotate(${angle})`}>
+      <path d={`M${size * 0.55},${size * 0.5} l${size * 0.7},${size * 0.7}`} />
+      <circle cx={size * 1.35} cy={size * 1.3} r={4} />
+    </g>
+  )
+}

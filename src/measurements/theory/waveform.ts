@@ -150,6 +150,12 @@ export function none(p: ResolvedParams, notes: string[]): Theory {
   return finish(p, {}, [], notes)
 }
 
+/** True when the source rows (and the ripple frequency) of a healthy circuit apply. */
+function healthySource(p: ResolvedParams): boolean {
+  const f = p.faults
+  return !f.imbalance && !f.missingPhase && !f.diode && !f.vfOverride
+}
+
 /** Rows every circuit shares: source values and ripple frequency. */
 export function finish(p: ResolvedParams, values: Theory['values'], approximations: Theory['approximations'], notes: string[], mode?: Theory['mode']): Theory {
   const { n, vft } = pathDrops(p)
@@ -158,13 +164,13 @@ export function finish(p: ResolvedParams, values: Theory['values'], approximatio
     values: {
       vinPeak: { value: p.vm, formula: 'Vm = √2·Vrms', kind: 'exact' },
       vinRms: { value: p.vrms, formula: 'Vrms = Vm/√2', kind: 'exact' },
-      ...(isThreePhase(p.topology)
+      ...(isThreePhase(p.topology) && !p.faults.imbalance && !p.faults.missingPhase
         ? {
             vphRms: { value: p.vrms, formula: 'Vph = Vm/√2', kind: 'exact' as const },
             vllRms: { value: Math.sqrt(3) * p.vrms, formula: 'VLL = √3·Vph', kind: 'exact' as const },
           }
         : {}),
-      ...(conducts ? { rippleFrequency: { value: n * p.frequency, formula: n === 2 ? 'f_r = 2f' : 'f_r = f', kind: 'exact' as const } } : {}),
+      ...(conducts && healthySource(p) ? { rippleFrequency: { value: n * p.frequency, formula: n === 2 ? 'f_r = 2f' : 'f_r = f', kind: 'exact' as const } } : {}),
       ...values,
     },
     approximations,

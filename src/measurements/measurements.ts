@@ -149,20 +149,35 @@ export function measure(result: SimulationResult): Measurements {
   if (S.il) rectCurrentMin = minOf(S.il)
   else if (p.load === 'RL') rectCurrentMin = minOf(io)
 
-  // Ripple frequency: number of output crests per source cycle × f.
-  let crests = 0
-  const vspan = Math.max(...[maxOf(vout), -minOf(vout), 1e-12])
-  const crestEps = vspan * 1e-9
-  // Plateau-aware: a crest can span equal samples (e.g. a peak exactly midway between two).
-  for (let i = Math.max(1, i0); i < i1; i++) {
-    if (!(vout[i] > vout[i - 1] + crestEps)) continue
-    let j = i + 1
-    while (j < i1 && Math.abs(vout[j] - vout[i]) <= crestEps) j++
-    if (vout[j] < vout[i] - crestEps) crests++
-    i = j - 1
+  // Ripple frequency = the repetition frequency of the output: the largest k for which the
+  // last cycle repeats every T/k (checked sample by sample). A flat output has no ripple.
+  // (Counting crests is not enough: e.g. a half-controlled bridge has 6 unequal crests per
+  // cycle but only repeats every 120°.)
+  const vspan = Math.max(maxOf(vout), -minOf(vout), 1e-12)
+  let rippleFrequency: number | null = null
+  if (maxOf(vout) - minOf(vout) > vspan * 1e-6) {
+    const perCycle = T / p.dt
+    // 2 % of the ripple: far above interpolation error at a commutation kink, far below the
+    // difference between genuinely different pulses (e.g. unequal crests).
+    const tol = Math.max(1e-6, 2e-2 * (maxOf(vout) - minOf(vout)))
+    const at = (x: number) => {
+      const k = Math.floor(x)
+      return vout[k] + (vout[Math.min(i1, k + 1)] - vout[k]) * (x - k)
+    }
+    for (const k of [12, 6, 4, 3, 2, 1]) {
+      const shift = perCycle / k
+      // Samples right at a jump (SCR firing, commutation notch) cannot be interpolated; allow
+      // up to 2 % of them to differ. A genuinely different period differs almost everywhere.
+      let bad = 0
+      let total = 0
+      for (let i = i0; i + shift <= i1; i++, total++) if (Math.abs(vout[i] - at(i + shift)) > tol) bad++
+      const ok = total > 0 && bad <= 0.02 * total
+      if (ok) {
+        rippleFrequency = k / T
+        break
+      }
+    }
   }
-  // A crest exactly at a window edge may be missed or doubled; snap to an integer count per cycle.
-  const rippleFrequency = crests > 0 ? crests / T : null
 
   const wl = S.wl
   const wc = S.wc

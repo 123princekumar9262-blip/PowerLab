@@ -199,6 +199,18 @@ export function threePhaseTheory(p: ResolvedParams): Theory {
         turnOffAngleDeg: 'θoff = 150° + α',
       }
   const values = fromWaveform(p, w, formulas)
+  // Conduction of phase a's upper device, measured on the theoretical current itself (a
+  // freewheeling diode or discontinuous current can split or shorten it).
+  let onCount = 0
+  const N = 7200
+  for (let k = 0; k < N; k++) if (iD1((k / N) * TWO_PI) > 0) onCount++
+  const fwActive = fw && [...Array(721).keys()].some((k) => drive(start + (k / 720) * TWO_PI) < -p.diode.vf)
+  if (values.conductionAngleDeg) values.conductionAngleDeg = { ...values.conductionAngleDeg, value: (onCount / N) * 360, formula: fwActive ? 'γ: until the freewheeling diode takes over' : values.conductionAngleDeg.formula }
+  if (fwActive) {
+    delete values.turnOnAngleDeg
+    delete values.turnOffAngleDeg
+    notes.push('The freewheeling diode conducts whenever the bridge output would go negative: the SCR pair turns off and the inductor current circulates through Dfw. Vdc rises compared with no freewheeling diode.')
+  }
   if (controlled) delete values.piv // forward-blocking SCRs: PIV is not the simple diode formula
   if (!continuousConduction) {
     delete values.turnOnAngleDeg
@@ -212,9 +224,10 @@ export function threePhaseTheory(p: ResolvedParams): Theory {
     // Source impedance: commutation overlap (Ls) and resistive drop (Rs) lower the output.
     const drop = half ? (3 * p.omega * p.threePhase.ls) / (2 * Math.PI) + p.threePhase.rs : (3 * p.omega * p.threePhase.ls) / Math.PI + 2 * p.threePhase.rs
     const v0 = values.voutAvg?.value ?? 0
+    approximations.push({ key: 'voutAvg', label: 'Vdc, ideal source (no Rs, Ls)', value: v0, formula: values.voutAvg?.formula ?? '' })
     approximations.push({ key: 'voutAvg', label: 'Vdc with source impedance', value: v0 / (1 + drop / Reff), formula: half ? 'Vdc ≈ Vdc0 − (3ωLs/2π + Rs)·Idc' : 'Vdc ≈ Vdc0 − (3ωLs/π + 2Rs)·Idc' })
-    notes.push('Source impedance is present: the exact rows above are for an ideal source. During each commutation THREE devices conduct for an overlap angle μ, which lowers Vdc — see the approximate row.')
-    return finish(p, { voutAvg: values.voutAvg && { ...values.voutAvg, kind: 'approx' } }, approximations, notes, mode)
+    notes.push('Source impedance is present, so the ideal-source closed forms no longer apply exactly. During each commutation the source inductance makes THREE devices conduct for an overlap angle μ, which lowers Vdc. Compare the two approximate rows with the simulation.')
+    return finish(p, {}, approximations, notes, mode)
   }
   if (controlled) notes.push(`Firing angle α = ${αDeg.toFixed(1)}°: each SCR is fired α after the instant its phase would naturally take over.`)
   return finish(p, values, approximations, notes, mode)

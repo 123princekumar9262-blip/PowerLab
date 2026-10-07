@@ -184,7 +184,9 @@ export function solveNetlist(
     if (e.kind === 'C') ci++
   })
 
-  // Floating-reference constraints (see the REF element).
+  // Floating-reference constraints (see the REF element). `floating` collects the nodes of
+  // any sub-circuit that is currently disconnected (its absolute potential is arbitrary).
+  const floating = new Set<number>()
   let dIdx = 0
   const onNodes = new Set<number>()
   elements.forEach((e) => {
@@ -197,6 +199,7 @@ export function solveNetlist(
   })
   for (const e of elements) {
     if (e.kind !== 'REF' || (e.watch ?? [e.a, e.b]).some((q) => onNodes.has(q))) continue
+    for (const q of floatingSet(net, e)) floating.add(q)
     const row = node(e.a)
     for (let c = 0; c < n; c++) A[row * n + c] = 0
     const add = (q: number, coef: number) => {
@@ -214,6 +217,35 @@ export function solveNetlist(
 
   const v = new Float64Array(nn + 1)
   for (let q = 1; q <= nn; q++) v[q] = x[q - 1]
+
+  // A floating sub-circuit settles at WHATEVER common potential keeps its devices blocking
+  // (in a real circuit leakage and stray capacitance decide it). Find the range of common
+  // shifts δ that keeps every OFF device that cannot block a forward voltage at vD ≤ Vf;
+  // if the range is non-empty the OFF devices are consistent, and the potentials are reported
+  // with the δ closest to the symmetric REF choice (δ = 0).
+  if (floating.size) {
+    let lo = -Infinity
+    let hi = Infinity
+    let dd = 0
+    for (const e of elements) {
+      if (e.kind !== 'D') continue
+      const bit = 1 << dd
+      dd++
+      if (combo & bit || e.fault) continue
+      const gated = e.gate ? e.gate(t + h) : true
+      if (e.gate && !gated && !(prevCombo & bit)) continue // a blocking SCR may hold any forward voltage
+      const vf = e.vf ?? diode.vf
+      const v0 = v[e.a] - v[e.b]
+      const aIn = floating.has(e.a)
+      const bIn = floating.has(e.b)
+      if (aIn && !bIn) hi = Math.min(hi, vf - v0) // vD = v0 + δ ≤ Vf
+      else if (bIn && !aIn) lo = Math.max(lo, v0 - vf) // vD = v0 − δ ≤ Vf
+    }
+    if (lo <= hi) {
+      const delta = Math.min(hi, Math.max(lo, 0))
+      for (const q of floating) v[q] += delta
+    }
+  }
   const i = new Float64Array(elements.length)
   const iL = new Float64Array(state.iL.length)
   const vC = new Float64Array(state.vC.length)
@@ -254,6 +286,32 @@ export function solveNetlist(
     }
   })
   return { v, i, diodes, storage: { iL, vC }, consistent: violation === 0, violation }
+}
+
+const floatingCache = new WeakMap<Element, Set<number>>()
+/**
+ * Nodes of the sub-circuit a REF element pins: everything reachable from its node `a`
+ * through sources, resistors, inductors and capacitors (never through a diode, never the
+ * reference node). For a three-phase bridge: the neutral, the source and impedance nodes.
+ */
+function floatingSet(net: Netlist, ref: Extract<Element, { kind: 'REF' }>): Set<number> {
+  let set = floatingCache.get(ref)
+  if (set) return set
+  set = new Set<number>([ref.a])
+  const stack = [ref.a]
+  while (stack.length) {
+    const q = stack.pop()!
+    for (const e of net.elements) {
+      if (e.kind === 'D' || e.kind === 'REF') continue
+      const other = e.a === q ? e.b : e.b === q ? e.a : -1
+      if (other > 0 && !set.has(other)) {
+        set.add(other)
+        stack.push(other)
+      }
+    }
+  }
+  floatingCache.set(ref, set)
+  return set
 }
 
 /** Bias classification for display, from the solved state and voltage. */

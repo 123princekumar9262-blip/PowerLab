@@ -145,6 +145,7 @@ export function App() {
         onLoad={(load) => dispatch({ type: 'chooseLoad', load })}
         onRun={onRun}
         onMode={(mode) => dispatch({ type: 'setMode', mode })}
+        onSection={(section) => dispatch({ type: 'setSection', section })}
         circuitLocked={(state.mode === 'learn' && !!modes.lesson) || (state.mode === 'challenge' && !!modes.challenge) || state.mode === 'predict'}
       />
 
@@ -174,6 +175,7 @@ export function App() {
         <main className="lab">
           <aside className="col-params">
             <ParameterPanel
+              topology={result.params.topology}
               load={result.params.load}
               params={state.params}
               resolved={result.params}
@@ -194,7 +196,7 @@ export function App() {
                   ⚡ Energy view
                 </button>
               </div>
-              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={hide ? null : explanation.sample} result={hide ? null : result} params={result.params} />
+              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={hide ? null : explanation.sample} result={hide ? null : result} params={result.params} lens={state.lensStage === null ? null : (explanation.chain[state.lensStage]?.stage ?? null)} />
             </section>
 
             {state.showEnergy && !hide && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
@@ -296,7 +298,15 @@ export function App() {
                 onClose={() => dispatch({ type: 'selectEventGroup', id: null })}
               />
             )}
-            {!hide && <StatePanel ex={explanation} signalIds={result.signalIds} whyOpen={state.whyOpen} onToggleWhy={() => dispatch({ type: 'toggleWhy' })} />}
+            {!hide && <StatePanel
+                ex={explanation}
+                signalIds={result.signalIds}
+                topology={result.params.topology}
+                whyOpen={state.whyOpen}
+                onToggleWhy={() => dispatch({ type: 'toggleWhy' })}
+                lensOn={state.lensStage !== null}
+                onToggleLens={() => dispatch({ type: 'setLens', stage: state.lensStage === null ? 0 : null })}
+              />}
           </aside>
         </main>
       )}

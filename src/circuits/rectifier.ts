@@ -125,8 +125,14 @@ function buildNetlist(p: ResolvedParams): Built {
   let fixedOff = 0
   let hasShort = false
   let k = 0
+  // A disconnected phase conductor cannot carry current: its devices are effectively open.
+  const missingNode = isThreePhase(p.topology) && p.faults.missingPhase ? missingPhaseNode(els, p.faults.missingPhase) : -1
   for (const e of els) {
     if (e.kind !== 'D') continue
+    if (missingNode > 0 && (e.a === missingNode || e.b === missingNode) && !e.fault) {
+      e.fault = 'open'
+      fixedOff |= 1 << k
+    }
     if (p.faults.diode?.id === e.id) {
       e.fault = p.faults.diode.kind
       fixedOff |= 1 << k
@@ -138,6 +144,12 @@ function buildNetlist(p: ResolvedParams): Built {
 
   const find = (id: string) => els.findIndex((e) => e.id === id)
   return { net: { nodes, elements: els }, P, N, M, diodeIds, fixedOff, hasShort, kR: find('R'), kL: find('L'), kC: find('C'), vin, phase: phaseFn }
+}
+
+/** The phase node of a disconnected phase (the end of its 1 GΩ leak element). */
+function missingPhaseNode(els: Element[], x: Phase): number {
+  const leak = els.find((e) => e.kind === 'R' && e.id === `Rleak${x}`) as Extract<Element, { kind: 'R' }> | undefined
+  return leak ? leak.a : -1
 }
 
 /**

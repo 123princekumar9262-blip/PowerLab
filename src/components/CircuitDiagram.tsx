@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import type { LoadType, RectifierTopology, ResolvedParams, SimulationResult, SimulationSample } from '../types/simulation.ts'
+import { isThreePhase, type LoadType, type RectifierTopology, type ResolvedParams, type SimulationResult, type SimulationSample } from '../types/simulation.ts'
+import { ThreePhaseDiagram } from './ThreePhaseDiagram.tsx'
 import { formatA, formatSI, formatV, formatCapacitance } from '../utils/format.ts'
 import { CapacitorSym, DiodeSym, diodeEnds, hopV, inductorPath, resistorPath, SourceSym, type DeviceState } from './circuit/symbols.tsx'
 
@@ -10,19 +11,21 @@ interface Props {
   /** Simulated state at the cursor; null before the first run (idle schematic). */
   sample: SimulationSample | null
   result: SimulationResult | null
+  /** Physics Lens stage to emphasise. */
+  lens?: string | null
 }
 
 /** A wire segment that carries a simulated branch current (signed, along the path direction). */
-interface Flow {
+export interface Flow {
   key: string
   d: string
   current: number
 }
 
 // Layout constants (SVG user units)
-const YT = 60 // + output rail
-const YB = 300 // − output rail
-const EX = 640 // load entry (tap on the + rail)
+export const YT = 60 // + output rail
+export const YB = 300 // − output rail
+export const EX = 640 // load entry (tap on the + rail)
 
 const ohm = (r: number) => formatSI(r, 'Ω').replace(/\.0+ /, ' ')
 
@@ -30,7 +33,12 @@ const ohm = (r: number) => formatSI(r, 'Ω').replace(/\.0+ /, ' ')
  * Schematic for any rectifier × load, synchronized to the simulation sample at the cursor.
  * Every highlighted wire and every moving particle corresponds to a simulated branch current.
  */
-export function CircuitDiagram({ topology, load, params, sample, result }: Props) {
+export function CircuitDiagram(props: Props) {
+  if (isThreePhase(props.topology)) return <ThreePhaseDiagram params={props.params} sample={props.sample} result={props.result} lens={props.lens} />
+  return <SinglePhaseDiagram {...props} />
+}
+
+function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Props) {
   const idle = !sample
   const x = sample?.values ?? {}
   const d = sample?.diodes ?? []
@@ -59,107 +67,8 @@ export function CircuitDiagram({ topology, load, params, sample, result }: Props
   const parts: ReactNode[] = []
   const labels: ReactNode[] = []
 
-  // ── Load block (hangs from the + rail at EX, returns on the − rail) ─────────────
-  let nLeft = EX // x where the load's return joins the − rail's leftward run
-  const rLabel = (rx: number, ry0: number, ry1: number) => (
-    <g key="rlabel">
-      <text className="label" x={rx - 26} y={(ry0 + ry1) / 2 - 4} textAnchor="end">R</text>
-      <text className="sub" x={rx - 26} y={(ry0 + ry1) / 2 + 13} textAnchor="end">{ohm(params.resistance)}</text>
-    </g>
-  )
-  const heat = !idle ? Math.min(1, (x.pload ?? 0) / scale.p) : 0
-  const heatGlow = (rx: number, ry0: number, ry1: number) =>
-    heat > 0.01 ? <ellipse key="heat" cx={rx} cy={(ry0 + ry1) / 2} rx={36} ry={(ry1 - ry0) / 2 + 12} fill="url(#heat)" opacity={heat} /> : null
-  const lGlow = (lx: number, ly0: number, ly1: number) => {
-    const w = !idle ? Math.min(1, (x.wl ?? 0) / scale.wl) : 0
-    return w > 0.01 ? <ellipse key="lglow" cx={lx} cy={(ly0 + ly1) / 2} rx={30} ry={(ly1 - ly0) / 2 + 10} fill="url(#field)" opacity={w} /> : null
-  }
-  const lLabel = (lx: number, ly0: number, ly1: number) => (
-    <g key="llabel">
-      <text className="label" x={lx - 26} y={(ly0 + ly1) / 2 - 4} textAnchor="end">L</text>
-      <text className="sub" x={lx - 26} y={(ly0 + ly1) / 2 + 13} textAnchor="end">{formatSI(params.inductance, 'H')}</text>
-      {!idle && <text className="value value--small" x={lx + 20} y={(ly0 + ly1) / 2 + 4}>vL {formatV(x.vl ?? 0)}</text>}
-    </g>
-  )
-  const capFill = !idle ? Math.sqrt(Math.min(1, (x.wc ?? 0) / scale.wc)) : 0
-  const outBracket = (bx: number, y0: number, y1: number, value: number | null, name = 'Vout') => (
-    <g key={`br-${name}`}>
-      <path className="bracket" d={`M${bx},${y0} h8 V${y1} h-8`} />
-      <text className={`polarity ${value !== null && value > 0 ? '' : 'polarity--dim'}`} x={bx + 18} y={y0 + 6}>+</text>
-      <text className={`polarity ${value !== null && value > 0 ? '' : 'polarity--dim'}`} x={bx + 18} y={y1 + 2}>−</text>
-      <text className="label" x={bx + 24} y={(y0 + y1) / 2 - 4}>{name}</text>
-      <text className="value" x={bx + 24} y={(y0 + y1) / 2 + 14}>{value === null ? '—' : formatV(value)}</text>
-    </g>
-  )
-
-  if (load === 'R' || load === 'RL') {
-    const rTop = load === 'R' ? 110 : 190
-    const rBot = load === 'R' ? 250 : 275
-    if (load === 'RL') {
-      const lTop = 80
-      const lBot = 165
-      parts.push(lGlow(EX, lTop, lBot))
-      parts.push(<path key="Lw" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${rTop}`} />)
-      parts.push(<path key="L" className={`wire coil ${io > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
-      flows.push({ key: 'e-l', d: `M${EX},${YT} V${rTop}`, current: io })
-      labels.push(lLabel(EX, lTop, lBot))
-    } else {
-      parts.push(<path key="er" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${rTop}`} />)
-      flows.push({ key: 'e-r', d: `M${EX},${YT} V${rTop}`, current: io })
-    }
-    parts.push(heatGlow(EX, rTop, rBot))
-    parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={resistorPath(EX, rTop, rBot) + ` M${EX},${rBot} V${YB}`} />)
-    flows.push({ key: 'R', d: resistorPath(EX, rTop, rBot) + ` V${YB}`, current: io })
-    labels.push(rLabel(EX, rTop, rBot))
-    labels.push(outBracket(EX + 44, YT + 20, YB - 20, idle ? null : (x.vout ?? 0)))
-    if (!idle && io > 0) labels.push(<text key="io" className="value value--current" x={EX + 18} y={YT + 34}>io {formatA(io)}</text>)
-  } else {
-    // RC: split at y = ys into C (left) and R (right). RLC: inductor first, then the split.
-    const ys = load === 'RC' ? 92 : 168
-    const cx = EX - 50
-    const rx = EX + 50
-    if (load === 'RLC') {
-      const lTop = 78
-      const lBot = 150
-      parts.push(lGlow(EX, lTop, lBot))
-      parts.push(<path key="Lw" className={`wire ${il > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${ys}`} />)
-      parts.push(<path key="L" className={`wire coil ${il > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
-      flows.push({ key: 'e-l', d: `M${EX},${YT} V${ys}`, current: il })
-      labels.push(lLabel(EX, lTop, lBot))
-      if (!idle) labels.push(<text key="il" className="value value--small" x={EX + 20} y={lTop - 2}>iL {formatA(il)}</text>)
-    } else {
-      parts.push(<path key="es" className={`wire ${irect > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${ys}`} />)
-      flows.push({ key: 'e-s', d: `M${EX},${YT} V${ys}`, current: irect })
-    }
-    const cMid = (ys + YB) / 2
-    parts.push(<path key="splitc" className={`wire ${Math.abs(ic) > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${cx}`} />)
-    parts.push(<CapacitorSym key="C" x={cx} y0={ys} y1={YB} fill={capFill} />)
-    flows.push({ key: 'c', d: `M${EX},${ys} H${cx} V${cMid - 5} M${cx},${cMid + 5} V${YB}`, current: ic })
-    const rTop = ys + 30
-    const rBot = YB - 30
-    parts.push(heatGlow(rx, rTop, rBot))
-    parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`} />)
-    parts.push(<circle key="jt" className="junction" cx={EX} cy={ys} r={3.5} />)
-    parts.push(<circle key="jb" className="junction" cx={cx} cy={YB} r={3.5} />)
-    flows.push({ key: 'r', d: `M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`, current: io })
-    labels.push(
-      <g key="clabel">
-        <text className="label" x={cx - 30} y={cMid - 4} textAnchor="end">C</text>
-        <text className="sub" x={cx - 30} y={cMid + 13} textAnchor="end">{formatCapacitance(params.capacitance)}</text>
-        {!idle && <text className="value value--small" x={cx - 30} y={cMid + 32} textAnchor="end">iC {formatA(ic, true)}</text>}
-      </g>,
-    )
-    labels.push(
-      <g key="rl2">
-        <text className="label" x={rx + 20} y={(rTop + rBot) / 2 - 4}>R</text>
-        <text className="sub" x={rx + 20} y={(rTop + rBot) / 2 + 13}>{ohm(params.resistance)}</text>
-        {!idle && <text className="value value--small" x={rx + 20} y={(rTop + rBot) / 2 + 32}>io {formatA(io)}</text>}
-      </g>,
-    )
-    labels.push(outBracket(rx + 76, ys + 4, YB - 4, idle ? null : (x.vout ?? 0)))
-    if (load === 'RLC' && !idle) labels.push(<text key="vrect" className="value value--small" x={EX - 22} y={YT - 10} textAnchor="end">vrect {formatV(x.vrect ?? 0)}</text>)
-    nLeft = cx
-  }
+  const loadParts: ReactNode[] = []
+  const nLeft = renderLoad({ load, params, idle, x, io, il, ic, irect, scale, flows, parts: loadParts, labels })
 
   // ── Rectifier part (delivers to the + rail at EX and takes the return from nLeft) ─
   const srcLabel = (cx: number, cy: number, key: string, name: string, value: number | null) => (
@@ -283,7 +192,7 @@ export function CircuitDiagram({ topology, load, params, sample, result }: Props
 
   return (
     <svg
-      className={`circuit circuit--${state}`}
+      className={`circuit circuit--${state} ${lens ? `lens lens--${lens}` : ''}`}
       viewBox="-70 0 960 380"
       role="img"
       aria-label={
@@ -303,10 +212,139 @@ export function CircuitDiagram({ topology, load, params, sample, result }: Props
         </radialGradient>
       </defs>
       {parts}
+      <g className="load-block">{loadParts}</g>
       {flows.map((f) => (visible(f) ? <path key={`f-${f.key}`} ref={refs(f.key)} className="flow" d={f.d} /> : null))}
       {labels}
     </svg>
   )
+}
+
+
+/** Everything the load block needs to draw itself from the simulated sample. */
+export interface LoadCtx {
+  load: LoadType
+  params: ResolvedParams
+  idle: boolean
+  x: SimulationSample['values']
+  io: number
+  il: number
+  ic: number
+  /** Current delivered by the rectifier into the + rail. */
+  irect: number
+  scale: { i: number; p: number; wl: number; wc: number }
+  flows: Flow[]
+  parts: ReactNode[]
+  labels: ReactNode[]
+}
+
+/**
+ * Load block, shared by every rectifier: hangs from the + rail at x = EX and returns on the
+ * − rail. Returns the x where the return joins the − rail's leftward run.
+ */
+export function renderLoad(c: LoadCtx): number {
+  // ── Load block (hangs from the + rail at EX, returns on the − rail) ─────────────
+  let nLeft = EX // x where the load's return joins the − rail's leftward run
+  const { load, params, idle, x, io, il, ic, irect, scale, flows, parts, labels } = c
+  const rLabel = (rx: number, ry0: number, ry1: number) => (
+    <g key="rlabel">
+      <text className="label" x={rx - 26} y={(ry0 + ry1) / 2 - 4} textAnchor="end">R</text>
+      <text className="sub" x={rx - 26} y={(ry0 + ry1) / 2 + 13} textAnchor="end">{ohm(params.resistance)}</text>
+    </g>
+  )
+  const heat = !idle ? Math.min(1, (x.pload ?? 0) / scale.p) : 0
+  const heatGlow = (rx: number, ry0: number, ry1: number) =>
+    heat > 0.01 ? <ellipse key="heat" cx={rx} cy={(ry0 + ry1) / 2} rx={36} ry={(ry1 - ry0) / 2 + 12} fill="url(#heat)" opacity={heat} /> : null
+  const lGlow = (lx: number, ly0: number, ly1: number) => {
+    const w = !idle ? Math.min(1, (x.wl ?? 0) / scale.wl) : 0
+    return w > 0.01 ? <ellipse key="lglow" cx={lx} cy={(ly0 + ly1) / 2} rx={30} ry={(ly1 - ly0) / 2 + 10} fill="url(#field)" opacity={w} /> : null
+  }
+  const lLabel = (lx: number, ly0: number, ly1: number) => (
+    <g key="llabel">
+      <text className="label" x={lx - 26} y={(ly0 + ly1) / 2 - 4} textAnchor="end">L</text>
+      <text className="sub" x={lx - 26} y={(ly0 + ly1) / 2 + 13} textAnchor="end">{formatSI(params.inductance, 'H')}</text>
+      {!idle && <text className="value value--small" x={lx + 20} y={(ly0 + ly1) / 2 + 4}>vL {formatV(x.vl ?? 0)}</text>}
+    </g>
+  )
+  const capFill = !idle ? Math.sqrt(Math.min(1, (x.wc ?? 0) / scale.wc)) : 0
+  const outBracket = (bx: number, y0: number, y1: number, value: number | null, name = 'Vout') => (
+    <g key={`br-${name}`}>
+      <path className="bracket" d={`M${bx},${y0} h8 V${y1} h-8`} />
+      <text className={`polarity ${value !== null && value > 0 ? '' : 'polarity--dim'}`} x={bx + 18} y={y0 + 6}>+</text>
+      <text className={`polarity ${value !== null && value > 0 ? '' : 'polarity--dim'}`} x={bx + 18} y={y1 + 2}>−</text>
+      <text className="label" x={bx + 24} y={(y0 + y1) / 2 - 4}>{name}</text>
+      <text className="value" x={bx + 24} y={(y0 + y1) / 2 + 14}>{value === null ? '—' : formatV(value)}</text>
+    </g>
+  )
+
+  if (load === 'R' || load === 'RL') {
+    const rTop = load === 'R' ? 110 : 190
+    const rBot = load === 'R' ? 250 : 275
+    if (load === 'RL') {
+      const lTop = 80
+      const lBot = 165
+      parts.push(lGlow(EX, lTop, lBot))
+      parts.push(<path key="Lw" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${rTop}`} />)
+      parts.push(<path key="L" className={`wire coil ${io > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
+      flows.push({ key: 'e-l', d: `M${EX},${YT} V${rTop}`, current: io })
+      labels.push(lLabel(EX, lTop, lBot))
+    } else {
+      parts.push(<path key="er" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${rTop}`} />)
+      flows.push({ key: 'e-r', d: `M${EX},${YT} V${rTop}`, current: io })
+    }
+    parts.push(heatGlow(EX, rTop, rBot))
+    parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={resistorPath(EX, rTop, rBot) + ` M${EX},${rBot} V${YB}`} />)
+    flows.push({ key: 'R', d: resistorPath(EX, rTop, rBot) + ` V${YB}`, current: io })
+    labels.push(rLabel(EX, rTop, rBot))
+    labels.push(outBracket(EX + 44, YT + 20, YB - 20, idle ? null : (x.vout ?? 0)))
+    if (!idle && io > 0) labels.push(<text key="io" className="value value--current" x={EX + 18} y={YT + 34}>io {formatA(io)}</text>)
+  } else {
+    // RC: split at y = ys into C (left) and R (right). RLC: inductor first, then the split.
+    const ys = load === 'RC' ? 92 : 168
+    const cx = EX - 50
+    const rx = EX + 50
+    if (load === 'RLC') {
+      const lTop = 78
+      const lBot = 150
+      parts.push(lGlow(EX, lTop, lBot))
+      parts.push(<path key="Lw" className={`wire ${il > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${ys}`} />)
+      parts.push(<path key="L" className={`wire coil ${il > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
+      flows.push({ key: 'e-l', d: `M${EX},${YT} V${ys}`, current: il })
+      labels.push(lLabel(EX, lTop, lBot))
+      if (!idle) labels.push(<text key="il" className="value value--small" x={EX + 20} y={lTop - 2}>iL {formatA(il)}</text>)
+    } else {
+      parts.push(<path key="es" className={`wire ${irect > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${ys}`} />)
+      flows.push({ key: 'e-s', d: `M${EX},${YT} V${ys}`, current: irect })
+    }
+    const cMid = (ys + YB) / 2
+    parts.push(<path key="splitc" className={`wire ${Math.abs(ic) > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${cx}`} />)
+    parts.push(<CapacitorSym key="C" x={cx} y0={ys} y1={YB} fill={capFill} />)
+    flows.push({ key: 'c', d: `M${EX},${ys} H${cx} V${cMid - 5} M${cx},${cMid + 5} V${YB}`, current: ic })
+    const rTop = ys + 30
+    const rBot = YB - 30
+    parts.push(heatGlow(rx, rTop, rBot))
+    parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`} />)
+    parts.push(<circle key="jt" className="junction" cx={EX} cy={ys} r={3.5} />)
+    parts.push(<circle key="jb" className="junction" cx={cx} cy={YB} r={3.5} />)
+    flows.push({ key: 'r', d: `M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`, current: io })
+    labels.push(
+      <g key="clabel">
+        <text className="label" x={cx - 30} y={cMid - 4} textAnchor="end">C</text>
+        <text className="sub" x={cx - 30} y={cMid + 13} textAnchor="end">{formatCapacitance(params.capacitance)}</text>
+        {!idle && <text className="value value--small" x={cx - 30} y={cMid + 32} textAnchor="end">iC {formatA(ic, true)}</text>}
+      </g>,
+    )
+    labels.push(
+      <g key="rl2">
+        <text className="label" x={rx + 20} y={(rTop + rBot) / 2 - 4}>R</text>
+        <text className="sub" x={rx + 20} y={(rTop + rBot) / 2 + 13}>{ohm(params.resistance)}</text>
+        {!idle && <text className="value value--small" x={rx + 20} y={(rTop + rBot) / 2 + 32}>io {formatA(io)}</text>}
+      </g>,
+    )
+    labels.push(outBracket(rx + 76, ys + 4, YB - 4, idle ? null : (x.vout ?? 0)))
+    if (load === 'RLC' && !idle) labels.push(<text key="vrect" className="value value--small" x={EX - 22} y={YT - 10} textAnchor="end">vrect {formatV(x.vrect ?? 0)}</text>)
+    nLeft = cx
+  }
+  return nLeft
 }
 
 /** ON/OFF tag with the diode voltage. */
@@ -327,7 +365,7 @@ function diodeTag(x: number, y: number, sample: SimulationSample | null, k: numb
  * Move each flow's dotted pattern along its path at a speed ∝ |current| (direction = sign),
  * by writing stroke-dashoffset directly (no React re-render per frame). Respects reduced motion.
  */
-function useFlowAnimation(flows: Flow[], iScale: number) {
+export function useFlowAnimation(flows: Flow[], iScale: number) {
   const els = useRef(new Map<string, SVGPathElement>())
   const speeds = useRef(new Map<string, number>())
   const offsets = useRef(new Map<string, number>())

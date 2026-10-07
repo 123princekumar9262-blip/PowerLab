@@ -1852,3 +1852,57 @@ tr.row-approx td {
   padding: 40px;
   background: repeating-linear-gradient(45deg, var(--surface-1) 0 12px, var(--surface-2) 12px 24px);
 }
+
+/* ── Three-phase ─────────────────────────────────────────────────────────── */
+:root {
+  /* Phase colours (R-Y-B convention within the validated palette; all-pairs pass, dark
+     surface): a magenta, b amber, c blue. Vo is bright neutral — it never competes with a phase. */
+  --sig-pa: #d55181;
+  --sig-pb: #c98500;
+  --sig-pc: #3987e5;
+  --sig-vout3: #eef2f7;
+}
+.phase-wire--a { stroke: color-mix(in srgb, var(--sig-pa) 55%, #3a4554); }
+.phase-wire--b { stroke: color-mix(in srgb, var(--sig-pb) 55%, #3a4554); }
+.phase-wire--c { stroke: color-mix(in srgb, var(--sig-pc) 55%, #3a4554); }
+.circuit .phase-wire--a.wire--active { stroke: var(--sig-pa); }
+.circuit .phase-wire--b.wire--active { stroke: var(--sig-pb); }
+.circuit .phase-wire--c.wire--active { stroke: var(--sig-pc); }
+.circuit .source--a circle { stroke: var(--sig-pa); }
+.circuit .source--b circle { stroke: var(--sig-pb); }
+.circuit .source--c circle { stroke: var(--sig-pc); }
+.circuit .source.is-missing { opacity: 0.25; }
+.circuit .phase-label { font-style: normal; font-size: 11px; fill: var(--text-2); }
+.circuit .value--tiny { font-family: var(--font-mono); font-size: 10.5px; fill: var(--text-3); }
+.circuit .value--tiny.is-on { fill: var(--good); }
+.circuit .fault-tag { font-size: 11px; font-weight: 700; fill: var(--warning); }
+.circuit .gate path { stroke: var(--text-3); stroke-width: 1.5; fill: none; }
+.circuit .gate circle { fill: var(--surface-1); stroke: var(--text-3); stroke-width: 1.5; }
+.circuit .gate--on circle { fill: var(--warning); stroke: var(--warning); }
+/* Physics Lens: dim everything except the stage being explained. */
+.circuit.lens .rect-block,
+.circuit.lens .load-block,
+.circuit.lens .flows { transition: opacity 0.2s; }
+.circuit.lens--source .rect-block .diode,
+.circuit.lens--source .load-block,
+.circuit.lens--source .flows { opacity: 0.25; }
+.circuit.lens--condition .load-block,
+.circuit.lens--condition .flows,
+.circuit.lens--diode .load-block,
+.circuit.lens--diode .flows { opacity: 0.3; }
+.circuit.lens--condition .source,
+.circuit.lens--diode .source { opacity: 0.45; }
+.circuit.lens--path .rect-block .source { opacity: 0.6; }
+.circuit.lens--output .rect-block,
+.circuit.lens--energy .rect-block,
+.circuit.lens--waveform .rect-block { opacity: 0.3; }
+.phase-chip { display: inline-block; padding: 0 6px; margin-right: 4px; border-radius: 4px; font-weight: 700; font-size: 12px; color: #0b0f14; }
+.phase-chip--a { background: var(--sig-pa); }
+.phase-chip--b { background: var(--sig-pb); }
+.phase-chip--c { background: var(--sig-pc); }
+.why-row { display: flex; gap: 8px; }
+.why-row .why-btn { flex: 1; }
+.lens-btn { flex: none; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 12.5px; }
+.lens-btn.is-on { border-color: var(--accent); color: var(--text-1); background: rgba(110, 168, 255, 0.12); }
+.chain-eq { font-family: var(--font-mono); font-size: 12px !important; color: var(--text-2) !important; background: var(--surface-2); border-radius: 5px; padding: 3px 7px; margin-top: 4px !important; display: inline-block; }
+.section-seg { margin-left: 0; }
