@@ -25,10 +25,14 @@ export function EnergyPanel({ result, sample, measurements: m }: Props) {
   const il = x.il ?? (p.load === 'RL' ? (x.io ?? 0) : 0)
 
   // Positive = absorbing energy, negative = supplying.
+  const fw = sample.diodes.find((d) => d.id === 'Dfw')
+  const pFw = fw ? fw.voltage * fw.current : 0
   const rows: Array<{ id: string; label: string; p: number; note: string }> = [
     { id: 'src', label: 'Source', p: -(x.ps ?? 0), note: 'supplies energy while a diode conducts' },
-    { id: 'd', label: 'Diodes', p: x.pd ?? 0, note: 'lose Vf·i (+ Ron·i²) as heat' },
+    // With a freewheeling diode, show where the inductor's energy goes: D1 and Dfw separately.
+    { id: 'd', label: fw ? 'Diode D1' : 'Diodes', p: (x.pd ?? 0) - pFw, note: 'lose Vf·i (+ Ron·i²) as heat' },
   ]
+  if (fw) rows.push({ id: 'fw', label: 'Freewheel Dfw', p: pFw, note: 'loses Vf·i while the inductor freewheels' })
   if (hasL) rows.push({ id: 'l', label: 'Inductor L', p: (x.vl ?? 0) * il, note: 'stores ½·L·i² in its magnetic field' })
   if (hasC) rows.push({ id: 'c', label: 'Capacitor C', p: vC * (x.ic ?? 0), note: 'stores ½·C·v² in its electric field' })
   rows.push({ id: 'r', label: 'Resistor R', p: x.pload ?? 0, note: 'turns energy into heat (always absorbing)' })

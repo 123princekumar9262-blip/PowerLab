@@ -16,8 +16,10 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
   Diodes or SCRs with firing angle α = 0–180°, an optional freewheeling diode, source R/L
   (commutation overlap), and fault injection.
 
-Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 354 unit tests pass, along with
-two browser smoke suites (54 single-phase checks and 24 three-phase checks).
+- **Freewheeling diode** (half-wave + RL): toggle Dfw ON/OFF and compare the two circuits side by side.
+
+Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 410 unit tests pass, along with
+three browser smoke suites (54 single-phase, 24 three-phase and 29 freewheeling-diode checks).
 
 ## Run it
 
@@ -30,7 +32,7 @@ npm test             # physics / theory / limits / lessons / challenges (Vitest)
 npm run build        # type-check + production build into dist/
 npm run smoke        # browser smoke tests — need the dev server on port 5199:
 npm run smoke3       #   npm run dev -- --port 5199     (then, in another terminal)
-                     #   npm run smoke && npm run smoke3
+npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw
 ```
 
 The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
@@ -61,6 +63,31 @@ Chrome instead) and saves screenshots to `scripts/out/`.
 | Step size: Event · 15° · Δt | next detected event · next 15° of θ · one timestep |
 | Speed 0.25×–4× | 1× = one source cycle every 4 s (slow motion) |
 | ⚡ Energy view | power ledger (who supplies, who absorbs, with a live Σp = 0 check), energy stored in L and C, energy/power channels on the scope |
+
+### Freewheeling diode
+
+Choose **Half-wave** + **RL** and press **Freewheeling diode: OFF** in the bench bar (or the
+toggle under Parameters). Dfw is a real circuit element across the load, with its anode on the − output and its
+cathode on the + output. Nothing about its behaviour is scripted: the solver decides at every step whether it conducts.
+
+- **Freewheeling diode card** (right column): Dfw ON/OFF with its bias, current and voltage, plus Vin,
+  Vout, IL and the state of D1 at the cursor. Below that are the inductor energy E_L = ½·L·i² and where
+  it is going, and a numbered **"Why is the freewheeling diode ON / OFF?"** written from the simulated state.
+- **Schematic**: the rails are split at Dfw's junctions, so each wire carries its own simulated current.
+  While the diode freewheels, only the L → R → Dfw loop is lit. The scope shades D1's conduction green
+  and Dfw's violet, and offers Ifw, Vfw and E_L (WL) channels.
+- **⇄ Compare with / without Dfw**: the same circuit simulated twice, drawn on shared axes (Vout, Io,
+  Ifw, E_L), with bands where the outputs differ and a table of measured differences. Drag on it to move the master cursor.
+- **⏭ Step through conduction**: seven stops found from the simulation's events (D1 ON → D1 OFF →
+  current must continue → Dfw forward biased → freewheel current → energy decreasing → Dfw OFF).
+  **Auto** plays and pauses at each one.
+- **Physics Lens**: ten stages, from the source to the decaying current.
+- **Experiment** mode offers five guided experiments, and **Predict → What if…?** puts the freewheel
+  questions first (e.g. "what happens to the current ripple when Dfw is added?", A–D).
+
+The architecture is reusable: `supportsFreewheel(topology, load)` in `types/simulation.ts` is the only
+rule deciding which circuits accept Dfw. The netlist, solver, events, measurements and explanations are generic
+(the three-phase rectifiers already use the same element).
 
 ### Three-phase section
 
@@ -126,12 +153,14 @@ src/
     theory/index.ts          dispatch; single-phase closed-form theory per load (+ approximations)
     theory/waveform.ts       shared: analytic waveform → measurements by quadrature
     theory/threePhase.ts     three-phase theory: envelopes, firing angle, periodic RL, overlap approx.
+    theory/freewheel.ts      half-wave RL + freewheeling diode: closed-form periodic solution
     compare.ts               simulation vs theory, tolerance, steady-state gating
   explanations/
     rectifier.ts             WHY engine for every single-phase circuit (state + event explanations)
     threePhase.ts            three-phase WHY: highest/lowest phase, conducting pair, gates, faults
-    lens.ts                  Physics Lens stages built from the same explanation
-  experiment/                before/after snapshots, measured differences, WHY per change
+    freewheel.ts             freewheeling diode: mode, why Dfw is ON/OFF, freewheel intervals, step-through
+    lens.ts                  Physics Lens stages built from the same explanation (10 for the freewheel circuit)
+  experiment/                before/after snapshots, measured differences, WHY per change, freewheel experiments
   reverse/                   reverse-engineering tasks (hidden circuit)
   learning/                  lessons (Phase 8), facts read from the simulation, cursor targets
   prediction/                sketch tasks and scoring (Phase 9); what-if questions
@@ -139,12 +168,14 @@ src/
   visualization/             scope renderer (overlay/grouped/separate), signals, scales, events
   state/                     reducer, playback, stepping, mode logic (useModes)
   components/                Header, CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
+                             FreewheelPanel, CompareView, StepThrough,
                              PhysicsLens, Scope, Transport, StatePanel, EnergyPanel, ParameterPanel,
                              MeasurementTable, EventPanels, modes/*
   styles/index.css           design tokens + layout
 tests/                       Vitest suites (physics, theory, limits, three-phase, modes, lessons, challenges)
 scripts/smoke.mjs            Playwright end-to-end check (single-phase)
 scripts/smoke3.mjs           Playwright end-to-end check (three-phase)
+scripts/smoke-fw.mjs         Playwright end-to-end check (freewheeling diode)
 docs/simulation.md           the mathematical model
 ```
 
@@ -232,5 +263,9 @@ Circuits are netlists. To add, say, a half-wave rectifier with a freewheeling di
 | H | Faults: device open/short, unequal Vf, missing phase, imbalance | ✅ |
 | I | RC/RLC loads, SCRs with α = 0–180°, half-controlled bridge, freewheeling diode, gate pulses | ✅ |
 
-Possible next steps: single-phase controlled rectifiers, a closed-form theory for commutation
+Freewheeling-diode feature (phases 1–10): topology, switching, RL validation, current-path animation,
+waveforms, WHY engine, energy view, with/without comparison, prediction/experiments, tests. ✅
+
+Possible next steps: a freewheeling diode for the other single-phase rectifiers (one line in
+`supportsFreewheel`, plus their theory), single-phase controlled rectifiers, a closed-form theory for commutation
 overlap (it is shown only as an approximation now), and twelve-pulse arrangements.

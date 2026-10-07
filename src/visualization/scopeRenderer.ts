@@ -31,6 +31,7 @@ export interface ScopeColors {
   text3: string
   conduction: string
   conduction2: string
+  conductionFw: string
   cursor: string
   marker: string
   markerDiode: string
@@ -87,6 +88,7 @@ export function readColors(el: Element): ScopeColors {
     text3: v('--text-3'),
     conduction: v('--scope-conduction'),
     conduction2: v('--scope-conduction-2'),
+    conductionFw: v('--scope-conduction-fw'),
     cursor: v('--scope-cursor'),
     marker: v('--text-3'),
     markerDiode: v('--text-1'),
@@ -191,10 +193,11 @@ export function drawBase(ctx: CanvasRenderingContext2D, L: ScopeLayout, result: 
     ctx.fillStyle = colors.laneBg
     ctx.fillRect(L.plotLeft, lane.top, plotW, lane.height)
 
-    // Conduction shading: D1 (and D2 for full-wave) ON intervals, shared by every lane.
+    // Conduction shading: D1 (and D2 for full-wave, or the freewheeling diode) ON intervals,
+    // shared by every lane — the operating intervals of the circuit at a glance.
     if (showConduction) {
       trace.diodes.slice(0, 2).forEach((d, j) => {
-        ctx.fillStyle = j === 0 ? colors.conduction : colors.conduction2
+        ctx.fillStyle = d.id === 'Dfw' ? colors.conductionFw : j === 0 ? colors.conduction : colors.conduction2
         let runStart = -1
         for (let i = i0; i <= i1 + 1; i++) {
           const isOn = i <= i1 && d.on[i] === 1

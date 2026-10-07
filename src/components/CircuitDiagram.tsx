@@ -44,6 +44,10 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
   const d = sample?.diodes ?? []
   const iD = (k: number) => d[k]?.current ?? 0
   const devState = (k: number): DeviceState => (idle ? 'idle' : d[k]?.on ? 'on' : 'off')
+  // Freewheeling diode (half-wave RL): always the last device in the simulation's diode list.
+  const fwK = params.control.freewheel ? d.length - 1 : -1
+  const hasFw = params.control.freewheel
+  const ifw = hasFw ? (x.ifw ?? 0) : 0
   const irect = topology === 'half-wave' ? iD(0) : iD(0) + iD(1)
   const io = x.io ?? 0
   const il = x.il ?? (load === 'RL' ? io : irect)
@@ -68,7 +72,9 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
   const labels: ReactNode[] = []
 
   const loadParts: ReactNode[] = []
-  const nLeft = renderLoad({ load, params, idle, x, io, il, ic, irect, scale, flows, parts: loadParts, labels })
+  const nLeft = renderLoad({ load, params, idle, x, io, il, ic, irect: irect + ifw, scale, flows, parts: loadParts, labels })
+  const srcParts: ReactNode[] = []
+  const fwParts: ReactNode[] = []
 
   // ── Rectifier part (delivers to the + rail at EX and takes the return from nLeft) ─
   const srcLabel = (cx: number, cy: number, key: string, name: string, value: number | null) => (
@@ -87,7 +93,39 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
   const vin = idle ? null : (x.vin ?? 0)
   const dLabel = (k: number) => `D${k + 1}`
 
-  if (topology === 'half-wave') {
+  if (topology === 'half-wave' && hasFw) {
+    // Rails are split at the freewheeling diode's junctions (x = FW_X), so each segment shows
+    // its own simulated current:  source side = iD1,  load side = io = iD1 + iDfw,  Dfw = iDfw.
+    const S = { cx: 100, cy: 180, r: 32 }
+    const dx = 290
+    const FW_X = 480
+    const { anode, cathode } = diodeEnds(dx, YT, 0)
+    const fe = diodeEnds(FW_X, 180, -90, 18)
+    const act = (i: number) => (i > 0 ? 'wire--active' : '')
+    srcParts.push(<SourceSym key="S" {...S} />)
+    srcParts.push(<path key="w1" className={`wire ${act(iD(0))}`} d={`M${S.cx},${S.cy - S.r} V${YT} H${anode.x}`} />)
+    srcParts.push(<path key="w2" className={`wire ${act(iD(0))}`} d={`M${cathode.x},${YT} H${FW_X}`} />)
+    srcParts.push(<path key="w3" className={`wire ${act(iD(0))}`} d={`M${FW_X},${YB} H${S.cx} V${S.cy + S.r}`} />)
+    srcParts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label="D1" />)
+    parts.push(<path key="w4" className={`wire ${act(io)}`} d={`M${FW_X},${YT} H${EX}`} />)
+    parts.push(<path key="w5" className={`wire ${act(io)}`} d={`M${nLeft},${YB} H${FW_X}`} />)
+    fwParts.push(<path key="fw" className={`wire ${act(ifw)}`} d={`M${FW_X},${YT} V${fe.cathode.y} M${FW_X},${fe.anode.y} V${YB}`} />)
+    fwParts.push(<DiodeSym key="Dfw" x={FW_X} y={180} angle={-90} size={18} state={devState(fwK)} label="Dfw" labelDx={30} labelDy={6} />)
+    parts.push(<circle key="jt" className="junction" cx={FW_X} cy={YT} r={3.5} />, <circle key="jb" className="junction" cx={FW_X} cy={YB} r={3.5} />)
+    flows.push({ key: 'src', d: `M${S.cx},${S.cy - S.r} V${YT} H${FW_X}`, current: iD(0) })
+    flows.push({ key: 'rail', d: `M${FW_X},${YT} H${EX}`, current: io })
+    flows.push({ key: 'retL', d: `M${nLeft},${YB} H${FW_X}`, current: io })
+    flows.push({ key: 'ret', d: `M${FW_X},${YB} H${S.cx} V${S.cy + S.r}`, current: iD(0) })
+    flows.push({ key: 'fw', d: `M${FW_X},${YB} V${YT}`, current: ifw })
+    labels.push(srcLabel(S.cx, S.cy, 's', 'vin', vin), polarity(S.cx, S.cy - 18, S.cy + 18, vin ?? 0, 'pol'))
+    labels.push(diodeTag(dx, YT + 40, sample, 0))
+    labels.push(fwTag(FW_X - 96, 236, sample, fwK))
+    labels.push(<text key="sub" className="sub" x={S.cx} y={YB + 30} textAnchor="middle">{formatSI(params.vrms, 'V')} rms · {params.frequency} Hz</text>)
+    if (!idle) {
+      const mode = iD(0) > 0 && ifw > 0 ? 'Hand-over: D1 and Dfw share the current' : ifw > 0 ? 'Freewheeling: L drives io round L → R → Dfw' : iD(0) > 0 ? 'Source supplying: vin → D1 → L → R' : 'No current: both diodes blocking'
+      labels.push(<text key="mode" className={`value value--small fw-mode ${ifw > 0 ? 'fw-mode--on' : ''}`} x={(FW_X + EX) / 2 - 40} y={YB + 30} textAnchor="middle">{mode}</text>)
+    }
+  } else if (topology === 'half-wave') {
     const S = { cx: 100, cy: 180, r: 32 }
     const dx = 302
     const { anode, cathode } = diodeEnds(dx, YT, 0)
@@ -198,7 +236,7 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
       aria-label={
         idle
           ? `${topology} rectifier with ${load} load.`
-          : `${topology} rectifier. Vin ${formatV(x.vin ?? 0)}. ${d.filter((q) => q.on).map((q) => q.id).join(', ') || 'No diode'} conducting. Vout ${formatV(x.vout ?? 0)}.`
+          : `${topology} rectifier${hasFw ? ' with freewheeling diode' : ''}. Vin ${formatV(x.vin ?? 0)}. ${d.filter((q) => q.on).map((q) => q.id).join(', ') || 'No diode'} conducting. Vout ${formatV(x.vout ?? 0)}.`
       }
     >
       <defs>
@@ -212,6 +250,8 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
         </radialGradient>
       </defs>
       {parts}
+      {srcParts.length > 0 && <g className="src-block">{srcParts}</g>}
+      {fwParts.length > 0 && <g className="fw-block">{fwParts}</g>}
       <g className="load-block">{loadParts}</g>
       {flows.map((f) => (visible(f) ? <path key={`f-${f.key}`} ref={refs(f.key)} className="flow" d={f.d} /> : null))}
       {labels}
@@ -345,6 +385,20 @@ export function renderLoad(c: LoadCtx): number {
     nLeft = cx
   }
   return nLeft
+}
+
+/** Freewheeling-diode tag: state, bias, and the simulated current and voltage. */
+function fwTag(x: number, y: number, sample: SimulationSample | null, k: number) {
+  if (!sample || k < 0 || !sample.diodes[k]) return null
+  const dd = sample.diodes[k]
+  return (
+    <g key="fwtag" transform={`translate(${x}, ${y})`}>
+      <rect className={`badge ${dd.on ? 'badge--on' : 'badge--off'}`} x={-68} y={-14} width={136} height={22} rx={11} />
+      <text className="badge-text" x={0} y={1} textAnchor="middle">{dd.on ? '● Dfw ON · forward' : dd.bias === 'reverse' ? '✕ Dfw OFF · reverse' : '○ Dfw OFF'}</text>
+      <text className="value value--small" x={0} y={26} textAnchor="middle">i {formatA(dd.current)}</text>
+      <text className="value value--small" x={0} y={44} textAnchor="middle">v {formatV(dd.voltage)}</text>
+    </g>
+  )
 }
 
 /** ON/OFF tag with the diode voltage. */

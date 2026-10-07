@@ -242,7 +242,10 @@ export function solveNetlist(
       else if (bIn && !aIn) lo = Math.max(lo, v0 - vf) // vD = v0 − δ ≤ Vf
     }
     if (lo <= hi) {
-      const delta = Math.min(hi, Math.max(lo, 0))
+      // Stay just inside the allowed range (≤ 1 nV): sitting exactly on a bound would leave a
+      // device at vD = Vf, which floating-point rounding can turn into Vf + 10⁻¹⁶ — "inconsistent".
+      const m = Math.min(1e-9, (hi - lo) / 2)
+      const delta = Math.min(hi - m, Math.max(lo + m, 0))
       for (const q of floating) v[q] += delta
     }
   }

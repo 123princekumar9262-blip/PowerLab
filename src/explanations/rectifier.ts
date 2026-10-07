@@ -3,9 +3,10 @@ import { sineSource } from '../simulation/source.ts'
 import type { CircuitEvent, DiodeBias, DiodeId, SimulationResult, SimulationSample } from '../types/simulation.ts'
 import { formatA, formatDeg, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
 import { trendAt, type Trend } from './trend.ts'
+import type { FreewheelInsight } from './freewheel.ts'
 
 /** Stages of the causal chain, in the order the physics happens. */
-export type CausalStage = 'source' | 'condition' | 'diode' | 'path' | 'energy' | 'output' | 'waveform'
+export type CausalStage = 'source' | 'condition' | 'diode' | 'inductor' | 'freewheel' | 'path' | 'energy' | 'output' | 'waveform'
 
 export interface CausalStep {
   stage: CausalStage
@@ -58,6 +59,8 @@ export interface StateExplanation {
   summary: string
   chain: CausalStep[]
   threePhase?: ThreePhaseInsight
+  /** Freewheeling-diode circuits: Dfw state, inductor energy, why Dfw is ON/OFF. */
+  freewheel?: FreewheelInsight
 }
 
 const V = (v: number) => formatV(v)
@@ -295,6 +298,8 @@ const EVENT_TITLES: Record<CircuitEvent['kind'], string> = {
   'vout-max': 'Vout crest',
   'vout-min': 'Vout valley',
   'phase-crossing': 'Phase voltages cross',
+  'current-transfer': 'takes over the current',
+  'energy-min': 'Inductor energy minimum',
 }
 
 export function eventTitle(e: CircuitEvent): string {
@@ -395,6 +400,14 @@ export function explainEvent(result: SimulationResult, e: CircuitEvent): EventEx
       }
     case 'phase-crossing':
       return { title, what: `Two phase voltages are equal ${at}.`, why: 'A natural commutation point: the highest or lowest phase changes here.' }
+    case 'current-transfer':
+      return {
+        title,
+        what: `${e.device} takes over the load current ${at}: io = ${formatA(v.io ?? 0)} flows on without a break.`,
+        why: 'The inductor current cannot change instantly, so when one path closes the current simply moves to the other one.',
+      }
+    case 'energy-min':
+      return { title, what: `The energy stored in L reaches a minimum, ½·L·i² = ${formatSI(v.wl ?? 0, 'J')}, ${at}.`, why: 'Here the inductor stops giving energy back and starts storing it again — the load current is at its lowest.' }
     case 'vout-max':
       return {
         title,

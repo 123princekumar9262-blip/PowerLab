@@ -19,6 +19,14 @@ export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge' | '3ph-hal
 export const THREE_PHASE_TOPOLOGIES: readonly RectifierTopology[] = ['3ph-half-wave', '3ph-bridge', '3ph-half-controlled']
 export const isThreePhase = (t: RectifierTopology) => t.startsWith('3ph')
 
+/**
+ * Circuits that accept a freewheeling diode across the load (anode on the − output,
+ * cathode on the + output). Every three-phase rectifier, and the single-phase half-wave
+ * rectifier with an RL load. Extending the feature to another circuit only needs this rule:
+ * the netlist, solver, events, measurements and explanations are already generic.
+ */
+export const supportsFreewheel = (t: RectifierTopology, load: LoadType) => isThreePhase(t) || (t === 'half-wave' && load === 'RL')
+
 /** Fault injection for the three-phase experiments. */
 export interface FaultSpec {
   /** A diode that is open-circuit (never conducts) or short-circuit (conducts both ways). */
@@ -205,6 +213,9 @@ export type SignalId =
   | 'id4'
   | 'id5'
   | 'id6'
+  // Freewheeling diode Dfw: current (anode → cathode) and voltage (anode − cathode = −Vout).
+  | 'ifw'
+  | 'vfw'
 
 export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'Da' | 'Db' | 'Dc' | 'Dfw'
 
@@ -281,6 +292,10 @@ export type EventKind =
   | 'vout-max'
   | 'vout-min'
   | 'phase-crossing'
+  /** The load current passes from one path to another without interruption (e.g. D1 → Dfw). */
+  | 'current-transfer'
+  /** Local minimum of the energy stored in the inductor. */
+  | 'energy-min'
 
 /** An automatically detected event, located to sub-timestep precision. */
 export interface CircuitEvent {

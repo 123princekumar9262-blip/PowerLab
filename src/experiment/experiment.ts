@@ -83,8 +83,20 @@ export function describeFault(f: LabParams['faults']): string {
   return parts.join(', ') || 'none'
 }
 
-export function diffQuantities(before: Measurements, after: Measurements): QuantityChange[] {
-  return QUANTITIES.map(({ key, label, unit }) => {
+/** Extra rows for circuits that offer a freewheeling diode (half-wave RL). */
+const FREEWHEEL_QUANTITIES: Array<{ key: keyof Measurements; label: string; unit: string }> = [
+  { key: 'voutMin', label: 'Most negative output', unit: 'V' },
+  { key: 'ioMin', label: 'Minimum load current', unit: 'A' },
+  { key: 'ioRippleFactor', label: 'Current ripple factor', unit: '' },
+  { key: 'turnOffAngleDeg', label: 'D1 turn-off / extinction β', unit: '°' },
+  { key: 'fwConductionDeg', label: 'Dfw conduction', unit: '°' },
+  { key: 'wlMax', label: 'Inductor energy, max', unit: 'J' },
+  { key: 'wlMin', label: 'Inductor energy, min', unit: 'J' },
+]
+
+export function diffQuantities(before: Measurements, after: Measurements, freewheel = false): QuantityChange[] {
+  const list = freewheel ? [...QUANTITIES.filter((x) => x.key !== 'rippleFrequency' && x.key !== 'piv'), ...FREEWHEEL_QUANTITIES] : QUANTITIES
+  return list.map(({ key, label, unit }) => {
     const b = before[key] as number | null
     const a = after[key] as number | null
     const rel = b !== null && a !== null && Math.abs(b) > 1e-12 ? (a - b) / Math.abs(b) : null
@@ -137,9 +149,21 @@ export function explainChanges(changes: ParamChange[], q: QuantityChange[], thre
       case 'device':
         out.push(`Devices changed: SCRs only start when fired. With α = 0 they behave like diodes; with α > 0 the output is delayed — Vdc ${word(d('voutAvg'))}.`)
         break
-      case 'freewheel':
-        out.push(`Freewheeling diode ${c.after === 'yes' ? 'added' : 'removed'}: it ${c.after === 'yes' ? 'stops the output from going negative — the inductor current circulates through it instead of through the source' : 'no longer clamps the output'}; Vdc ${word(d('voutAvg'))}.`)
+      case 'freewheel': {
+        const added = c.after === 'yes'
+        const min = q.find((x) => x.key === 'voutMin')
+        const imin = q.find((x) => x.key === 'ioMin')
+        const extra =
+          min && min.before !== null && min.after !== null
+            ? ` The most negative output went from ${fmt(min.before, 'V')} to ${fmt(min.after, 'V')}${imin && imin.before !== null && imin.after !== null ? `, and the minimum load current from ${fmt(imin.before, 'A')} to ${fmt(imin.after, 'A')}` : ''}.`
+            : ''
+        out.push(
+          added
+            ? `Freewheeling diode added: when vin turns negative the inductor current no longer has to flow back through the source — it circulates through Dfw, which clamps the output at −Vf instead of letting it follow vin below zero. The negative area disappears, so Vdc ${word(d('voutAvg'))}; the current ripple factor ${word(d('ioRippleFactor'))}.${extra}`
+            : `Freewheeling diode removed: the inductor must now keep D1 conducting after vin turns negative, dragging the output below zero until its energy is spent (extinction angle β). Vdc ${word(d('voutAvg'))}; the current ripple factor ${word(d('ioRippleFactor'))}.${extra}`,
+        )
         break
+      }
       case 'sequence':
         out.push(`Phase sequence reversed: the order in which the phases peak changes, so the devices conduct in the reverse order — but the bridge still connects the load between the highest and lowest phase, so Vdc ${word(d('voutAvg'))} and the ripple frequency ${word(d('rippleFrequency'))}.`)
         break

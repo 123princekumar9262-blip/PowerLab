@@ -290,6 +290,14 @@ export function explainEventThreePhase(result: SimulationResult, e: CircuitEvent
         what: `The rectifier ${e.kind === 'current-start' ? 'starts' : 'stops'} delivering current ${at}.`,
         why: e.kind === 'current-start' ? 'A device pair was forward biased (and fired, for SCRs).' : 'The load current reached zero — discontinuous conduction (large α, resistive load, or a fault).',
       }
+    case 'current-transfer':
+      return {
+        title: `Current transfers to ${name}`,
+        what: `${name} takes over the load current (${formatA(v.io ?? 0)}) ${at}.`,
+        why: 'The load inductance keeps the current flowing, so it changes path without being interrupted — the inductor current is continuous across the switch.',
+      }
+    case 'energy-min':
+      return { title: 'Inductor energy minimum', what: `½·L·i² = ${formatSI(v.wl ?? 0, 'J')} ${at}.`, why: 'Here the inductor stops returning energy and starts storing it again: the load current is at its lowest.' }
     case 'vout-max':
     case 'vout-min':
       return {

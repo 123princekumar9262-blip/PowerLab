@@ -14,7 +14,7 @@ export interface EventGroup {
   category: 'diode' | 'source' | 'output'
 }
 
-const DIODE_KINDS = new Set<CircuitEvent['kind']>(['diode-on', 'diode-off', 'current-start', 'current-stop'])
+const DIODE_KINDS = new Set<CircuitEvent['kind']>(['diode-on', 'diode-off', 'current-start', 'current-stop', 'current-transfer'])
 
 /** Display priority within a group: the switching event first. */
 const ORDER: Record<CircuitEvent['kind'], number> = {
@@ -29,9 +29,11 @@ const ORDER: Record<CircuitEvent['kind'], number> = {
   'vout-max': 4,
   'vout-min': 4,
   'phase-crossing': 5,
+  'current-transfer': 1,
+  'energy-min': 4,
 }
 
-const categoryOf = (k: CircuitEvent['kind']): EventGroup['category'] => (DIODE_KINDS.has(k) ? 'diode' : k === 'vout-max' || k === 'vout-min' ? 'output' : 'source')
+const categoryOf = (k: CircuitEvent['kind']): EventGroup['category'] => (DIODE_KINDS.has(k) ? 'diode' : k === 'vout-max' || k === 'vout-min' || k === 'energy-min' ? 'output' : 'source')
 const RANK = { diode: 2, source: 1, output: 0 } as const
 
 export function groupEvents(result: SimulationResult): EventGroup[] {

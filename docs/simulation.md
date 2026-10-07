@@ -192,7 +192,9 @@ rest only through OFF devices, that part's potential is undefined. The solver re
 with a reference constraint (as for the single-phase bridge) and then shifts the floating part by
 the common δ that keeps every OFF device blocking. Without this shift, idle SCRs at large α (and
 the freewheeling and RC cases) looked forward biased and forced thousands of solver fallbacks. It
-now produces none.
+now produces none. δ is kept up to 1 nV inside its allowed range: sitting exactly on a bound leaves a
+device at vD = Vf, which rounding can read as Vf + 10⁻¹⁶ V. That alone caused 1843 fallbacks for an
+SCR bridge at α = 90° with a freewheeling diode, before the fix.
 
 **Faults** (`LabParams.faults`):
 
@@ -234,9 +236,45 @@ RC and RLC filters, and every fault, have no closed form here, so the table says
 (VaN RMS, VLL RMS) are compared only for a balanced, healthy source, and the ripple frequency only
 when no phase is missing or unbalanced.
 
-## 10. Validation
+## 10. Freewheeling diode (half-wave + RL)
 
-`npm test` runs 354 tests:
+**Element.** `Dfw` is an ordinary PWL diode element (same Vf and Ron as D1) across the load,
+anode on the − output and cathode on the + output. `sanitizeParams` only accepts it where
+`supportsFreewheel(topology, load)` allows it. With it the netlist has two diodes, and the assumed-state
+search picks the consistent combination at every step exactly as before.
+
+**When it conducts.** With D1 conducting, Dfw sees vDfw = −Vout = −(vin − Vf), so it turns on
+when vin < 0. With Dfw conducting, Vout = −Vf, so D1 sees vin + Vf and takes the current back
+when vin > 0. The hand-over therefore happens at vin = 0 (exactly, for Ron = 0; with Ron > 0 both
+conduct while |vin| < Ron·i). If the freewheel current decays to zero first (small L, Vf > 0), Dfw turns off
+and the circuit idles until vin > Vf.
+
+**Signals and events.** `ifw`, `vfw` (= −vout) and `wl = ½·L·i²` are stored per sample. Two event kinds exist
+only for circuits with Dfw. `current-transfer` is a device turning ON while io > 0: the current changes path
+without interruption. `energy-min` is a local minimum of E_L, just after D1 takes over, because the current keeps
+falling while vin < Vf + R·i.
+
+**Theory** (`theory/freewheel.ts`, Reff = R + Ron, ωτ = ωL/Reff, Z, φ as for RL):
+
+```
+D1 ON:   i(θ) = (Vm/Z)·sin(θ − φ) − Vf/Reff + [i_s − (Vm/Z)·sin(θ_s − φ) + Vf/Reff]·e^(−(θ−θ_s)/ωτ)
+Dfw ON:  i(θ) = (i_s + Vf/Reff)·e^(−(θ−θ_s)/ωτ) − Vf/Reff
+continuous: i(2π) = a·i0 + b, a = e^(−2π/ωτ)  ⇒  i0 = b/(1 − a)        (verified: i > 0 everywhere)
+            Vdc = Vm/π − Vf − Ron·Idc   (independent of L: avg vL = 0)
+discontinuous: D1 from θ₁ = asin(Vf/Vm) with i = 0; Dfw from 180° until
+            θz = 180° + ωτ·ln((i(π) + Vf/Reff)/(Vf/Reff))
+```
+
+The rows for Dfw current, Dfw conduction, current ripple (Io,min, ΔIo, RFi = √(Io,rms² − Idc²)/Idc) and
+E_L,max/min = ½·L·Io,pk²/Io,min² are exact for Ron = 0 and labelled approximations otherwise.
+
+**Energy during a freewheel interval.** `freewheelIntervals()` integrates R·i² and vDfw·iDfw from the
+refined switching instants. ΔE_L equals their sum to within the backward-Euler numerical dissipation
+½·L·(Δi)² per step, a relative error of about Δt/(2τ): 0.1 % at the default τ = 5 ms, 1 % at τ = 0.5 ms.
+
+## 11. Validation
+
+`npm test` runs 410 tests:
 
 - **Physics.** Conduction and blocking, the real-diode dead zone, KVL/KCL/Ohm at every sample,
   periodicity, bridge diode pairing, the symmetric blocking split, PIV for each topology, the RL hold-on and
@@ -256,6 +294,13 @@ when no phase is missing or unbalanced.
   (D1 open → 50 Hz ripple, missing phase → 100 Hz); theory agreement within 1 %; no solver fallbacks.
 - **Three-phase modes.** Experiment diffs and explanations, every what-if answer derived from
   simulation, reverse-engineering tasks, three-phase lessons and challenges.
+- **Freewheeling diode.** Topology and polarity (vfw = −vout at every sample); every sample consistent
+  (ON ⇒ i > 0, OFF ⇒ vD ≤ Vf) with no solver fallbacks across six parameter sets; Dfw ON only while
+  vin ≤ 0, with Vout = −Vf; hand-over at 180°/360° as current-transfer events; Dfw OFF at zero current in the
+  discontinuous case; KCL io = iD1 + iDfw; the RL equation residual; no current jumps; E_L = ½·L·i² and
+  Σp = 0; the analytic freewheel decay; theory within 1 % on seven parameter sets; with vs without (Vdc
+  rises to Vm/π − Vf, Vo,min → −Vf, β → 180°, continuous current, lower ripple factor, E_L,min > 0). The WHY,
+  lens, step-through, experiments and what-ifs are checked against the simulation, and the other circuits are unchanged.
 
-`npm run smoke` and `npm run smoke3` drive the real UI in Edge: 54 + 24 checks, plus screenshots in
-`scripts/out/`.
+`npm run smoke`, `npm run smoke3` and `npm run smoke-fw` drive the real UI in Edge: 54 + 24 + 29 checks,
+plus screenshots in `scripts/out/`.

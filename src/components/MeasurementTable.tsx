@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { RELATIVE_TOLERANCE, type Comparison, type RowGroup } from '../measurements/compare.ts'
+import { RELATIVE_TOLERANCE, ROW_GROUPS, type Comparison } from '../measurements/compare.ts'
 import { formatPercent, formatSI, formatTime, formatW } from '../utils/format.ts'
 
 function fmt(v: number | null, unit: string): string {
@@ -10,7 +10,7 @@ function fmt(v: number | null, unit: string): string {
   return formatSI(v, unit)
 }
 
-const GROUP_ORDER: RowGroup[] = ['Source', 'Output', 'Load current', 'Diodes', 'Timing', 'Power']
+const GROUP_ORDER = ROW_GROUPS
 
 /** Measurements from the simulated waveforms, next to closed-form theory, with the error. */
 export function MeasurementTable({ comparison }: { comparison: Comparison }) {

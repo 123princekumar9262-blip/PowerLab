@@ -2,6 +2,7 @@ import { isThreePhase, type ResolvedParams } from '../../types/simulation.ts'
 import { bisectRoot, firstRoot } from './numeric.ts'
 import { deg, finish, fromWaveform, none, pathDrops, pivAt, TWO_PI, type Theory, type Waveform } from './waveform.ts'
 import { threePhaseTheory } from './threePhase.ts'
+import { freewheelTheory } from './freewheel.ts'
 
 export type { MeasureKey, Theory, TheoryValue } from './waveform.ts'
 
@@ -260,6 +261,7 @@ function lcFilter(p: ResolvedParams): Theory {
 
 export function theoryFor(p: ResolvedParams): Theory {
   if (isThreePhase(p.topology)) return threePhaseTheory(p)
+  if (p.control.freewheel) return freewheelTheory(p)
   switch (p.load) {
     case 'R':
       return resistive(p)

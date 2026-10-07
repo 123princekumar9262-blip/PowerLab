@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { LIMITS } from '../simulation/params.ts'
 import type { FieldKey } from '../challenges/challenges.ts'
-import { isThreePhase, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
+import { isThreePhase, supportsFreewheel, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
 import { THREE_PHASE_DEFAULTS } from '../simulation/params.ts'
 import { formatSI } from '../utils/format.ts'
 
@@ -102,6 +102,23 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
           </div>
         </div>
       </div>
+
+      {!three && supportsFreewheel(topology, load) && (
+        <div className="param-group">
+          <h3 className="group-title">Freewheeling diode</h3>
+          <div className="field">
+            <span className="field-label">Dfw across the RL load</span>
+            <div className="seg seg--full" role="radiogroup" aria-label="Freewheeling diode">
+              {([false, true] as const).map((on) => (
+                <button key={String(on)} role="radio" disabled={lockAll} aria-checked={ctl.freewheel === on} className={ctl.freewheel === on ? 'on' : ''} onClick={() => set('control', { ...ctl, freewheel: on })}>
+                  {on ? 'ON — fitted' : 'OFF — not fitted'}
+                </button>
+              ))}
+            </div>
+            <p className="muted small">Anode on the − output, cathode on the + output. It conducts only when the inductor drives the output below zero.</p>
+          </div>
+        </div>
+      )}
 
       {three && (
         <div className="param-group">

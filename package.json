@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "smoke": "node scripts/smoke.mjs",
-    "smoke3": "node scripts/smoke3.mjs"
+    "smoke3": "node scripts/smoke3.mjs",
+    "smoke-fw": "node scripts/smoke-fw.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

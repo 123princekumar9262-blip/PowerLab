@@ -46,7 +46,7 @@ export function runSimulation(input: LabParams, circuitId: CircuitId = 'half-wav
   return {
     circuitId,
     params,
-    signalIds: model.signals,
+    signalIds: model.signalsFor?.(params) ?? model.signals,
     diodeIds: model.diodeIdsFor?.(params) ?? model.diodeIds,
     trace,
     events,
@@ -63,7 +63,8 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
   const n = p.steps + 1
   const time = new Float64Array(n)
   const signals: Partial<Record<SignalId, Float64Array>> = {}
-  for (const s of model.signals) signals[s] = new Float64Array(n)
+  const signalIds = model.signalsFor?.(p) ?? model.signals
+  for (const s of signalIds) signals[s] = new Float64Array(n)
   const ids = model.diodeIdsFor?.(p) ?? model.diodeIds
   const diodes: DiodeTrace[] = ids.map((id) => ({
     id,
@@ -81,7 +82,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
 
   const store = (k: number, t: number, sol: CircuitSolution) => {
     time[k] = t
-    for (const s of model.signals) signals[s]![k] = sol.signals[s] ?? 0
+    for (const s of signalIds) signals[s]![k] = sol.signals[s] ?? 0
     sol.diodes.forEach((d, j) => {
       const tr = diodes[j]
       tr.on[k] = d.on ? 1 : 0
@@ -141,6 +142,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
   detectSourceEvents(p, time, signals, pushEvent)
   if (isThreePhase(p.topology)) detectPhaseCrossings(p, time, signals, pushEvent)
   if (p.load !== 'R') detectOutputExtrema(time, signals.vout!, pushEvent)
+  if (p.control.freewheel) detectFreewheelEvents(ids, time, signals, events, pushEvent)
 
   events.sort((x, y) => x.time - y.time)
   const trace: SimulationTrace = { length: n, time, signals, diodes }
@@ -264,6 +266,50 @@ function detectOutputExtrema(time: Float64Array, vout: Float64Array, push: (k: E
     const t = time[k] + Math.max(-0.5, Math.min(0.5, off)) * dt
     const v = b - 0.25 * (a - c) * Math.max(-0.5, Math.min(0.5, off))
     push(isMax ? 'vout-max' : 'vout-min', t, { vout: v })
+    k = j - 1
+  }
+}
+
+/**
+ * Circuits with a freewheeling diode:
+ *  - current-transfer: a device turns ON while the load current is already flowing, so the
+ *    current changes PATH without being interrupted (D1 → Dfw when the source reverses,
+ *    Dfw → D1 when it comes back). The inductor's current is continuous across it.
+ *  - energy-min: local minima of the energy stored in the inductor, ½·L·i² (where the
+ *    inductor stops giving energy back and starts storing again). Zero plateaus are ignored.
+ */
+function detectFreewheelEvents(
+  ids: readonly CircuitEvent['device'][],
+  time: Float64Array,
+  signals: Partial<Record<SignalId, Float64Array>>,
+  events: CircuitEvent[],
+  push: (k: EventKind, t: number, v: SignalValues, d?: CircuitEvent['device']) => void,
+) {
+  const io = signals.io!
+  let iScale = 0
+  for (let k = 0; k < io.length; k++) iScale = Math.max(iScale, Math.abs(io[k]))
+  const switching = events.filter((e) => e.kind === 'diode-on' && ids.includes(e.device))
+  for (const e of switching) if ((e.values.io ?? 0) > iScale * 1e-6) push('current-transfer', e.time, e.values, e.device)
+
+  const wl = signals.wl
+  if (!wl) return
+  let span = 0
+  for (let k = 0; k < wl.length; k++) span = Math.max(span, wl[k])
+  const eps = span * 1e-9
+  for (let k = 1; k < wl.length - 1; k++) {
+    const a = wl[k - 1]
+    const b = wl[k]
+    let j = k + 1
+    while (j < wl.length - 1 && Math.abs(wl[j] - b) <= eps) j++
+    const c = wl[j]
+    if (!(b < a - eps && b < c - eps) || b <= eps) continue
+    const denom = a - 2 * b + c
+    const off = denom !== 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / denom)) : 0
+    const t = time[k] + off * (time[k + 1] - time[k])
+    const values: SignalValues = {}
+    for (const [id, arr] of Object.entries(signals) as Array<[SignalId, Float64Array]>) values[id] = arr[k]
+    values.wl = b - 0.25 * (a - c) * off
+    push('energy-min', t, values)
     k = j - 1
   }
 }

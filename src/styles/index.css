@@ -29,6 +29,8 @@
   --sig-d2: #008300;
   --sig-l: #e66767;
   --sig-c: #9085e9;
+  /* Freewheeling diode Dfw (never shares a lane with C in a single-phase circuit). */
+  --sig-fw: #9085e9;
   --sig-vrect: #aeb7c5;
 
   /* Status (reserved: diode state). Always paired with an icon + label. */
@@ -50,6 +52,7 @@
   --scope-zero: #3a4656;
   --scope-conduction: rgba(47, 194, 141, 0.07);
   --scope-conduction-2: rgba(110, 168, 255, 0.07);
+  --scope-conduction-fw: rgba(144, 133, 233, 0.11);
   --scope-cursor: #f2f5f9;
 
   --font-ui: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
@@ -1962,3 +1965,89 @@ tr.row-approx td {
 .ba-table th { white-space: normal; }
 .ba-table td { white-space: nowrap; }
 .ba-table { table-layout: auto; width: 100%; }
+
+/* ── Freewheeling diode ───────────────────────────────────────────── */
+.circuit .fw-mode { fill: var(--text-2); }
+.circuit .fw-mode--on { fill: var(--sig-fw); }
+.circuit.lens .src-block,
+.circuit.lens .fw-block { transition: opacity 0.2s; }
+.circuit.lens--fw-source .fw-block,
+.circuit.lens--fw-source .load-block,
+.circuit.lens--fw-rectifier .fw-block,
+.circuit.lens--fw-rectifier .load-block { opacity: 0.25; }
+.circuit.lens--fw-inductor .src-block,
+.circuit.lens--fw-inductor .fw-block,
+.circuit.lens--fw-energy .src-block,
+.circuit.lens--fw-energy .fw-block { opacity: 0.25; }
+.circuit.lens--fw-mainoff .load-block,
+.circuit.lens--fw-mainoff .fw-block { opacity: 0.35; }
+.circuit.lens--fw-continue .src-block,
+.circuit.lens--fw-continue .fw-block { opacity: 0.3; }
+.circuit.lens--fw-path .src-block,
+.circuit.lens--fw-on .src-block,
+.circuit.lens--fw-on .load-block,
+.circuit.lens--fw-dissipate .src-block,
+.circuit.lens--fw-decay .src-block { opacity: 0.25; }
+.fw-toggle { margin-left: auto; margin-right: 8px; }
+.fw-toggle.is-on { color: var(--sig-fw); border-color: var(--sig-fw); }
+.shade-key { padding: 0 6px; border-radius: 4px; font-size: 11.5px; }
+.shade-key--d1 { background: rgba(47, 194, 141, 0.25); }
+.shade-key--fw { background: rgba(144, 133, 233, 0.3); }
+
+/* Freewheeling-diode card */
+.fw-panel { background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--sig-fw); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 10px; }
+.fw-chip { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-2); }
+.fw-chip--freewheel, .fw-chip--overlap { color: var(--text-1); border-color: var(--sig-fw); background: rgba(144, 133, 233, 0.16); }
+.fw-chip--source { color: var(--text-1); border-color: rgba(47, 194, 141, 0.6); }
+.fw-state { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.fw-state.is-on { border-color: var(--sig-fw); background: rgba(144, 133, 233, 0.1); }
+.fw-state-main { display: grid; }
+.fw-state-big { font-size: 22px; font-weight: 750; letter-spacing: 0.02em; }
+.fw-state.is-on .fw-state-big { color: var(--sig-fw); }
+.fw-state.is-off .fw-state-big { color: var(--text-3); }
+.fw-state-bias { font-size: 12.5px; color: var(--text-2); }
+.fw-state-vals { display: grid; grid-template-columns: auto auto; gap: 2px 14px; margin: 0; }
+.fw-state-vals div, .fw-instant div { display: grid; }
+.fw-state-vals dt, .fw-instant dt { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.fw-state-vals dd, .fw-instant dd { margin: 0; font-family: var(--font-mono); font-size: 13px; color: var(--text-1); }
+.fw-instant { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.fw-instant dd.ok { color: var(--sig-io); }
+.fw-instant dd.off { color: var(--text-3); }
+.fw-energy { display: grid; gap: 6px; }
+.fw-energy-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fw-energy p { margin: 0; color: var(--text-2); }
+.fw-why { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.fw-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.fw-actions .is-on, .fw-compare-btn.is-on { color: var(--text-1); border-color: var(--accent); }
+.fw-compare-btn { width: 100%; margin-bottom: 10px; }
+
+/* With / without comparison */
+.compare { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 8px; }
+.compare-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.cmp-key { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; }
+.cmp-key::before { content: ''; width: 16px; height: 3px; border-radius: 2px; background: currentColor; }
+.cmp-key--without::before { background: #c98500; }
+.cmp-key--with::before { background: var(--sig-fw); }
+.cmp-key--diff::before { height: 10px; background: rgba(110, 168, 255, 0.18); }
+.compare-svg { width: 100%; height: auto; touch-action: none; cursor: crosshair; user-select: none; }
+.cmp-lane { fill: var(--surface-2); }
+.cmp-band { fill: rgba(110, 168, 255, 0.1); }
+.cmp-zero { stroke: var(--border-strong); stroke-width: 1; }
+.cmp-title { fill: var(--text-2); font-size: 11.5px; }
+.cmp-tick { fill: var(--text-3); font-size: 10px; font-family: var(--font-mono); }
+.cmp-trace { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.cmp-trace--without { stroke: #c98500; stroke-dasharray: 6 3; }
+.cmp-trace--with { stroke: var(--sig-fw); }
+.cmp-cursor { stroke: var(--text-1); stroke-width: 1.2; opacity: 0.8; }
+.cmp-now dl { margin: 0; display: grid; gap: 4px; }
+.cmp-now dl div { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: baseline; }
+.cmp-now dd { margin: 0; font-size: 12.5px; font-family: var(--font-mono); color: var(--text-1); }
+
+/* Guided experiments / step-through */
+.guided { margin-bottom: 8px; }
+.guided-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.guided-list .lesson-card { padding: 8px 10px; }
+.lesson-card.is-active { border-color: var(--accent); }
+.guided-result { margin-bottom: 8px; }
+.step-panel { border-color: var(--sig-fw); }
+.ledger-fill--fw { background: var(--sig-fw); }

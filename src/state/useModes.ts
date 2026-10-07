@@ -8,6 +8,9 @@ import { randomTask, type PredictionTask } from '../prediction/prediction.ts'
 import type { WhatIf } from '../prediction/whatIf.ts'
 import { randomReverseTask, reverseAnswers, type ReverseTask } from '../reverse/reverse.ts'
 import type { Snapshot } from '../experiment/experiment.ts'
+import { FREEWHEEL_EXPERIMENTS, type FreewheelExperiment } from '../experiment/freewheel.ts'
+import { compareWithTheory } from '../measurements/compare.ts'
+import { runSimulation } from '../simulation/engine.ts'
 import { indexAtOrAfter } from '../simulation/engine.ts'
 import type { SimulationResult, SimulationSample } from '../types/simulation.ts'
 import { loadJSON, saveJSON } from '../utils/storage.ts'
@@ -112,7 +115,27 @@ export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result:
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const captureBefore = useCallback(() => {
     if (result && comparison) setSnapshot({ circuitId: result.circuitId, params: state.params, m: comparison.measurements })
+    setGuidedId(null)
   }, [result, comparison, state.params])
+
+  // Guided freewheeling-diode experiments: BEFORE is simulated directly from the experiment's
+  // parameters (a clean baseline), AFTER becomes the live circuit on the bench.
+  const [guidedId, setGuidedId] = useState<string | null>(null)
+  const runGuided = useCallback(
+    (x: FreewheelExperiment) => {
+      const id = 'half-wave:RL' as const
+      const base = state.params
+      if (x.before) {
+        const pb = x.before(base)
+        setSnapshot({ circuitId: id, params: pb, m: compareWithTheory(runSimulation(pb, id)).measurements })
+      } else setSnapshot(null)
+      setGuidedId(x.id)
+      dispatch({ type: 'applyPreset', topology: 'half-wave', load: 'RL', params: x.after(x.before ? x.before(base) : base), whyOpen: false })
+      dispatch({ type: 'setMode', mode: 'experiment' })
+    },
+    [dispatch, state.params],
+  )
+  const guided = FREEWHEEL_EXPERIMENTS.find((x) => x.id === guidedId) ?? null
 
   // ── Predict: "what if?" (default for three-phase) or sketch ──────────────────────
   const showWhatIfInLab = useCallback(
@@ -180,7 +203,12 @@ export function useModes(state: LabState, dispatch: Dispatch<LabAction>, result:
     hideCircuit,
     snapshot,
     captureBefore,
-    clearSnapshot: () => setSnapshot(null),
+    clearSnapshot: () => {
+      setSnapshot(null)
+      setGuidedId(null)
+    },
+    guided,
+    runGuided,
     predictTab,
     setPredictTab,
     showWhatIfInLab,

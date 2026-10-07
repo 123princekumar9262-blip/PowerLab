@@ -24,7 +24,15 @@ export interface WhatIf {
   unit: string
   why: string
   /** For the record — what the physics says; tests check the simulation agrees. */
-  expected: Outcome
+  expected: Outcome | string
+  /** Freewheeling-diode questions are listed first when that circuit is on the bench. */
+  topic?: 'freewheel'
+  /**
+   * Multiple-choice questions: the options, and how the two simulations' measurements decide
+   * which one is true (the answer is never stored — it is classified from the measurements).
+   */
+  choices?: Array<{ id: string; label: string }>
+  classify?: (before: Measurements, after: Measurements) => string
 }
 
 type Patch = { source?: Partial<LabParams['source']>; diode?: Partial<LabParams['diode']>; load?: Partial<LabParams['load']>; threePhase?: Partial<NonNullable<LabParams['threePhase']>>; control?: Partial<NonNullable<LabParams['control']>>; faults?: LabParams['faults']; cycles?: number }
@@ -43,10 +51,106 @@ const with1 = (o: Patch = {}): LabParams => ({
   source: { ...DEFAULT_PARAMS.source, ...o.source },
   diode: { ...DEFAULT_PARAMS.diode, ...o.diode },
   load: { ...DEFAULT_PARAMS.load, ...o.load },
+  ...(o.control ? { control: { device: 'diode' as const, alphaDeg: 0, freewheel: false, ...o.control } } : {}),
   sim: { ...DEFAULT_PARAMS.sim, cycles: o.cycles ?? 8 },
 })
+/** Half-wave RL with or without the freewheeling diode. */
+const fw1 = (on: boolean, o: Patch = {}) => with1({ ...o, control: { freewheel: on }, cycles: o.cycles ?? 10 })
+
+/**
+ * "What happens to the load-current ripple?" — classified from the measured current:
+ * a current that stays ≈ 0 → zero; one that starts to stop every cycle → discontinuous;
+ * otherwise the ripple factor Iac,rms/Idc decides (±5 % counts as about the same).
+ */
+export function classifyRipple(b: Measurements, a: Measurements): string {
+  if (a.ioPeak < 1e-6 * Math.max(b.ioPeak, 1e-12)) return 'zero'
+  if (a.ioMin <= 0 && b.ioMin > 0) return 'discontinuous'
+  const rb = b.ioRippleFactor ?? 0
+  const ra = a.ioRippleFactor ?? 0
+  if (ra > rb * 1.1) return 'increases'
+  if (ra < rb * 0.95) return 'smoother'
+  return 'same'
+}
+export const RIPPLE_CHOICES = [
+  { id: 'increases', label: 'A. Increases significantly' },
+  { id: 'smoother', label: 'B. Becomes smoother' },
+  { id: 'zero', label: 'C. Becomes zero' },
+  { id: 'discontinuous', label: 'D. Becomes discontinuous immediately' },
+]
 
 export const WHAT_IFS: WhatIf[] = [
+  {
+    id: 'fw-add-ripple',
+    section: 'single',
+    topic: 'freewheel',
+    question: 'A half-wave rectifier feeds an RL load (R = 10 Ω, L = 50 mH). What happens to the load current ripple when a freewheeling diode is added across the load?',
+    circuit: 'half-wave:RL',
+    base: fw1(false),
+    after: { params: fw1(true) },
+    quantity: 'ioRippleFactor',
+    quantityLabel: 'Current ripple factor Iac,rms / Idc',
+    unit: '',
+    why: 'Without Dfw the current must fall to zero every cycle (the inductor drags the output negative until its energy is spent). With Dfw the inductor current keeps circulating through L → R → Dfw while vin is negative, decaying only with τ = L/R. The current no longer stops, its average rises, and its AC part shrinks relative to the DC — it becomes smoother. It does not become zero: the source still only pushes for half a cycle.',
+    expected: 'smoother',
+    choices: RIPPLE_CHOICES,
+    classify: classifyRipple,
+  },
+  {
+    id: 'fw-l-up',
+    section: 'single',
+    topic: 'freewheel',
+    question: 'With the freewheeling diode fitted, L is increased from 50 mH to 150 mH. What happens to the current ripple factor?',
+    circuit: 'half-wave:RL',
+    base: fw1(true),
+    after: { params: fw1(true, { load: { inductance: 0.15 } }) },
+    quantity: 'ioRippleFactor',
+    quantityLabel: 'Current ripple factor Iac,rms / Idc',
+    unit: '',
+    why: 'While freewheeling the current decays as e^(−t/τ), τ = L/R. A larger L means a slower decay, so less current is lost before D1 takes over again: the AC part shrinks while Idc = Vdc/R stays the same (with Dfw, Vdc = Vm/π − Vf does not depend on L).',
+    expected: 'decreases',
+  },
+  {
+    id: 'fw-r-up',
+    section: 'single',
+    topic: 'freewheel',
+    question: 'With the freewheeling diode fitted, R is increased from 10 Ω to 20 Ω. What happens to the current ripple factor?',
+    circuit: 'half-wave:RL',
+    base: fw1(true),
+    after: { params: fw1(true, { load: { resistance: 20 } }) },
+    quantity: 'ioRippleFactor',
+    quantityLabel: 'Current ripple factor Iac,rms / Idc',
+    unit: '',
+    why: 'A larger R shortens τ = L/R, so the freewheel current decays faster and falls further before D1 conducts again. The current becomes less smooth relative to its (smaller) average.',
+    expected: 'increases',
+  },
+  {
+    id: 'fw-remove',
+    section: 'single',
+    topic: 'freewheel',
+    question: 'The freewheeling diode is removed from the half-wave RL rectifier. What happens to the average output voltage Vdc?',
+    circuit: 'half-wave:RL',
+    base: fw1(true),
+    after: { params: fw1(false) },
+    quantity: 'voutAvg',
+    quantityLabel: 'Average output Vdc',
+    unit: 'V',
+    why: 'Without Dfw the inductor keeps D1 on after vin turns negative, so the output follows vin below zero until the extinction angle β. That negative area is subtracted from the average, so Vdc falls (with Dfw the output is clamped at −Vf instead).',
+    expected: 'decreases',
+  },
+  {
+    id: 'fw-f-up',
+    section: 'single',
+    topic: 'freewheel',
+    question: 'With the freewheeling diode fitted, the source frequency is raised from 50 Hz to 100 Hz (same L and R). What happens to the current ripple factor?',
+    circuit: 'half-wave:RL',
+    base: fw1(true),
+    after: { params: fw1(true, { source: { frequency: 100 } }) },
+    quantity: 'ioRippleFactor',
+    quantityLabel: 'Current ripple factor Iac,rms / Idc',
+    unit: '',
+    why: 'The freewheel interval is half a period. At 100 Hz it lasts 5 ms instead of 10 ms, while τ = L/R is unchanged — the current has less time to decay (ωL/R doubles). Idc stays Vdc/R, so the ripple factor falls.',
+    expected: 'decreases',
+  },
   {
     id: 'r-up-current',
     section: 'three',
@@ -195,13 +299,17 @@ export const WHAT_IFS: WhatIf[] = [
 export interface WhatIfResult {
   before: number | null
   after: number | null
-  actual: Outcome
+  /** The outcome (or, for multiple-choice questions, the option id) the simulation shows. */
+  actual: Outcome | string
 }
 
 /** Run both simulations and classify the measured change (±0.5 % counts as unchanged). */
 export function evaluateWhatIf(q: WhatIf): WhatIfResult {
-  const a = measure(runSimulation(q.base, q.circuit))[q.quantity] as number | null
-  const b = measure(runSimulation(q.after.params, q.after.circuit ?? q.circuit))[q.quantity] as number | null
+  const mb = measure(runSimulation(q.base, q.circuit))
+  const ma = measure(runSimulation(q.after.params, q.after.circuit ?? q.circuit))
+  const a = mb[q.quantity] as number | null
+  const b = ma[q.quantity] as number | null
+  if (q.classify) return { before: a, after: b, actual: q.classify(mb, ma) }
   let actual: Outcome = 'unchanged'
   if (a !== null && b !== null) {
     const rel = (b - a) / Math.max(Math.abs(a), 1e-12)

@@ -1,4 +1,4 @@
-import { isThreePhase, type CircuitId, type FaultSpec, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
+import { isThreePhase, supportsFreewheel, type CircuitId, type FaultSpec, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
 
 /**
  * Educational defaults. 12 V RMS is a typical step-down transformer secondary —
@@ -175,7 +175,7 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
   // The half-controlled bridge always has SCRs (upper) — that is what defines it.
   const device = topology === '3ph-half-controlled' ? ('scr' as const) : isThreePhase(topology) && ctl?.device === 'scr' ? ('scr' as const) : ('diode' as const)
   const alphaDeg = device === 'scr' && ctl ? num('alphaDeg', 'Firing angle α', ctl.alphaDeg, 30) : 0
-  const control = { device, alpha: alphaDeg * DEG, freewheel: isThreePhase(topology) && !!ctl?.freewheel }
+  const control = { device, alpha: alphaDeg * DEG, freewheel: supportsFreewheel(topology, load) && !!ctl?.freewheel }
   const faults: FaultSpec = isThreePhase(topology) ? { ...(input.faults ?? {}) } : {}
   if (faults.vfOverride) {
     const v = faults.vfOverride.vf

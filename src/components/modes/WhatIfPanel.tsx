@@ -5,6 +5,8 @@ import type { Section } from '../../state/labState.ts'
 
 interface Props {
   section: Section
+  /** Freewheeling-diode circuit on the bench: its questions come first. */
+  focus?: 'freewheel'
   onShowInLab: (q: WhatIf) => void
 }
 
@@ -15,13 +17,16 @@ const OPTIONS: Array<{ id: Outcome; label: string }> = [
 ]
 
 /** Phase G — predict first, then the simulation decides. */
-export function WhatIfPanel({ section, onShowInLab }: Props) {
-  const list = WHAT_IFS.filter((q) => q.section === section)
+export function WhatIfPanel({ section, focus, onShowInLab }: Props) {
+  const all = WHAT_IFS.filter((q) => q.section === section)
+  const list = focus ? [...all.filter((q) => q.topic === focus), ...all.filter((q) => q.topic !== focus)] : all
   const [k, setK] = useState(0)
-  const [guess, setGuess] = useState<Outcome | null>(null)
+  const [guess, setGuess] = useState<Outcome | string | null>(null)
   const [res, setRes] = useState<WhatIfResult | null>(null)
   const [score, setScore] = useState({ right: 0, total: 0 })
   const q = list[k % list.length]
+  const options: Array<{ id: string; label: string }> = q.choices ?? OPTIONS
+  const label = (id: string) => q.choices?.find((o) => o.id === id)?.label ?? OPTIONS.find((o) => o.id === id)?.label ?? 'about the same'
 
   const run = () => {
     const r = evaluateWhatIf(q) // runs BOTH simulations now
@@ -49,7 +54,7 @@ export function WhatIfPanel({ section, onShowInLab }: Props) {
       </header>
       <p className="lesson-body">{q.question}</p>
       <div className="quiz" role="group" aria-label="Your prediction">
-        {OPTIONS.map((o) => (
+        {options.map((o) => (
           <button
             key={o.id}
             className={`quiz-opt ${guess === o.id ? 'is-picked' : ''} ${res ? (o.id === res.actual ? 'is-right' : guess === o.id ? 'is-wrong' : '') : ''}`}
@@ -72,12 +77,12 @@ export function WhatIfPanel({ section, onShowInLab }: Props) {
           <div className="wi-grid">
             <div>
               <p className="event-q">Your prediction</p>
-              <p className="lesson-body">{OPTIONS.find((o) => o.id === guess)?.label}</p>
+              <p className="lesson-body">{guess ? label(guess) : ''}</p>
             </div>
             <div>
               <p className="event-q">Actual result (simulated)</p>
               <p className="lesson-body">
-                {q.quantityLabel}: <b>{formatQuantity(res.before, q.unit)}</b> → <b>{formatQuantity(res.after, q.unit)}</b> — {OPTIONS.find((o) => o.id === res.actual)?.label.toLowerCase()}.
+                {q.quantityLabel}: <b>{formatQuantity(res.before, q.unit)}</b> → <b>{formatQuantity(res.after, q.unit)}</b> — {q.choices ? label(res.actual) : label(res.actual).toLowerCase()}.
               </p>
             </div>
           </div>

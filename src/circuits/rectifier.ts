@@ -115,8 +115,11 @@ function buildNetlist(p: ResolvedParams): Built {
       els.push({ kind: 'R', id: 'R', a: M, b: N, r: R })
       break
   }
-  // Freewheeling diode across the whole load (three-phase option): anode at −, cathode at +.
-  if (isThreePhase(p.topology) && p.control.freewheel) {
+  // Freewheeling diode across the whole load: anode at −, cathode at +. It can only conduct
+  // when the load tries to drive the + output below the − output (an inductor keeping its
+  // current flowing after the rectifier stops supplying it). sanitizeParams allows it only
+  // where supportsFreewheel() says so.
+  if (p.control.freewheel) {
     els.push({ kind: 'D', id: 'Dfw', a: N, b: P })
     diodeIds = [...diodeIds, 'Dfw']
   }
@@ -263,7 +266,7 @@ function orderFor(prev: number, count: number, fixedOff: number) {
   return o
 }
 
-export function signalsFor(topology: RectifierTopology, load: LoadType): SignalId[] {
+export function signalsFor(topology: RectifierTopology, load: LoadType, freewheel = false): SignalId[] {
   if (isThreePhase(topology)) {
     const s: SignalId[] = ['vin', 'vb', 'vc', 'vab', 'vbc', 'vca']
     if (load === 'RLC') s.push('vrect')
@@ -271,6 +274,7 @@ export function signalsFor(topology: RectifierTopology, load: LoadType): SignalI
     if (load === 'RL' || load === 'RLC') s.push('vl')
     s.push('io', 'id', 'id2', 'id3')
     if (topology !== '3ph-half-wave') s.push('id4', 'id5', 'id6')
+    if (freewheel) s.push('ifw', 'vfw')
     if (load === 'RLC') s.push('il')
     if (load === 'RC' || load === 'RLC') s.push('ic')
     if (load === 'RL' || load === 'RLC') s.push('wl')
@@ -286,6 +290,7 @@ export function signalsFor(topology: RectifierTopology, load: LoadType): SignalI
   if (load === 'RL' || load === 'RLC') s.push('vl')
   s.push('io', 'id')
   if (fw) s.push('id2')
+  if (freewheel) s.push('ifw', 'vfw')
   if (load === 'RLC') s.push('il')
   if (load === 'RC' || load === 'RLC') s.push('ic')
   if (load === 'RL' || load === 'RLC') s.push('wl')
@@ -363,10 +368,15 @@ export function rectifierModel(topology: RectifierTopology, load: LoadType): Cir
       })
     } else {
       values.id = sol.diodes[0].current
-      if (sol.diodes.length > 1) {
+      if (sol.diodes.length > 1 && sol.diodes[1].id !== 'Dfw') {
         values.vd2 = sol.diodes[1].voltage
         values.id2 = sol.diodes[1].current
       }
+    }
+    const fwd = sol.diodes.find((d) => d.id === 'Dfw')
+    if (fwd) {
+      values.ifw = fwd.current
+      values.vfw = fwd.voltage
     }
     if (hasL) {
       const iL = sol.i[b.kL]
@@ -414,6 +424,7 @@ export function rectifierModel(topology: RectifierTopology, load: LoadType): Cir
     signals,
     diodeIds: staticIds,
     diodeIdsFor,
+    signalsFor: (p) => (p.control.freewheel ? signalsFor(topology, load, true) : signals),
 
     initialState: (p) => {
       const nL = built(p).net.elements.filter((e) => e.kind === 'L').length

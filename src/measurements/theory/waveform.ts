@@ -28,6 +28,15 @@ export type MeasureKey =
   | 'efficiency'
   | 'vphRms'
   | 'vllRms'
+  // Load-current ripple and inductor energy (RL loads), freewheeling diode
+  | 'ioMin'
+  | 'ioRipplePP'
+  | 'ioRippleFactor'
+  | 'wlMax'
+  | 'wlMin'
+  | 'ifwAvg'
+  | 'ifwPeak'
+  | 'fwConductionDeg'
 
 export interface TheoryValue {
   value: number
@@ -135,6 +144,16 @@ export function fromWaveform(p: ResolvedParams, w: Waveform, formulas: Partial<R
     idAvg: e(avg(w.iD1), 'idAvg', 'ID1,avg = (1/2π)∫iD1 dθ'),
     piv: e(ex(w.piv).max, 'piv', 'max reverse vD'),
     efficiency: e(pLoad / (pLoad + pDiode || 1), 'efficiency', 'η = P_R / (P_R + P_diodes)'),
+  }
+  // Load-current ripple; for an RL load the inductor carries the load current, so E_L = ½·L·io².
+  const ix = ex(w.io)
+  const idc = avg(w.io)
+  vals.ioMin = e(ix.min, 'ioMin', 'min io(θ)')
+  vals.ioRipplePP = e(ix.max - ix.min, 'ioRipplePP', 'ΔIo = Io,pk − Io,min')
+  if (idc > 1e-12) vals.ioRippleFactor = e(Math.sqrt(Math.max(0, avg((θ) => w.io(θ) ** 2) - idc * idc)) / idc, 'ioRippleFactor', 'RFi = √(Io,rms² − Idc²)/Idc')
+  if (p.load === 'RL') {
+    vals.wlMax = e(0.5 * p.inductance * ix.max ** 2, 'wlMax', 'E_L,max = ½·L·Io,pk²')
+    vals.wlMin = e(0.5 * p.inductance * ix.min ** 2, 'wlMin', 'E_L,min = ½·L·Io,min²')
   }
   if (Math.abs(vdc) > p.vm * 1e-9) vals.rippleFactor = e(Math.sqrt(Math.max(0, vrms ** 2 - vdc ** 2)) / Math.abs(vdc), 'rippleFactor', 'RF = √(Vrms² − Vdc²)/Vdc')
   if (w.turnOn !== null && w.turnOff !== null) {

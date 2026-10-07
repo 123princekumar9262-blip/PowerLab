@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { describeFault, diffParams, diffQuantities, explainChanges, formatQuantity, type Snapshot } from '../../experiment/experiment.ts'
 import type { Measurements } from '../../measurements/measurements.ts'
-import type { CircuitId, DiodeId, FaultSpec, LabParams, RectifierTopology } from '../../types/simulation.ts'
+import { supportsFreewheel, type CircuitId, type DiodeId, type FaultSpec, type LabParams, type LoadType, type RectifierTopology } from '../../types/simulation.ts'
+import { FREEWHEEL_EXPERIMENTS, type FreewheelExperiment } from '../../experiment/freewheel.ts'
 
 interface Props {
   circuitId: CircuitId
@@ -13,13 +14,18 @@ interface Props {
   onCapture: () => void
   onClearSnapshot: () => void
   onFaults: (f: FaultSpec) => void
+  load: LoadType
+  /** Guided freewheeling-diode experiment in progress (half-wave RL). */
+  guided: FreewheelExperiment | null
+  onRunGuided: (x: FreewheelExperiment) => void
 }
 
 type FaultKind = 'none' | 'open' | 'short' | 'vf' | 'missing' | 'imbalance'
 
 /** Phase G/H — Experiment: BEFORE / AFTER comparisons, and fault injection (three-phase). */
-export function ExperimentPanel({ circuitId, topology, params, measurements, steady, snapshot, onCapture, onClearSnapshot, onFaults }: Props) {
+export function ExperimentPanel({ circuitId, topology, params, measurements, steady, snapshot, onCapture, onClearSnapshot, onFaults, load, guided, onRunGuided }: Props) {
   const three = topology.startsWith('3ph')
+  const fwCircuit = !three && supportsFreewheel(topology, load)
   const devices: DiodeId[] = topology === '3ph-half-wave' ? ['Da', 'Db', 'Dc'] : ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']
   const [kind, setKind] = useState<FaultKind>('open')
   const [device, setDevice] = useState<DiodeId>(devices[0])
@@ -36,7 +42,7 @@ export function ExperimentPanel({ circuitId, topology, params, measurements, ste
   }
 
   const changes = snapshot ? diffParams(snapshot, circuitId, params) : []
-  const deltas = snapshot ? diffQuantities(snapshot.m, measurements) : []
+  const deltas = snapshot ? diffQuantities(snapshot.m, measurements, fwCircuit) : []
   const why = snapshot ? explainChanges(changes, deltas, three) : []
   const active = describeFault(params.faults)
 
@@ -53,6 +59,32 @@ export function ExperimentPanel({ circuitId, topology, params, measurements, ste
           </button>
         )}
       </header>
+
+      {fwCircuit && (
+        <div className="guided">
+          <p className="event-q">Freewheeling-diode experiments</p>
+          <ol className="guided-list">
+            {FREEWHEEL_EXPERIMENTS.map((x) => (
+              <li key={x.id}>
+                <button className={`lesson-card ${guided?.id === x.id ? 'is-active' : ''}`} onClick={() => onRunGuided(x)}>
+                  <span>
+                    <span className="lesson-title">{x.title}</span>
+                    <span className="lesson-sum">{x.goal}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {guided && !guided.before && (
+        <div className="guided-result">
+          <p className="event-q">What does the physics say?</p>
+          <p className="lesson-body">{guided.physics(measurements, null)}</p>
+          <p className="muted small">Now run experiment 2 to add the freewheeling diode.</p>
+        </div>
+      )}
 
       {!snapshot ? (
         <>
@@ -101,12 +133,18 @@ export function ExperimentPanel({ circuitId, topology, params, measurements, ste
                   ))}
                 </tbody>
               </table>
-              <p className="event-q">Why?</p>
+              <p className="event-q">{guided ? 'Why did it change?' : 'Why?'}</p>
               {why.map((w, k) => (
                 <p key={k} className="lesson-body">
                   {w}
                 </p>
               ))}
+              {guided && guided.before && (
+                <>
+                  <p className="event-q">What does the physics say?</p>
+                  <p className="lesson-body">{guided.physics(measurements, snapshot.m)}</p>
+                </>
+              )}
             </>
           )}
         </>

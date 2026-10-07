@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { CircuitDiagram } from './components/CircuitDiagram.tsx'
 import { EnergyPanel } from './components/EnergyPanel.tsx'
 import { EventDetail, EventStrip } from './components/EventPanels.tsx'
@@ -17,9 +17,12 @@ import { WhatIfPanel } from './components/modes/WhatIfPanel.tsx'
 import { ReversePanel } from './components/modes/ReversePanel.tsx'
 import { AngleView } from './components/AngleView.tsx'
 import { PhysicsLens } from './components/PhysicsLens.tsx'
+import { FreewheelPanel } from './components/FreewheelPanel.tsx'
+import { CompareView } from './components/CompareView.tsx'
+import { StepThrough } from './components/StepThrough.tsx'
 import { lensStages } from './explanations/lens.ts'
 import { resolveTarget } from './learning/target.ts'
-import { isThreePhase } from './types/simulation.ts'
+import { isThreePhase, supportsFreewheel } from './types/simulation.ts'
 import { getExplainer } from './explanations/index.ts'
 import { compareWithTheory } from './measurements/compare.ts'
 import { indexAtTime, runSimulation } from './simulation/engine.ts'
@@ -44,7 +47,9 @@ export function App() {
   const explainer = getExplainer(circuitId)
 
   const channels = useMemo(
-    () => (result ? result.signalIds.filter((sid) => state.showEnergy || !SIGNAL_META[sid].advanced) : []),
+    // With a freewheeling diode the inductor's stored energy is part of the story: offer E_L
+    // (WL) as an ordinary channel even outside the energy view.
+    () => (result ? result.signalIds.filter((sid) => state.showEnergy || !SIGNAL_META[sid].advanced || (sid === 'wl' && result.params.control.freewheel)) : []),
     [result, state.showEnergy],
   )
   const cursorIndex = result ? indexAtTime(result, state.cursorTime) : 0
@@ -61,6 +66,13 @@ export function App() {
   const lens = useMemo(() => (result && explanation && state.lensStage !== null ? lensStages(result, explanation) : null), [result, explanation, state.lensStage])
   const hide = modes.hideAnswers
   const hideCircuit = modes.hideCircuit
+  // Freewheeling diode views (half-wave RL): with/without comparison and step-through.
+  const [compareOn, setCompareOn] = useState(false)
+  const [stepOn, setStepOn] = useState(false)
+  const fwCircuit = !!result && !isThreePhase(result.params.topology) && supportsFreewheel(result.params.topology, result.params.load)
+  const fwFitted = fwCircuit && result!.params.control.freewheel
+  const pause = useCallback(() => dispatch({ type: 'pause' }), [])
+  const play = useCallback(() => dispatch({ type: 'play' }), [])
   // Reverse engineering: only the source and output channels.
   const shownChannels = hideCircuit ? channels.filter((sid) => sid === 'vin' || sid === 'vb' || sid === 'vc' || sid === 'vout') : channels
 
@@ -216,7 +228,20 @@ export function App() {
             ) : (
             <section className="bench" aria-label="Circuit">
               <div className="bench-bar">
-                <h2 className="bench-title">{getModel(circuitId).name}</h2>
+                <h2 className="bench-title">
+                  {getModel(circuitId).name}
+                  {result.params.control.freewheel && !isThreePhase(result.params.topology) ? ' + freewheeling diode' : ''}
+                </h2>
+                {!isThreePhase(result.params.topology) && supportsFreewheel(result.params.topology, result.params.load) && (
+                  <button
+                    className={`text-btn fw-toggle ${result.params.control.freewheel ? 'is-on' : ''}`}
+                    aria-pressed={result.params.control.freewheel}
+                    disabled={state.mode === 'challenge' && !!modes.challenge}
+                    onClick={() => dispatch({ type: 'setParams', params: { ...state.params, control: { device: 'diode', alphaDeg: state.params.control?.alphaDeg ?? 0, freewheel: !result.params.control.freewheel } } })}
+                  >
+                    Freewheeling diode: {result.params.control.freewheel ? 'ON' : 'OFF'}
+                  </button>
+                )}
                 <button className={`text-btn energy-toggle ${state.showEnergy ? 'is-on' : ''}`} aria-pressed={state.showEnergy} onClick={() => dispatch({ type: 'toggleEnergy' })}>
                   ⚡ Energy view
                 </button>
@@ -282,17 +307,30 @@ export function App() {
               <div className="instrument-foot">
                 <label className="check">
                   <input type="checkbox" checked={state.showConduction} onChange={() => dispatch({ type: 'toggleConduction' })} />
-                  Shade D1 conduction
+                  {result.params.control.freewheel && !isThreePhase(result.params.topology) ? (
+                    <>
+                      Shade conduction: <span className="shade-key shade-key--d1">D1</span> <span className="shade-key shade-key--fw">Dfw</span>
+                    </>
+                  ) : (
+                    'Shade D1 conduction'
+                  )}
                 </label>
                 <EventStrip groups={hideCircuit ? [] : visibleGroups} selectedId={state.selectedEventGroupId} onSelect={selectGroup} />
               </div>
             </section>
             )}
 
+            {fwCircuit && compareOn && !hide && !hideCircuit && (
+              <CompareView result={result} params={state.params} circuitId={circuitId} cursorTime={state.cursorTime} onCursorTime={(t) => setCursor(t, true)} />
+            )}
+
             {!hide && !hideCircuit && <MeasurementTable comparison={comparison} />}
           </div>
 
           <aside className="col-state">
+            {fwFitted && stepOn && !hide && !hideCircuit && (
+              <StepThrough result={result} cursorTime={state.cursorTime} playing={state.playing} onCursor={(t) => setCursor(t, true)} onPlay={play} onPause={pause} onClose={() => setStepOn(false)} />
+            )}
             {lens && state.lensStage !== null && !hide && !hideCircuit && (
               <PhysicsLens stages={lens} stage={state.lensStage} onStage={(k) => dispatch({ type: 'setLens', stage: k })} onClose={() => dispatch({ type: 'setLens', stage: null })} />
             )}
@@ -331,6 +369,9 @@ export function App() {
                 onCapture={modes.captureBefore}
                 onClearSnapshot={modes.clearSnapshot}
                 onFaults={(faults) => dispatch({ type: 'setParams', params: { ...state.params, faults } })}
+                load={result.params.load}
+                guided={modes.guided}
+                onRunGuided={modes.runGuided}
               />
             )}
             {state.mode === 'predict' && (
@@ -342,7 +383,7 @@ export function App() {
                 ))}
               </div>
             )}
-            {state.mode === 'predict' && modes.predictTab === 'whatif' && <WhatIfPanel section={state.section} onShowInLab={modes.showWhatIfInLab} />}
+            {state.mode === 'predict' && modes.predictTab === 'whatif' && <WhatIfPanel section={state.section} focus={fwCircuit ? 'freewheel' : undefined} onShowInLab={modes.showWhatIfInLab} />}
             {state.mode === 'reverse' && modes.reverse && modes.reverseAns && (
               <ReversePanel
                 task={modes.reverse.task}
@@ -372,6 +413,21 @@ export function App() {
                 explanations={selectedGroup.events.map((e) => explainer.event(result, e))}
                 onClose={() => dispatch({ type: 'selectEventGroup', id: null })}
               />
+            )}
+            {fwFitted && !hide && !hideCircuit && explanation.freewheel && (
+              <FreewheelPanel
+                result={result}
+                ex={explanation}
+                compareOn={compareOn}
+                onToggleCompare={() => setCompareOn((v) => !v)}
+                stepOn={stepOn}
+                onToggleStep={() => setStepOn((v) => !v)}
+              />
+            )}
+            {fwCircuit && !fwFitted && !hide && !hideCircuit && (
+              <button className={`text-btn fw-compare-btn ${compareOn ? 'is-on' : ''}`} aria-pressed={compareOn} onClick={() => setCompareOn((v) => !v)}>
+                ⇄ Compare with / without a freewheeling diode
+              </button>
             )}
             {!hide && !hideCircuit && <StatePanel
                 ex={explanation}

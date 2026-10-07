@@ -33,6 +33,8 @@ export interface CircuitModel<S extends ModelState = ModelState> {
   /** Signals this circuit produces, in display order. */
   signals: readonly SignalId[]
   diodeIds: readonly DiodeId[]
+  /** Signals for a specific parameter set, when they depend on it (e.g. a freewheeling diode). */
+  signalsFor?(p: ResolvedParams): readonly SignalId[]
   /** Diode ids for a specific parameter set, when they depend on it (e.g. a freewheeling diode). */
   diodeIdsFor?(p: ResolvedParams): readonly DiodeId[]
 

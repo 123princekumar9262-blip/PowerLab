@@ -47,6 +47,10 @@ export const SIGNAL_META: Record<SignalId, SignalMeta> = {
   id4: { id: 'id4', label: 'Id4', name: 'Diode 4 current', unit: 'A', cssVar: '--sig-pa', dash: [2, 3], optional: true },
   id5: { id: 'id5', label: 'Id5', name: 'Diode 5 current', unit: 'A', cssVar: '--sig-pc', dashed: true, optional: true },
   id6: { id: 'id6', label: 'Id6', name: 'Diode 6 current', unit: 'A', cssVar: '--sig-pb', dash: [2, 3], optional: true },
+  // Freewheeling diode: its own colour (validated against Io/Id1 in the current lane and Vd1 in
+  // the diode-voltage lane). Vfw = −Vout exactly, so it is offered but off by default.
+  ifw: { id: 'ifw', label: 'Ifw', name: 'Freewheeling diode Dfw current', unit: 'A', cssVar: '--sig-fw' },
+  vfw: { id: 'vfw', label: 'Vfw', name: 'Freewheeling diode voltage, anode − cathode (= −Vout)', unit: 'V', cssVar: '--sig-fw', optional: true },
 }
 
 /**
@@ -65,6 +69,8 @@ const THREE_PHASE_META: Partial<Record<SignalId, Partial<SignalMeta>>> = {
   id4: { name: 'D4 current (lower, phase a)' },
   id5: { name: 'D5 current (upper, phase c)' },
   id6: { name: 'D6 current (lower, phase b)' },
+  // Three-phase capacitor loads also use violet (IC): Ifw is dashed there and off by default.
+  ifw: { dashed: true, optional: true },
 }
 const HALF_WAVE_3PH_META: Partial<Record<SignalId, Partial<SignalMeta>>> = {
   vd: { label: 'VDa', name: 'Diode Da voltage' },
@@ -82,7 +88,7 @@ export function metaFor(sid: SignalId, topology: RectifierTopology): SignalMeta 
 }
 
 /** Every CSS variable any signal may use (the renderer resolves them once). */
-export const SIGNAL_CSS_VARS = ['--sig-vin', '--sig-vrect', '--sig-vout', '--sig-vout3', '--sig-vd', '--sig-d2', '--sig-l', '--sig-io', '--sig-id', '--sig-c', '--sig-pa', '--sig-pb', '--sig-pc']
+export const SIGNAL_CSS_VARS = ['--sig-vin', '--sig-vrect', '--sig-vout', '--sig-vout3', '--sig-vd', '--sig-d2', '--sig-l', '--sig-io', '--sig-id', '--sig-c', '--sig-pa', '--sig-pb', '--sig-pc', '--sig-fw']
 
 /** How the scope arranges traces. */
 export type ScopeLayoutMode = 'overlay' | 'grouped' | 'separate'
@@ -97,8 +103,8 @@ export interface LaneSpec {
 const GROUPS: ReadonlyArray<{ id: string; title: string; signals: SignalId[] }> = [
   { id: 'voltage', title: 'Source & output', signals: ['vin', 'vb', 'vc', 'vab', 'vbc', 'vca', 'vrect', 'vout'] },
   { id: 'inductor', title: 'Inductor voltage', signals: ['vl'] },
-  { id: 'diode', title: 'Diode voltages', signals: ['vd', 'vd2'] },
-  { id: 'current', title: 'Currents', signals: ['io', 'il', 'ic', 'id', 'id2', 'id3', 'id4', 'id5', 'id6'] },
+  { id: 'diode', title: 'Diode voltages', signals: ['vd', 'vd2', 'vfw'] },
+  { id: 'current', title: 'Currents', signals: ['io', 'il', 'ic', 'id', 'id2', 'id3', 'id4', 'id5', 'id6', 'ifw'] },
   { id: 'energy', title: 'Stored energy', signals: ['wl', 'wc'] },
   { id: 'power', title: 'Power', signals: ['ps', 'pload', 'pd'] },
 ]

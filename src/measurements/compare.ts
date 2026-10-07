@@ -1,4 +1,4 @@
-import type { SimulationResult } from '../types/simulation.ts'
+import { supportsFreewheel, type SimulationResult } from '../types/simulation.ts'
 import { measure, type Measurements } from './measurements.ts'
 import { theoryFor, type MeasureKey, type Theory } from './theory/index.ts'
 
@@ -9,7 +9,10 @@ import { theoryFor, type MeasureKey, type Theory } from './theory/index.ts'
  */
 export const RELATIVE_TOLERANCE = 0.01
 
-export type RowGroup = 'Source' | 'Output' | 'Load current' | 'Diodes' | 'Timing' | 'Power'
+export type RowGroup = 'Source' | 'Output' | 'Load current' | 'Diodes' | 'Freewheeling diode' | 'Inductor energy' | 'Timing' | 'Power'
+
+/** Display order of the row groups (every group a row can belong to). */
+export const ROW_GROUPS: RowGroup[] = ['Source', 'Output', 'Load current', 'Diodes', 'Freewheeling diode', 'Inductor energy', 'Timing', 'Power']
 
 export interface ComparisonRow {
   key: MeasureKey
@@ -44,9 +47,17 @@ const ROWS: ReadonlyArray<{ key: MeasureKey; label: string; symbol: string; unit
   { key: 'ioAvg', label: 'Average current', symbol: 'Idc', unit: 'A', group: 'Load current' },
   { key: 'ioRms', label: 'RMS current', symbol: 'Io,rms', unit: 'A', group: 'Load current' },
   { key: 'ioPeak', label: 'Peak current', symbol: 'Io,pk', unit: 'A', group: 'Load current' },
+  { key: 'ioMin', label: 'Minimum current', symbol: 'Io,min', unit: 'A', group: 'Load current' },
+  { key: 'ioRipplePP', label: 'Current ripple (peak-to-peak)', symbol: 'ΔIo', unit: 'A', group: 'Load current' },
+  { key: 'ioRippleFactor', label: 'Current ripple factor', symbol: 'RFi', unit: '', group: 'Load current' },
   { key: 'idPeak', label: 'D1 peak current', symbol: 'ID,pk', unit: 'A', group: 'Diodes' },
   { key: 'idAvg', label: 'D1 average current', symbol: 'ID,avg', unit: 'A', group: 'Diodes' },
   { key: 'piv', label: 'Peak inverse voltage', symbol: 'PIV', unit: 'V', group: 'Diodes' },
+  { key: 'ifwAvg', label: 'Dfw average current', symbol: 'IDfw,avg', unit: 'A', group: 'Freewheeling diode' },
+  { key: 'ifwPeak', label: 'Dfw peak current', symbol: 'IDfw,pk', unit: 'A', group: 'Freewheeling diode' },
+  { key: 'fwConductionDeg', label: 'Dfw conduction per cycle', symbol: 'γfw', unit: '°', group: 'Freewheeling diode' },
+  { key: 'wlMax', label: 'Inductor energy, maximum', symbol: 'E_L,max', unit: 'J', group: 'Inductor energy' },
+  { key: 'wlMin', label: 'Inductor energy, minimum', symbol: 'E_L,min', unit: 'J', group: 'Inductor energy' },
   { key: 'conductionAngleDeg', label: 'D1 conduction angle', symbol: 'γ', unit: '°', group: 'Timing' },
   { key: 'turnOnAngleDeg', label: 'D1 turn-on angle', symbol: 'θon', unit: '°', group: 'Timing' },
   { key: 'turnOffAngleDeg', label: 'D1 turn-off / extinction', symbol: 'β', unit: '°', group: 'Timing' },
@@ -77,10 +88,16 @@ export function compareWithTheory(result: SimulationResult): Comparison {
   const p = result.params
   const continuous = measurements.rectCurrentMin === null ? null : measurements.rectCurrentMin > 0
   // Scale for absolute comparisons when the theoretical value is exactly zero.
-  const zeroScale: Record<string, number> = { V: p.vm, A: p.vm / p.resistance, '°': 360, Hz: p.frequency, '': 1 }
+  const zeroScale: Record<string, number> = { V: p.vm, A: p.vm / p.resistance, '°': 360, Hz: p.frequency, '': 1, J: 0.5 * p.inductance * (p.vm / p.resistance) ** 2 }
 
   const three = result.params.topology.startsWith('3ph')
+  // Current-ripple and inductor-energy rows belong to the circuits that offer a freewheeling
+  // diode (so with/without can be compared); the Dfw rows only when it is fitted.
+  const rippleRows = !three && supportsFreewheel(p.topology, p.load)
+  const FW_KEYS: MeasureKey[] = ['ifwAvg', 'ifwPeak', 'fwConductionDeg']
+  const RIPPLE_KEYS: MeasureKey[] = ['ioMin', 'ioRipplePP', 'ioRippleFactor', 'wlMax', 'wlMin']
   const defs = ROWS.filter((d) => (three ? d.key !== 'vinRms' : d.key !== 'vphRms' && d.key !== 'vllRms'))
+    .filter((d) => (FW_KEYS.includes(d.key) ? !three && p.control.freewheel : RIPPLE_KEYS.includes(d.key) ? rippleRows : true))
   const rows = defs.map((def): ComparisonRow => {
     const t = theory.values[def.key]
     const th = t?.value ?? null

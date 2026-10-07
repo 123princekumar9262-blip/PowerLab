@@ -30,6 +30,18 @@ export interface Measurements {
   ioPeak: number
   /** Peak-to-peak load-current ripple over the window. */
   ioRipplePP: number
+  /** Minimum load current over the window (0 = the current stops: discontinuous). */
+  ioMin: number
+  /** Current ripple factor Iac,rms / Idc (how far the load current is from pure DC). */
+  ioRippleFactor: number | null
+  /** Freewheeling diode Dfw (null when the circuit has none): conduction per cycle [°] and current. */
+  fwConductionDeg: number | null
+  ifwAvg: number | null
+  ifwRms: number | null
+  ifwPeak: number | null
+  /** Energy stored in the inductor ½·L·i², max / min over the window (null without L). */
+  wlMax: number | null
+  wlMin: number | null
   /** D1 current statistics. */
   idPeak: number
   idAvg: number
@@ -106,35 +118,41 @@ export function measure(result: SimulationResult): Measurements {
     steady = { reached: change < STEADY_STATE_TOLERANCE, change }
   }
 
-  // D1 conduction within the window: walk the window toggling at refined events.
+  // Conduction of one device within the window: walk the window toggling at refined events.
   // Events within 10⁻⁹·T of the window start are the same instant as the start (an ideal
   // diode switches exactly at a zero crossing, which can land a few ulps either side of t₀),
-  // so the state at t₀ is taken from the last D1 event up to t₀ + ε, not from a sample.
-  const d1 = trace.diodes[0]
-  // The reference diode: D1, or Da for the three-phase half-wave rectifier.
-  const d1Id = d1.id
+  // so the state at t₀ is taken from the last event up to t₀ + ε, not from a sample.
   const eps = T * 1e-9
-  const d1All = events.filter((e) => e.device === d1Id && (e.kind === 'diode-on' || e.kind === 'diode-off'))
-  const before = d1All.filter((e) => e.time <= t0 + eps).pop()
-  let on = before ? before.kind === 'diode-on' : d1.on[i0] === 1
-  let cursor = t0
-  let conducting = 0
-  for (const e of d1All) {
-    if (e.time <= t0 + eps || e.time > t1) continue
-    if (e.kind === 'diode-on' && !on) {
-      on = true
-      cursor = e.time
-    } else if (e.kind === 'diode-off' && on) {
-      conducting += e.time - cursor
-      on = false
+  const conductionOf = (k: number) => {
+    const tr = trace.diodes[k]
+    const all = events.filter((e) => e.device === tr.id && (e.kind === 'diode-on' || e.kind === 'diode-off'))
+    const before = all.filter((e) => e.time <= t0 + eps).pop()
+    let on = before ? before.kind === 'diode-on' : tr.on[i0] === 1
+    let cursor = t0
+    let total = 0
+    for (const e of all) {
+      if (e.time <= t0 + eps || e.time > t1) continue
+      if (e.kind === 'diode-on' && !on) {
+        on = true
+        cursor = e.time
+      } else if (e.kind === 'diode-off' && on) {
+        total += e.time - cursor
+        on = false
+      }
     }
+    if (on) total += t1 - cursor
+    return total
   }
-  if (on) conducting += t1 - cursor
+  // The reference diode: D1, or Da for the three-phase half-wave rectifier.
+  const d1 = trace.diodes[0]
+  const d1Id = d1.id
+  const conducting = conductionOf(0)
+  const fwK = trace.diodes.findIndex((d) => d.id === 'Dfw')
 
   // Last complete D1 pulse (turn-on followed by turn-off) → turn-on angle and extinction angle β.
   let turnOnAngleDeg: number | null = null
   let turnOffAngleDeg: number | null = null
-  const d1Events = events.filter((e) => e.device === d1Id)
+  const d1Events = events.filter((e) => e.device === d1Id && (e.kind === 'diode-on' || e.kind === 'diode-off'))
   for (let k = d1Events.length - 1; k > 0; k--) {
     const off = d1Events[k]
     const onE = d1Events[k - 1]
@@ -184,6 +202,9 @@ export function measure(result: SimulationResult): Measurements {
   const wl = S.wl
   const wc = S.wc
   const storedAt = (i: number) => (wl ? wl[i] : 0) + (wc ? wc[i] : 0)
+  const ioAvg = avg(io)
+  const ioRms = rms(io)
+  const ifw = S.ifw
   const sourcePower = avg(sig('ps'))
   const loadPower = avg(sig('pload'))
 
@@ -201,10 +222,18 @@ export function measure(result: SimulationResult): Measurements {
     ripplePP: maxOf(vout) - minOf(vout),
     rippleFactor: meaningful ? vac / Math.abs(voutAvg) : null,
     formFactor: meaningful ? voutRms / Math.abs(voutAvg) : null,
-    ioAvg: avg(io),
-    ioRms: rms(io),
+    ioAvg,
+    ioRms,
     ioPeak: maxOf(io),
     ioRipplePP: maxOf(io) - minOf(io),
+    ioMin: minOf(io),
+    ioRippleFactor: Math.abs(ioAvg) > 1e-12 ? Math.sqrt(Math.max(0, ioRms * ioRms - ioAvg * ioAvg)) / Math.abs(ioAvg) : null,
+    fwConductionDeg: fwK >= 0 ? (conductionOf(fwK) / T) * 360 : null,
+    ifwAvg: ifw ? avg(ifw) : null,
+    ifwRms: ifw ? rms(ifw) : null,
+    ifwPeak: ifw ? maxOf(ifw) : null,
+    wlMax: wl ? maxOf(wl) : null,
+    wlMin: wl ? minOf(wl) : null,
     idPeak: maxOf(d1.current),
     idAvg: avg(d1.current),
     idRms: rms(d1.current),
