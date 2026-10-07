@@ -208,6 +208,7 @@ export function explainThreePhase(result: SimulationResult, index: number): Stat
     region,
     overlap,
     freewheeling: fwOn,
+    names: Object.fromEntries(result.diodeIds.map((id) => [id, devName(id)])),
   }
   const polarity = phases.a > 0 ? 'positive' : phases.a < 0 ? 'negative' : 'zero'
   return {

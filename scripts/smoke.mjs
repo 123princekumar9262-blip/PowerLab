@@ -264,6 +264,7 @@ await page.getByRole('button', { name: 'All challenges' }).click()
 
 // ── Phase 9: Predict ────────────────────────────────────────────────────────────
 await page.getByRole('tab', { name: 'Predict' }).click()
+await page.getByRole('tab', { name: 'Sketch the output' }).click()
 await page.waitForTimeout(400)
 check(await page.locator('.instrument--hidden').count() === 1, 'prediction hides the scope until the reveal')
 check(await page.locator('.measure').count() === 0, 'prediction hides the measurements until the reveal')
@@ -279,7 +280,7 @@ await page.waitForTimeout(300)
 check(/Shape match/.test(await page.locator('.score').innerText()), 'reveal scores the sketch against the simulated Vout')
 check(await page.locator('.instrument--hidden').count() === 0 && (await page.locator('.measure').count()) === 1, 'after the reveal the scope and measurements appear')
 await page.screenshot({ path: OUT + '16-predict.png' })
-await page.getByRole('tab', { name: 'Lab' }).click()
+await page.getByRole('tab', { name: 'Explore' }).click()
 
 // Phone-width layout
 await page.setViewportSize({ width: 390, height: 844 })

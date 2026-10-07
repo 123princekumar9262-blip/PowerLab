@@ -100,10 +100,17 @@ export function explainChanges(changes: ParamChange[], q: QuantityChange[], thre
   const d = (k: keyof Measurements) => q.find((x) => x.key === k)?.rel ?? null
   const word = (r: number | null) => (r === null ? 'changed' : Math.abs(r) < 0.005 ? 'stayed the same' : r > 0 ? `rose ${(r * 100).toFixed(1)} %` : `fell ${(-r * 100).toFixed(1)} %`)
   const out: string[] = []
+  if (changes.length > 1) {
+    out.push(`You changed ${changes.length} things at once, so the measured differences mix their effects. For a clean experiment change one thing, capture BEFORE again, then change the next.`)
+  }
   for (const c of changes) {
     switch (c.key) {
       case 'resistance':
-        out.push(`R ${c.direction > 0 ? 'increased' : 'decreased'}: Vdc ${word(d('voutAvg'))} — the rectifier output is set by the source and the conducting devices, not by R — while Idc = Vdc/R ${word(d('ioAvg'))}.`)
+        out.push(
+          Math.abs(d('voutAvg') ?? 1) < 0.005
+            ? `R ${c.direction > 0 ? 'increased' : 'decreased'}: Vdc stayed the same — the rectifier output is set by the source and the conducting devices, not by R — while Idc = Vdc/R ${word(d('ioAvg'))}.`
+            : `R ${c.direction > 0 ? 'increased' : 'decreased'}: Idc = Vdc/R ${word(d('ioAvg'))}. (Vdc ${word(d('voutAvg'))} — for an R load the bridge output itself does not depend on R, so that part of the change comes from ${changes.length > 1 ? 'your other change' : 'the device drops (Ron·i) or a filter element'}.)`,
+        )
         break
       case 'vrms':
         out.push(`Source voltage ${c.direction > 0 ? 'increased' : 'decreased'}: every output voltage scales with Vm (Vdc ${word(d('voutAvg'))}); the diode drop Vf does not scale, so the change is slightly ${c.direction > 0 ? 'more' : 'less'} than proportional for a real diode.`)

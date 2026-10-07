@@ -1959,3 +1959,6 @@ tr.row-approx td {
 .rev-opts .pick { font-size: 12px; padding: 4px 10px; }
 .predict-tabs { margin: 0; }
 .params--hidden { padding: 14px; }
+.ba-table th { white-space: normal; }
+.ba-table td { white-space: nowrap; }
+.ba-table { table-layout: auto; width: 100%; }

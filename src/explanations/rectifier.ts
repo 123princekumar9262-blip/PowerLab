@@ -35,6 +35,8 @@ export interface ThreePhaseInsight {
   region: string
   overlap: boolean
   freewheeling: boolean
+  /** Display name per device id (SCRs are shown as T1…T6). */
+  names: Record<string, string>
 }
 
 export interface StateExplanation {

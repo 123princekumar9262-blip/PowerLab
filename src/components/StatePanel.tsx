@@ -84,11 +84,11 @@ export function StatePanel({ ex, signalIds, topology, whyOpen, onToggleWhy, lens
           </dd>
         </div>
         <div>
-          <dt>{ex.diodes.length > 1 ? 'Diodes' : 'Diode D1'}</dt>
+          <dt>{ex.diodes.length > 1 ? (tp && Object.values(tp.names).some((n) => n.startsWith('T')) ? 'Devices' : 'Diodes') : 'Diode D1'}</dt>
           <dd className="diode-list">
             {ex.diodes.map((d) => (
               <span key={d.id} className={`status ${d.on ? 'status--on' : 'status--off'}`} title={BIAS[d.bias]}>
-                {d.on ? '●' : '✕'} {ex.diodes.length > 1 ? d.id : ''} {d.on ? 'ON' : 'OFF'}
+                {d.on ? '●' : '✕'} {ex.diodes.length > 1 ? (tp?.names[d.id] ?? d.id) : ''} {d.on ? 'ON' : 'OFF'}
                 {ex.diodes.length === 1 && <span className="muted"> · {BIAS[d.bias]}</span>}
               </span>
             ))}

@@ -7,8 +7,8 @@ lesson text, challenge checks and measurements. No waveform is drawn from an
 
 ## 1. Circuits
 
-Three rectifiers × four loads = 12 circuits, all built from one netlist engine
-(`src/circuits/rectifier.ts`).
+Single-phase: three rectifiers × four loads = 12 circuits. Three-phase: §8. All are built from
+one netlist engine (`src/circuits/rectifier.ts`).
 
 | Rectifier | Diodes | Source | Path drop |
 |---|---|---|---|
@@ -102,7 +102,9 @@ All values are taken over the **last full cycle**. Steady state is declared when
 Vdc = (1/T)∫vout dt     Vrms = √((1/T)∫vout² dt)     ripple = max − min
 RF  = √(Vrms² − Vdc²)/Vdc       η = P_R / P_source
 γ, θon, β    from the refined D1 ON/OFF event times
-f_ripple     = (output crests per cycle) × f   (plateau-aware: a crest may span two equal samples)
+f_ripple     = k·f for the largest k ∈ {12, 6, 4, 3, 2, 1} such that vout(t) ≈ vout(t + T/k)
+               over the last cycle (interpolated shift; ≤ 2 % of samples may differ, which
+               tolerates the jumps at an SCR firing instant)
 PIV          = max over all diodes of −vD
 ```
 
@@ -150,9 +152,91 @@ Because the solved network satisfies KCL and KVL at every instant, Tellegen's th
 the signed element powers sum to zero. The Energy view shows this live (Σp = 0 ✓). Over a
 steady cycle the tests also check `P_source = P_R + P_diodes + ΔW/T` to 0.5 %.
 
-## 8. Validation
+## 8. Three-phase circuits
 
-`npm test` runs 287 tests:
+Same netlist engine, same assumed-state search, same event-located stepping. Only the
+netlist builder (`buildThreePhase` in `src/circuits/rectifier.ts`) is new.
+
+**Source.** Three star-connected sources from a neutral bus N, each optionally with a series
+Rs and Ls (Advanced):
+
+```
+VaN = Vm·sin(ωt + φ)    VbN = Vm·sin(ωt + φ − 120°)    VcN = Vm·sin(ωt + φ − 240°)   (abc)
+acb swaps the signs of the 120° shifts.   Vm = √2·Vph,  VLL = √3·Vph
+```
+
+| Topology | Devices | Output |
+|---|---|---|
+| 3-pulse half-wave | Da, Db, Dc from each phase to the + bus; the load returns to N | highest phase − Vf |
+| 6-pulse bridge | D1, D3, D5 (a, b, c) to the + rail; D4, D6, D2 from the − rail | highest − lowest phase − 2Vf |
+| Half-controlled | T1, T3, T5 (SCRs) on top, D4, D6, D2 below | |
+
+In the bridge the neutral is not connected to the load, so the network floats whenever the
+neutral is not involved (see "floating networks" below).
+
+**SCR model.** An SCR is a diode element with a gate signal `g(t)`:
+
+```
+ON   allowed only if i > 0 and (g(t) or it was already ON)       (latching)
+OFF  with forward voltage allowed only if g(t) is low and it was OFF before
+```
+
+The previous combination is passed to the solver so that latching is explicit. Gate pulses are
+120° wide and start α after each device's natural commutation instant. That instant is the
+phase angle 30° for the upper (and 3-pulse) devices and 210° for the lower ones, i.e. where that
+phase becomes the highest (lowest). At α = 0 every SCR is fired exactly when the equivalent diode would
+turn on, so the output is the diode rectifier's. The optional freewheeling diode Dfw sits across the load.
+
+**Floating networks.** When the conducting devices leave part of the circuit connected to the
+rest only through OFF devices, that part's potential is undefined. The solver replaces one KCL row
+with a reference constraint (as for the single-phase bridge) and then shifts the floating part by
+the common δ that keeps every OFF device blocking. Without this shift, idle SCRs at large α (and
+the freewheeling and RC cases) looked forward biased and forced thousands of solver fallbacks. It
+now produces none.
+
+**Faults** (`LabParams.faults`):
+
+| Fault | Model |
+|---|---|
+| device open | the device can never be ON |
+| device short | a 1 mΩ conductance in both directions (a warning appears if Rs < 0.05 Ω, since that is a phase-to-phase short) |
+| unequal Vf | that device's Vf overridden |
+| missing phase | that phase's source removed and its line tied to N through 1 GΩ; devices on that line are forced open so nA leakage never reads as "conduction" |
+| imbalance | that phase's amplitude scaled |
+
+## 9. Three-phase theory
+
+`src/measurements/theory/threePhase.ts` is again independent of the simulator. It writes vout(θ)
+analytically and integrates by quadrature.
+
+```
+3-pulse, R, α = 0:   Vdc = (3√3/2π)·Vm = 1.17·Vph              f_ripple = 3f
+6-pulse, R, α = 0:   Vdc = (3√3/π)·Vm = (3/π)·√2·VLL = 1.35·VLL   f_ripple = 6f
+controlled, continuous:  Vdc = Vdc0·cos α
+```
+
+With real devices the waveform is `envelope − path drop` (Vf for 3-pulse, 2Vf for the bridge).
+For SCRs each 60° (bridge) or 120° (3-pulse) segment starts α late. With an R load or a
+freewheeling diode the output is clamped at 0 (or at −Vf) when the segment voltage goes negative.
+
+**RL.** The load current is the periodic solution of `L·di/dt + R·i = vo(θ)`. It is obtained by
+exact exponential integration over the segment waveform (`periodicRL`), and discontinuity is
+detected when that solution would go negative. The conduction angle of each device is then
+measured on the theory current, not assumed to be 120°.
+
+**Approximations, not compared** (shown as "approx."):
+
+```
+source impedance:  Vdc ≈ Vdc0 / (1 + (3ωLs/π + 2Rs)/R)    (overlap voltage loss 3ωLs·Idc/π)
+```
+
+RC and RLC filters, and every fault, have no closed form here, so the table says so. Source rows
+(VaN RMS, VLL RMS) are compared only for a balanced, healthy source, and the ripple frequency only
+when no phase is missing or unbalanced.
+
+## 10. Validation
+
+`npm test` runs 354 tests:
 
 - **Physics.** Conduction and blocking, the real-diode dead zone, KVL/KCL/Ohm at every sample,
   periodicity, bridge diode pairing, the symmetric blocking split, PIV for each topology, the RL hold-on and
@@ -164,5 +248,14 @@ steady cycle the tests also check `P_source = P_R + P_diodes + ΔW/T` to 0.5 %.
   and NaN/∞/negative inputs, on every circuit. Results stay finite and explainable, with fewer than 5 solver fallbacks.
 - **Modes.** Every lesson claim is checked against the simulation. Every challenge starts
   unsolved and has a verified 3-star design. Event landing and stepping are tested.
+- **Three-phase.** 120° displacement and a balanced source (Σv = 0), both sequences; the D1D2 → … →
+  D6D1 sequence with each pair for 60°; Vo equal to the highest-minus-lowest line voltage; six-pulse
+  output with f_ripple = 6f; Vdc = 1.35·VLL; diode current conservation (upper sum = lower sum = io);
+  RL current continuity, and larger L giving smaller current ripple; SCR Vdc = Vdc0·cos α for R and RL
+  across α; an SCR turning on only during its gate pulse; the freewheeling clamp; the half-controlled bridge; each fault's physical signature
+  (D1 open → 50 Hz ripple, missing phase → 100 Hz); theory agreement within 1 %; no solver fallbacks.
+- **Three-phase modes.** Experiment diffs and explanations, every what-if answer derived from
+  simulation, reverse-engineering tasks, three-phase lessons and challenges.
 
-`npm run smoke` drives the real UI in Edge: 54 checks, plus screenshots in `scripts/out/`.
+`npm run smoke` and `npm run smoke3` drive the real UI in Edge: 54 + 24 checks, plus screenshots in
+`scripts/out/`.
