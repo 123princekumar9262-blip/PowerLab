@@ -1,0 +1,55 @@
+/** Display-only formatting. Never used inside the simulation. */
+
+const PREFIXES: ReadonlyArray<[number, string]> = [
+  [1e6, 'M'],
+  [1e3, 'k'],
+  [1, ''],
+  [1e-3, 'm'],
+  [1e-6, 'µ'],
+  [1e-9, 'n'],
+  [1e-12, 'p'],
+]
+
+/** Magnitudes below this are displayed as exactly zero (avoids "−0.000" and 1e-17 dust). */
+const DISPLAY_ZERO = 1e-13
+
+/**
+ * Engineering format with SI prefix: 0.7 → "0.700 V", 0.0505 → "50.50 mA", 16.97 → "16.97 V".
+ * Mantissa shows 4 significant figures (3 decimals below 1, 2 below 100, 1 above).
+ */
+export function formatSI(value: number, unit: string, opts: { signed?: boolean; digits?: number } = {}): string {
+  if (!Number.isFinite(value)) return `— ${unit}`
+  const signed = opts.signed ?? false
+  if (Math.abs(value) < DISPLAY_ZERO) return `${(0).toFixed(opts.digits ?? 3)} ${unit}`
+  const abs = Math.abs(value)
+  // Values ≥ 0.1 stay in base units so "0.700 V" reads naturally; smaller ones get a prefix.
+  let scale = 1
+  let prefix = ''
+  if (abs >= 1e3 || abs < 0.1) {
+    ;[scale, prefix] = PREFIXES.find(([s]) => abs >= s) ?? PREFIXES[PREFIXES.length - 1]
+  }
+  const m = abs / scale
+  const digits = opts.digits ?? (m >= 100 ? 1 : m >= 10 ? 2 : 3)
+  const sign = value < 0 ? '−' : signed ? '+' : ''
+  return `${sign}${m.toFixed(digits)} ${prefix}${unit}`
+}
+
+export const formatV = (v: number, signed = true) => formatSI(v, 'V', { signed })
+export const formatA = (a: number, signed = false) => formatSI(a, 'A', { signed })
+export const formatW = (w: number) => formatSI(w, 'W')
+export const formatTime = (t: number) => formatSI(t, 's')
+
+export function formatDeg(deg: number, digits = 1): string {
+  return `${deg.toFixed(digits)}°`
+}
+
+export function formatOhm(r: number): string {
+  return formatSI(r, 'Ω', { digits: r >= 1e3 ? 2 : undefined }).replace(/\.0+ /, ' ')
+}
+
+export function formatPercent(x: number, digits = 3): string {
+  const v = x * 100
+  if (Math.abs(v) < 1e-6) return '0 %'
+  if (Math.abs(v) < 10 ** -digits) return `${v.toExponential(1)} %`
+  return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(digits)} %`
+}
