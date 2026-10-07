@@ -11,6 +11,30 @@ export interface CausalStep {
   stage: CausalStage
   title: string
   text: string
+  /** The equation that describes this stage (shown by the Physics Lens). */
+  equation?: string
+}
+
+/** Three-phase specifics of the state at the cursor (all read from the simulation). */
+export interface ThreePhaseInsight {
+  phases: { a: number; b: number; c: number }
+  /** Phases ordered from highest to lowest instantaneous voltage. */
+  order: Array<'a' | 'b' | 'c'>
+  /** Conducting devices, upper (to the + rail) and lower (from the − rail / neutral). */
+  upper: string[]
+  lower: string[]
+  /** e.g. "D1 & D6" — the conducting pair (or set, during overlap). */
+  pairLabel: string
+  /** e.g. "Phase A → D1 → Load → D6 → Phase B". */
+  pathText: string
+  /** e.g. "Vo = Vab − 2·Vf". */
+  outputRelation: string
+  /** Value of that relation from the source EMFs (should equal the simulated Vo). */
+  outputFromSource: number
+  /** 60°/120° segment index, conduction region label. */
+  region: string
+  overlap: boolean
+  freewheeling: boolean
 }
 
 export interface StateExplanation {
@@ -31,6 +55,7 @@ export interface StateExplanation {
   /** One-paragraph answer to "why is this happening?" */
   summary: string
   chain: CausalStep[]
+  threePhase?: ThreePhaseInsight
 }
 
 const V = (v: number) => formatV(v)
@@ -267,6 +292,7 @@ const EVENT_TITLES: Record<CircuitEvent['kind'], string> = {
   'current-stop': 'Current stops',
   'vout-max': 'Vout crest',
   'vout-min': 'Vout valley',
+  'phase-crossing': 'Phase voltages cross',
 }
 
 export function eventTitle(e: CircuitEvent): string {
@@ -365,6 +391,8 @@ export function explainEvent(result: SimulationResult, e: CircuitEvent): EventEx
               : 'The source now drives in reverse; D1 blocks (unless stored energy keeps it on).'
             : 'The other half of the full-wave rectifier now has the positive side, so the next conduction pulse will come through the other diode(s).',
       }
+    case 'phase-crossing':
+      return { title, what: `Two phase voltages are equal ${at}.`, why: 'A natural commutation point: the highest or lowest phase changes here.' }
     case 'vout-max':
       return {
         title,

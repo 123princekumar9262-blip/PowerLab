@@ -32,6 +32,8 @@ export interface ComparisonRow {
 const ROWS: ReadonlyArray<{ key: MeasureKey; label: string; symbol: string; unit: string; group: RowGroup }> = [
   { key: 'vinPeak', label: 'Peak input', symbol: 'Vin,pk', unit: 'V', group: 'Source' },
   { key: 'vinRms', label: 'RMS input', symbol: 'Vin,rms', unit: 'V', group: 'Source' },
+  { key: 'vphRms', label: 'Phase voltage (RMS)', symbol: 'Vph', unit: 'V', group: 'Source' },
+  { key: 'vllRms', label: 'Line-to-line voltage (RMS)', symbol: 'VLL', unit: 'V', group: 'Source' },
   { key: 'voutAvg', label: 'Average output', symbol: 'Vdc', unit: 'V', group: 'Output' },
   { key: 'voutRms', label: 'RMS output', symbol: 'Vo,rms', unit: 'V', group: 'Output' },
   { key: 'voutPeak', label: 'Peak output', symbol: 'Vo,pk', unit: 'V', group: 'Output' },
@@ -77,11 +79,14 @@ export function compareWithTheory(result: SimulationResult): Comparison {
   // Scale for absolute comparisons when the theoretical value is exactly zero.
   const zeroScale: Record<string, number> = { V: p.vm, A: p.vm / p.resistance, '°': 360, Hz: p.frequency, '': 1 }
 
-  const rows = ROWS.map((def): ComparisonRow => {
+  const three = result.params.topology.startsWith('3ph')
+  const defs = ROWS.filter((d) => (three ? d.key !== 'vinRms' : d.key !== 'vphRms' && d.key !== 'vllRms'))
+  const rows = defs.map((def): ComparisonRow => {
     const t = theory.values[def.key]
     const th = t?.value ?? null
     const sim = simulatedValue(measurements, def.key, th)
-    const base = { ...def, simulated: sim, theory: th, formula: t?.formula ?? null, kind: t?.kind ?? ('none' as const) }
+    const label = three && def.key === 'vinPeak' ? { label: 'Peak phase voltage', symbol: 'Vm' } : {}
+    const base = { ...def, ...label, simulated: sim, theory: th, formula: t?.formula ?? null, kind: t?.kind ?? ('none' as const) }
     const noCompare = (skipped?: string): ComparisonRow => ({ ...base, error: null, errorIsAbsolute: false, withinTolerance: true, skipped })
     if (th === null || sim === null) return noCompare()
     // Steady-state formulas are only comparable once the transient has died out.

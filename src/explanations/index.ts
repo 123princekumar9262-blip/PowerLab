@@ -1,7 +1,8 @@
 import type { CircuitEvent, CircuitId, SimulationResult } from '../types/simulation.ts'
 import { explainEvent, explainState, type EventExplanation, type StateExplanation } from './rectifier.ts'
+import { explainEventThreePhase, explainThreePhase } from './threePhase.ts'
 
-export type { CausalStage, CausalStep, EventExplanation, StateExplanation } from './rectifier.ts'
+export type { CausalStage, CausalStep, EventExplanation, StateExplanation, ThreePhaseInsight } from './rectifier.ts'
 export { eventTitle } from './rectifier.ts'
 
 interface Explainer {
@@ -9,9 +10,11 @@ interface Explainer {
   event(result: SimulationResult, e: CircuitEvent): EventExplanation
 }
 
-/** One explainer covers every rectifier × load: it reads the topology and load from the result. */
+/** Single-phase explainer: reads the topology and load from the result. */
 const RECTIFIER_EXPLAINER: Explainer = { state: explainState, event: explainEvent }
+/** Three-phase explainer: phase voltages → highest/lowest → device decision → path → output. */
+const THREE_PHASE_EXPLAINER: Explainer = { state: explainThreePhase, event: explainEventThreePhase }
 
-export function getExplainer(_id: CircuitId): Explainer {
-  return RECTIFIER_EXPLAINER
+export function getExplainer(id: CircuitId): Explainer {
+  return id.startsWith('3ph') ? THREE_PHASE_EXPLAINER : RECTIFIER_EXPLAINER
 }

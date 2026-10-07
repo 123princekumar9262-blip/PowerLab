@@ -12,6 +12,9 @@ export interface Measurements {
   steady: { reached: boolean; change: number | null }
   vinPeak: number
   vinRms: number
+  /** Three-phase: measured phase RMS (phase a) and line-to-line RMS (a−b); null for single-phase. */
+  vphRms: number | null
+  vllRms: number | null
   voutPeak: number
   voutMin: number
   /** DC (average) output voltage Vdc = (1/T)∫vout dt. */
@@ -106,8 +109,10 @@ export function measure(result: SimulationResult): Measurements {
   // diode switches exactly at a zero crossing, which can land a few ulps either side of t₀),
   // so the state at t₀ is taken from the last D1 event up to t₀ + ε, not from a sample.
   const d1 = trace.diodes[0]
+  // The reference diode: D1, or Da for the three-phase half-wave rectifier.
+  const d1Id = d1.id
   const eps = T * 1e-9
-  const d1All = events.filter((e) => e.device === 'D1' && (e.kind === 'diode-on' || e.kind === 'diode-off'))
+  const d1All = events.filter((e) => e.device === d1Id && (e.kind === 'diode-on' || e.kind === 'diode-off'))
   const before = d1All.filter((e) => e.time <= t0 + eps).pop()
   let on = before ? before.kind === 'diode-on' : d1.on[i0] === 1
   let cursor = t0
@@ -127,7 +132,7 @@ export function measure(result: SimulationResult): Measurements {
   // Last complete D1 pulse (turn-on followed by turn-off) → turn-on angle and extinction angle β.
   let turnOnAngleDeg: number | null = null
   let turnOffAngleDeg: number | null = null
-  const d1Events = events.filter((e) => e.device === 'D1')
+  const d1Events = events.filter((e) => e.device === d1Id)
   for (let k = d1Events.length - 1; k > 0; k--) {
     const off = d1Events[k]
     const onE = d1Events[k - 1]
@@ -170,6 +175,8 @@ export function measure(result: SimulationResult): Measurements {
     steady,
     vinPeak: maxOf(vin),
     vinRms: rms(vin),
+    vphRms: S.vab ? rms(vin) : null,
+    vllRms: S.vab ? rms(S.vab) : null,
     voutPeak: maxOf(vout),
     voutMin: minOf(vout),
     voutAvg,

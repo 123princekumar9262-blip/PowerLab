@@ -1,4 +1,4 @@
-import type { CircuitId, LabParams, LoadType, ParamIssue, RectifierTopology, ResolvedParams } from '../types/simulation.ts'
+import { isThreePhase, type CircuitId, type FaultSpec, type LabParams, type LoadType, type ParamIssue, type RectifierTopology, type ResolvedParams } from '../types/simulation.ts'
 
 /**
  * Educational defaults. 12 V RMS is a typical step-down transformer secondary —
@@ -14,6 +14,19 @@ export const DEFAULT_PARAMS: LabParams = {
   sim: { cycles: 4, timestepMode: 'auto', timestepUs: 10 },
 }
 
+/**
+ * Three-phase educational defaults: 12 V RMS per phase, 50 Hz, R = 10 Ω, L = 10 mH
+ * (simulation values only — never a recommendation for real mains work).
+ */
+export const THREE_PHASE_DEFAULTS: LabParams = {
+  ...DEFAULT_PARAMS,
+  load: { resistance: 10, inductance: 0.01, capacitance: 1000e-6 },
+  threePhase: { sequence: 'abc', rs: 0, ls: 0 },
+  control: { device: 'diode', alphaDeg: 30, freewheel: false },
+  faults: {},
+  sim: { ...DEFAULT_PARAMS.sim, cycles: 4 },
+}
+
 /** Allowed ranges. Values outside are clamped and reported as an issue. */
 export const LIMITS = {
   vrms: { min: 0.1, max: 400, unit: 'V' },
@@ -25,6 +38,9 @@ export const LIMITS = {
   inductance: { min: 1e-6, max: 10, unit: 'H' },
   capacitance: { min: 1e-9, max: 0.1, unit: 'F' },
   cycles: { min: 1, max: 20, unit: 'cycles' },
+  rs: { min: 0, max: 100, unit: 'Ω' },
+  ls: { min: 0, max: 0.1, unit: 'H' },
+  alphaDeg: { min: 0, max: 180, unit: '°' },
   timestepUs: { min: 0.01, max: 1e5, unit: 'µs' },
 } as const
 
@@ -101,7 +117,7 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
   const duration = cycles * period
 
   // A bridge puts two diode drops in the path.
-  const vfPath = topology === 'bridge' ? 2 * vf : vf
+  const vfPath = topology === 'bridge' || topology === '3ph-bridge' || topology === '3ph-half-controlled' ? 2 * vf : vf
   if (kind === 'real' && vfPath >= vm) {
     issues.push({
       field: 'vf',
@@ -148,6 +164,35 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
     issues.push({ field: 'capacitance', severity: 'info', message: `R·C = ${(tauC * 1e6).toPrecision(3)} µs is shorter than 5·Δt — the capacitor's fast transient is not resolved. Reduce the timestep for detail.` })
   }
 
+  // ── Three-phase source, controlled devices and faults ───────────────────────────
+  const tp = input.threePhase
+  const threePhase = {
+    sequence: tp?.sequence === 'acb' ? ('acb' as const) : ('abc' as const),
+    rs: isThreePhase(topology) && tp ? num('rs', 'Source resistance', tp.rs, 0) : 0,
+    ls: isThreePhase(topology) && tp ? num('ls', 'Source inductance', tp.ls, 0) : 0,
+  }
+  const ctl = input.control
+  // The half-controlled bridge always has SCRs (upper) — that is what defines it.
+  const device = topology === '3ph-half-controlled' ? ('scr' as const) : isThreePhase(topology) && ctl?.device === 'scr' ? ('scr' as const) : ('diode' as const)
+  const alphaDeg = device === 'scr' && ctl ? num('alphaDeg', 'Firing angle α', ctl.alphaDeg, 30) : 0
+  const control = { device, alpha: alphaDeg * DEG, freewheel: isThreePhase(topology) && !!ctl?.freewheel }
+  const faults: FaultSpec = isThreePhase(topology) ? { ...(input.faults ?? {}) } : {}
+  if (faults.vfOverride) {
+    const v = faults.vfOverride.vf
+    faults.vfOverride = { ...faults.vfOverride, vf: Number.isFinite(v) ? Math.min(5, Math.max(0, v)) : vf }
+  }
+  if (faults.imbalance) {
+    const k = faults.imbalance.scale
+    faults.imbalance = { ...faults.imbalance, scale: Number.isFinite(k) ? Math.min(2, Math.max(0, k)) : 1 }
+  }
+  if (faults.diode?.kind === 'short' && threePhase.rs < 0.05) {
+    issues.push({
+      field: 'faults',
+      severity: 'warning',
+      message: 'A shorted diode connects two phases directly. With source resistance Rs ≈ 0 only the 1 mΩ fault path limits the current, so expect kiloamps. Add Rs (Advanced) to see a realistic fault current.',
+    })
+  }
+
   return {
     params: {
       topology,
@@ -162,6 +207,9 @@ export function sanitizeParams(input: LabParams, circuitId: CircuitId = 'half-wa
       resistance,
       inductance,
       capacitance,
+      threePhase,
+      control,
+      faults,
       cycles,
       duration,
       dt,

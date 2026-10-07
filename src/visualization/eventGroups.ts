@@ -28,6 +28,7 @@ const ORDER: Record<CircuitEvent['kind'], number> = {
   'vin-negative-peak': 3,
   'vout-max': 4,
   'vout-min': 4,
+  'phase-crossing': 5,
 }
 
 const categoryOf = (k: CircuitEvent['kind']): EventGroup['category'] => (DIODE_KINDS.has(k) ? 'diode' : k === 'vout-max' || k === 'vout-min' ? 'output' : 'source')

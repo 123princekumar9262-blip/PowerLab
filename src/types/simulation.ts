@@ -8,8 +8,30 @@
  *        ─► measurements / theory / explanations ─► UI
  */
 
-/** Rectifier topology. Full-wave comes in its two classic forms. */
-export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge'
+/**
+ * Rectifier topology.
+ * Single-phase: half-wave, and full-wave in its two classic forms.
+ * Three-phase: 3-pulse midpoint (half-wave), 6-pulse bridge, and the half-controlled
+ * bridge (upper SCRs, lower diodes). Diode or SCR devices are chosen by `control.device`.
+ */
+export type RectifierTopology = 'half-wave' | 'center-tap' | 'bridge' | '3ph-half-wave' | '3ph-bridge' | '3ph-half-controlled'
+
+export const THREE_PHASE_TOPOLOGIES: readonly RectifierTopology[] = ['3ph-half-wave', '3ph-bridge', '3ph-half-controlled']
+export const isThreePhase = (t: RectifierTopology) => t.startsWith('3ph')
+
+/** Fault injection for the three-phase experiments. */
+export interface FaultSpec {
+  /** A diode that is open-circuit (never conducts) or short-circuit (conducts both ways). */
+  diode?: { id: DiodeId; kind: 'open' | 'short' }
+  /** Per-diode forward-voltage override, e.g. one aged diode with a higher Vf. */
+  vfOverride?: { id: DiodeId; vf: number }
+  /** A phase conductor that is disconnected (blown fuse). */
+  missingPhase?: 'a' | 'b' | 'c'
+  /** Amplitude of one phase, as a fraction of nominal (voltage imbalance). */
+  imbalance?: { phase: 'a' | 'b' | 'c'; scale: number }
+}
+
+export type SwitchDevice = 'diode' | 'scr'
 
 /**
  * Load type (all loads are driven between the rectifier's + and − output):
@@ -51,6 +73,24 @@ export interface LabParams {
     /** Filter capacitance [F] (RC, RLC). */
     capacitance: number
   }
+  /** Three-phase source details (ignored by single-phase circuits). */
+  threePhase?: {
+    /** Phase sequence: abc (positive) or acb (negative). */
+    sequence: 'abc' | 'acb'
+    /** Source resistance per phase [Ω]. */
+    rs: number
+    /** Source inductance per phase [H] — causes commutation overlap. */
+    ls: number
+  }
+  /** Controlled rectifiers: device type and firing angle. */
+  control?: {
+    device: SwitchDevice
+    /** Firing angle α measured from each device's natural commutation instant [degrees]. */
+    alphaDeg: number
+    /** Freewheeling diode across the load. */
+    freewheel: boolean
+  }
+  faults?: FaultSpec
   sim: {
     /** Simulated duration, in source cycles. */
     cycles: number
@@ -86,6 +126,11 @@ export interface ResolvedParams {
   resistance: number
   inductance: number
   capacitance: number
+  /** Three-phase source: sequence and per-phase source impedance (defaults: abc, 0, 0). */
+  threePhase: { sequence: 'abc' | 'acb'; rs: number; ls: number }
+  /** Switching devices and firing angle α [rad] (diodes: α is ignored). */
+  control: { device: SwitchDevice; alpha: number; freewheel: boolean }
+  faults: FaultSpec
   cycles: number
   /** Total simulated time [s]. */
   duration: number
@@ -149,8 +194,19 @@ export type SignalId =
   | 'ps'
   | 'pload'
   | 'pd'
+  // Three-phase: phase voltages b and c (vin is phase a), line-to-line voltages, and the
+  // currents of diodes 3–6 (id, id2 are diodes 1–2).
+  | 'vb'
+  | 'vc'
+  | 'vab'
+  | 'vbc'
+  | 'vca'
+  | 'id3'
+  | 'id4'
+  | 'id5'
+  | 'id6'
 
-export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4'
+export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'Da' | 'Db' | 'Dc' | 'Dfw'
 
 export type SignalValues = Partial<Record<SignalId, number>>
 
@@ -162,6 +218,8 @@ export interface DiodeSolution {
   current: number
   /** Anode − cathode voltage [V]. */
   voltage: number
+  /** SCRs only: is the gate pulse applied at this instant? */
+  gate?: boolean
 }
 
 /** The electrical solution of the circuit at one instant. */
@@ -194,6 +252,8 @@ export interface DiodeTrace {
   bias: Uint8Array
   current: Float64Array
   voltage: Float64Array
+  /** SCRs only: 1 while the gate pulse is applied, per sample. */
+  gate?: Uint8Array
 }
 
 /**
@@ -220,6 +280,7 @@ export type EventKind =
   | 'current-stop'
   | 'vout-max'
   | 'vout-min'
+  | 'phase-crossing'
 
 /** An automatically detected event, located to sub-timestep precision. */
 export interface CircuitEvent {

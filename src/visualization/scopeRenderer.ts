@@ -2,7 +2,7 @@ import type { SignalId, SimulationResult } from '../types/simulation.ts'
 import { formatSI } from '../utils/format.ts'
 import type { EventGroup } from './eventGroups.ts'
 import { axisPrefix, niceTicks, tickLabel } from './scales.ts'
-import { lanesFor, SIGNAL_META, type ScopeLayoutMode, type Unit } from './signals.ts'
+import { lanesFor, metaFor, SIGNAL_CSS_VARS, SIGNAL_META, type ScopeLayoutMode, type Unit } from './signals.ts'
 
 /**
  * Canvas rendering of the oscilloscope. Pure drawing: it reads the simulation
@@ -34,7 +34,8 @@ export interface ScopeColors {
   cursor: string
   marker: string
   markerDiode: string
-  signals: Record<SignalId, string>
+  /** Resolved colour of every signal CSS variable (signals pick theirs per topology). */
+  vars: Record<string, string>
 }
 
 /** Value → pixel mapping for one unit inside a lane. */
@@ -74,7 +75,7 @@ const M = { left: 58, right: 14, rightAxis: 56, top: 4, eventRow: 24, laneGap: 6
 export function readColors(el: Element): ScopeColors {
   const cs = getComputedStyle(el)
   const v = (name: string) => cs.getPropertyValue(name).trim() || '#888'
-  const signals = Object.fromEntries((Object.keys(SIGNAL_META) as SignalId[]).map((s) => [s, v(SIGNAL_META[s].cssVar)])) as Record<SignalId, string>
+  const vars = Object.fromEntries(SIGNAL_CSS_VARS.map((name) => [name, v(name)]))
   return {
     surface: v('--scope-bg'),
     laneBg: v('--scope-lane'),
@@ -89,7 +90,7 @@ export function readColors(el: Element): ScopeColors {
     cursor: v('--scope-cursor'),
     marker: v('--text-3'),
     markerDiode: v('--text-1'),
-    signals,
+    vars,
   }
 }
 
@@ -110,7 +111,7 @@ function rangeOf(result: SimulationResult, signals: SignalId[]): { lo: number; h
 
 /** Lay out lanes for the visible signals in the chosen mode. */
 export function computeLayout(width: number, height: number, result: SimulationResult, visible: SignalId[], mode: ScopeLayoutMode): ScopeLayout {
-  const specs = lanesFor(visible, mode)
+  const specs = lanesFor(visible, mode, result.params.topology)
   const units = (sigs: SignalId[]) => [...new Set(sigs.map((s) => SIGNAL_META[s].unit))]
   const twoAxes = mode === 'overlay' && specs.length > 0 && units(specs[0].signals).length > 1
   const eventRowTop = M.top
@@ -251,10 +252,11 @@ export function drawBase(ctx: CanvasRenderingContext2D, L: ScopeLayout, result: 
       const arr = trace.signals[sid]
       if (!arr) continue
       const ax = axisFor(lane, sid)
-      ctx.strokeStyle = colors.signals[sid]
-      ctx.lineWidth = 2
+      const meta = metaFor(sid, result.params.topology)
+      ctx.strokeStyle = colors.vars[meta.cssVar]
+      ctx.lineWidth = sid === 'vout' && result.params.topology.startsWith('3ph') ? 2.5 : 2
       ctx.lineJoin = 'round'
-      ctx.setLineDash(SIGNAL_META[sid].dash ?? (SIGNAL_META[sid].dashed ? [6, 5] : []))
+      ctx.setLineDash(meta.dash ?? (meta.dashed ? [6, 5] : []))
       drawTrace(ctx, trace.time, arr, i0, i1, (t) => timeToX(L, vp, t), (v) => valueToY(lane, ax, v), plotW)
     }
     ctx.setLineDash([])
@@ -429,11 +431,12 @@ export function drawOverlay(
       ctx.beginPath()
       ctx.arc(xr, y, 5.5, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = colors.signals[sid]
+      const meta = metaFor(sid, result.params.topology)
+      ctx.fillStyle = colors.vars[meta.cssVar]
       ctx.beginPath()
       ctx.arc(xr, y, 3.75, 0, Math.PI * 2)
       ctx.fill()
-      rows.push({ sid, text: `${SIGNAL_META[sid].label} ${formatSI(v, SIGNAL_META[sid].unit, { signed: true })}` })
+      rows.push({ sid, text: `${meta.label} ${formatSI(v, meta.unit, { signed: true })}` })
     }
     if (!rows.length) continue
     ctx.font = FONT
@@ -454,7 +457,7 @@ export function drawOverlay(
     ctx.stroke()
     rows.forEach((r, k) => {
       const ry = by + 6 + k * 16
-      ctx.fillStyle = colors.signals[r.sid]
+      ctx.fillStyle = colors.vars[metaFor(r.sid, result.params.topology).cssVar]
       ctx.fillRect(bx + 8, ry + 3, 8, 8)
       ctx.fillStyle = colors.text1
       ctx.textBaseline = 'top'

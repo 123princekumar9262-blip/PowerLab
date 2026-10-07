@@ -1,4 +1,4 @@
-import type { SignalId } from '../types/simulation.ts'
+import { isThreePhase, type RectifierTopology, type SignalId } from '../types/simulation.ts'
 
 export type Unit = 'V' | 'A' | 'J' | 'W'
 
@@ -17,6 +17,8 @@ export interface SignalMeta {
   dash?: number[]
   /** Hidden until the student asks for it (energy & power). */
   advanced?: boolean
+  /** Offered in the legend but off by default (e.g. individual diode currents). */
+  optional?: boolean
 }
 
 export const SIGNAL_META: Record<SignalId, SignalMeta> = {
@@ -36,7 +38,51 @@ export const SIGNAL_META: Record<SignalId, SignalMeta> = {
   ps: { id: 'ps', label: 'Ps', name: 'Power delivered by the source', unit: 'W', cssVar: '--sig-vin', advanced: true },
   pload: { id: 'pload', label: 'PR', name: 'Power dissipated in R', unit: 'W', cssVar: '--sig-io', advanced: true },
   pd: { id: 'pd', label: 'PD', name: 'Power lost in the diodes', unit: 'W', cssVar: '--sig-id', dashed: true, advanced: true },
+  vb: { id: 'vb', label: 'VbN', name: 'Phase b voltage (to neutral)', unit: 'V', cssVar: '--sig-pb' },
+  vc: { id: 'vc', label: 'VcN', name: 'Phase c voltage (to neutral)', unit: 'V', cssVar: '--sig-pc' },
+  vab: { id: 'vab', label: 'Vab', name: 'Line voltage a−b', unit: 'V', cssVar: '--sig-pa', dash: [2, 4], optional: true },
+  vbc: { id: 'vbc', label: 'Vbc', name: 'Line voltage b−c', unit: 'V', cssVar: '--sig-pb', dash: [2, 4], optional: true },
+  vca: { id: 'vca', label: 'Vca', name: 'Line voltage c−a', unit: 'V', cssVar: '--sig-pc', dash: [2, 4], optional: true },
+  id3: { id: 'id3', label: 'Id3', name: 'Diode 3 current', unit: 'A', cssVar: '--sig-pb', dashed: true, optional: true },
+  id4: { id: 'id4', label: 'Id4', name: 'Diode 4 current', unit: 'A', cssVar: '--sig-pa', dash: [2, 3], optional: true },
+  id5: { id: 'id5', label: 'Id5', name: 'Diode 5 current', unit: 'A', cssVar: '--sig-pc', dashed: true, optional: true },
+  id6: { id: 'id6', label: 'Id6', name: 'Diode 6 current', unit: 'A', cssVar: '--sig-pb', dash: [2, 3], optional: true },
 }
+
+/**
+ * Three-phase overrides. Phase colours follow the R-Y-B convention as closely as the
+ * validated palette allows: phase a magenta, b amber, c blue (all-pairs validated, dark
+ * surface). Vo is bright neutral so it never competes with a phase. Each diode current takes
+ * its PHASE colour — upper diodes dashed, lower diodes dotted (secondary encoding).
+ */
+const THREE_PHASE_META: Partial<Record<SignalId, Partial<SignalMeta>>> = {
+  vin: { label: 'VaN', name: 'Phase a voltage (to neutral)', cssVar: '--sig-pa' },
+  vout: { label: 'Vo', name: 'DC output voltage', cssVar: '--sig-vout3' },
+  vd: { label: 'Vd1', name: 'Diode D1 voltage', cssVar: '--sig-pa', optional: true },
+  id: { label: 'Id1', name: 'D1 current (upper, phase a)', cssVar: '--sig-pa', dashed: true, dash: undefined, optional: true },
+  id2: { label: 'Id2', name: 'D2 current (lower, phase c)', cssVar: '--sig-pc', dashed: false, dash: [2, 3], optional: true },
+  id3: { name: 'D3 current (upper, phase b)' },
+  id4: { name: 'D4 current (lower, phase a)' },
+  id5: { name: 'D5 current (upper, phase c)' },
+  id6: { name: 'D6 current (lower, phase b)' },
+}
+const HALF_WAVE_3PH_META: Partial<Record<SignalId, Partial<SignalMeta>>> = {
+  vd: { label: 'VDa', name: 'Diode Da voltage' },
+  id: { label: 'IDa', name: 'Da current (phase a)', dash: undefined },
+  id2: { label: 'IDb', name: 'Db current (phase b)', cssVar: '--sig-pb', dashed: true, dash: undefined },
+  id3: { label: 'IDc', name: 'Dc current (phase c)', cssVar: '--sig-pc', dashed: true, dash: undefined },
+}
+
+/** Signal metadata for a given topology (three-phase relabels and recolours some signals). */
+export function metaFor(sid: SignalId, topology: RectifierTopology): SignalMeta {
+  const base = SIGNAL_META[sid]
+  if (!isThreePhase(topology)) return base
+  const over = { ...THREE_PHASE_META[sid], ...(topology === '3ph-half-wave' ? HALF_WAVE_3PH_META[sid] : {}) }
+  return { ...base, ...over }
+}
+
+/** Every CSS variable any signal may use (the renderer resolves them once). */
+export const SIGNAL_CSS_VARS = ['--sig-vin', '--sig-vrect', '--sig-vout', '--sig-vout3', '--sig-vd', '--sig-d2', '--sig-l', '--sig-io', '--sig-id', '--sig-c', '--sig-pa', '--sig-pb', '--sig-pc']
 
 /** How the scope arranges traces. */
 export type ScopeLayoutMode = 'overlay' | 'grouped' | 'separate'
@@ -49,17 +95,17 @@ export interface LaneSpec {
 }
 
 const GROUPS: ReadonlyArray<{ id: string; title: string; signals: SignalId[] }> = [
-  { id: 'voltage', title: 'Source & output', signals: ['vin', 'vrect', 'vout'] },
+  { id: 'voltage', title: 'Source & output', signals: ['vin', 'vb', 'vc', 'vab', 'vbc', 'vca', 'vrect', 'vout'] },
   { id: 'inductor', title: 'Inductor voltage', signals: ['vl'] },
   { id: 'diode', title: 'Diode voltages', signals: ['vd', 'vd2'] },
-  { id: 'current', title: 'Currents', signals: ['io', 'il', 'ic', 'id', 'id2'] },
+  { id: 'current', title: 'Currents', signals: ['io', 'il', 'ic', 'id', 'id2', 'id3', 'id4', 'id5', 'id6'] },
   { id: 'energy', title: 'Stored energy', signals: ['wl', 'wc'] },
   { id: 'power', title: 'Power', signals: ['ps', 'pload', 'pd'] },
 ]
 
 /** Lanes for a set of visible signals in the chosen layout. Empty lanes are dropped. */
-export function lanesFor(visible: SignalId[], mode: ScopeLayoutMode): LaneSpec[] {
+export function lanesFor(visible: SignalId[], mode: ScopeLayoutMode, topology: RectifierTopology = 'half-wave'): LaneSpec[] {
   if (mode === 'overlay') return visible.length ? [{ id: 'overlay', title: 'All channels', signals: visible }] : []
-  if (mode === 'separate') return visible.map((s) => ({ id: s, title: SIGNAL_META[s].name, signals: [s] }))
+  if (mode === 'separate') return visible.map((s) => ({ id: s, title: metaFor(s, topology).name, signals: [s] }))
   return GROUPS.map((g) => ({ ...g, signals: g.signals.filter((s) => visible.includes(s)) })).filter((g) => g.signals.length > 0)
 }

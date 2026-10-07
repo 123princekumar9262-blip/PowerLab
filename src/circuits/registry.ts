@@ -2,10 +2,13 @@ import type { CircuitId, LoadType, RectifierTopology } from '../types/simulation
 import type { CircuitModel } from './circuitModel.ts'
 import { rectifierModel } from './rectifier.ts'
 
-export const TOPOLOGIES: ReadonlyArray<{ id: RectifierTopology; label: string; short: string; phase: number }> = [
-  { id: 'half-wave', label: 'Half-wave', short: 'Half-wave', phase: 1 },
-  { id: 'center-tap', label: 'Full-wave · center-tap', short: 'Center-tap', phase: 2 },
-  { id: 'bridge', label: 'Full-wave · bridge', short: 'Bridge', phase: 2 },
+export const TOPOLOGIES: ReadonlyArray<{ id: RectifierTopology; label: string; short: string; phase: number; phases: 1 | 3 }> = [
+  { id: 'half-wave', label: 'Half-wave', short: 'Half-wave', phase: 1, phases: 1 },
+  { id: 'center-tap', label: 'Full-wave · center-tap', short: 'Center-tap', phase: 2, phases: 1 },
+  { id: 'bridge', label: 'Full-wave · bridge', short: 'Bridge', phase: 2, phases: 1 },
+  { id: '3ph-half-wave', label: 'Three-phase half-wave (3-pulse, midpoint)', short: '3-pulse', phase: 1, phases: 3 },
+  { id: '3ph-bridge', label: 'Three-phase bridge (6-pulse)', short: '6-pulse bridge', phase: 1, phases: 3 },
+  { id: '3ph-half-controlled', label: 'Three-phase half-controlled bridge (3 SCRs + 3 diodes)', short: 'Half-controlled', phase: 1, phases: 3 },
 ]
 
 export const LOADS: ReadonlyArray<{ id: LoadType; label: string; name: string; phase: number }> = [

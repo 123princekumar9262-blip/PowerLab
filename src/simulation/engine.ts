@@ -17,7 +17,8 @@ import {
   type SimulationTrace,
 } from '../types/simulation.ts'
 import { sanitizeParams } from './params.ts'
-import { sineSource } from './source.ts'
+import { isThreePhase } from '../types/simulation.ts'
+import { sineSource, threePhaseSource, type Phase } from './source.ts'
 
 /** Safety limit on switching events handled inside one timestep. */
 const MAX_SWITCHES_PER_STEP = 8
@@ -46,7 +47,7 @@ export function runSimulation(input: LabParams, circuitId: CircuitId = 'half-wav
     circuitId,
     params,
     signalIds: model.signals,
-    diodeIds: model.diodeIds,
+    diodeIds: model.diodeIdsFor?.(params) ?? model.diodeIds,
     trace,
     events,
     diagnostics: {
@@ -63,7 +64,8 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
   const time = new Float64Array(n)
   const signals: Partial<Record<SignalId, Float64Array>> = {}
   for (const s of model.signals) signals[s] = new Float64Array(n)
-  const diodes: DiodeTrace[] = model.diodeIds.map((id) => ({
+  const ids = model.diodeIdsFor?.(p) ?? model.diodeIds
+  const diodes: DiodeTrace[] = ids.map((id) => ({
     id,
     on: new Uint8Array(n),
     bias: new Uint8Array(n),
@@ -86,6 +88,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
       tr.bias[k] = DIODE_BIAS_CODES.indexOf(d.bias)
       tr.current[k] = d.current
       tr.voltage[k] = d.voltage
+      if (d.gate !== undefined) (tr.gate ??= new Uint8Array(n))[k] = d.gate ? 1 : 0
     })
   }
 
@@ -117,7 +120,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
       if (!at || h - hS <= hMin) {
         // The switch lands on the sample (within the 10⁻⁹·Δt floor — e.g. an ideal diode
         // turning on at a zero crossing that coincides with t₁): accept res, record the event there.
-        recordSwitch(model, held, res.state.combo, t1, res.solution.signals, pushEvent)
+        recordSwitch(ids, held, res.state.combo, t1, res.solution.signals, pushEvent)
         break
       }
       const tS = t0 + hS
@@ -125,7 +128,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
       // so a second switch later in the same timestep is still detected separately.
       const probe = model.step(p, { ...at.state, combo: held }, tS, Math.min(h - hS, p.dt * 1e-6))
       const after = probe.state.combo
-      recordSwitch(model, held, after, tS, at.solution.signals, pushEvent)
+      recordSwitch(ids, held, after, tS, at.solution.signals, pushEvent)
       s = { ...at.state, combo: after }
       t = tS
       res = model.step(p, s, t, t1 - t)
@@ -136,6 +139,7 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
   }
 
   detectSourceEvents(p, time, signals, pushEvent)
+  if (isThreePhase(p.topology)) detectPhaseCrossings(p, time, signals, pushEvent)
   if (p.load !== 'R') detectOutputExtrema(time, signals.vout!, pushEvent)
 
   events.sort((x, y) => x.time - y.time)
@@ -143,15 +147,15 @@ function integrate<S extends ModelState>(model: CircuitModel<S>, p: ResolvedPara
   return { trace, events, fallbacks }
 }
 
-function recordSwitch<S extends ModelState>(
-  model: CircuitModel<S>,
+function recordSwitch(
+  ids: readonly CircuitEvent['device'][],
   before: number,
   after: number,
   t: number,
   values: SignalValues,
   push: (k: EventKind, t: number, v: SignalValues, d?: CircuitEvent['device']) => void,
 ) {
-  model.diodeIds.forEach((id, j) => {
+  ids.forEach((id, j) => {
     const was = (before >> j) & 1
     const now = (after >> j) & 1
     if (was !== now) push(now ? 'diode-on' : 'diode-off', t, values, id)
@@ -168,7 +172,7 @@ function detectSourceEvents(
   signals: Partial<Record<SignalId, Float64Array>>,
   push: (k: EventKind, t: number, v: SignalValues) => void,
 ) {
-  const source = sineSource(p)
+  const source = isThreePhase(p.topology) ? threePhaseSource(p) : sineSource(p)
   const vin = signals.vin!
   const n = vin.length
   // Values at a source event: vin exact; other signals linearly interpolated between samples.
@@ -198,6 +202,37 @@ function detectSourceEvents(
       } else if (b <= a && b < c && b < 0) {
         const t = goldenSectionMax(time[k - 1], time[k + 1], (x) => -source.v(x))
         push('vin-negative-peak', t, valuesAt(t, t < time[k] ? k - 1 : k))
+      }
+    }
+  }
+}
+
+/**
+ * Three-phase: instants where two phase voltages are equal (a line voltage crosses zero).
+ * These are the NATURAL COMMUTATION points — where the highest or lowest phase changes.
+ */
+function detectPhaseCrossings(
+  p: ResolvedParams,
+  time: Float64Array,
+  signals: Partial<Record<SignalId, Float64Array>>,
+  push: (k: EventKind, t: number, v: SignalValues) => void,
+) {
+  const src = threePhaseSource(p)
+  const pairs: Array<[Phase, Phase, SignalId]> = [
+    ['a', 'b', 'vab'],
+    ['b', 'c', 'vbc'],
+    ['c', 'a', 'vca'],
+  ]
+  for (const [x, y, sid] of pairs) {
+    const d = signals[sid]
+    if (!d) continue
+    for (let k = 1; k < d.length; k++) {
+      if ((d[k - 1] <= 0 && d[k] > 0) || (d[k - 1] >= 0 && d[k] < 0)) {
+        const rising = d[k] > 0
+        const f = (t: number) => (src.phase(x, t) - src.phase(y, t) > 0) === rising
+        const t = bisectTransition(time[k - 1], time[k], f)
+        const vx = src.phase(x, t)
+        push('phase-crossing', t, { vin: src.phase('a', t), vb: src.phase('b', t), vc: src.phase('c', t), [sid]: 0, vout: vx })
       }
     }
   }
