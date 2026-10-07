@@ -19,6 +19,10 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
 await page.goto(process.env.LAB_URL ?? 'http://localhost:5199/')
+await page.evaluate(() => localStorage.clear())
+await page.reload()
+const mode = (name) => page.locator('.modes').getByRole('tab', { name, exact: true })
+const panelTab = (name) => page.locator('.panel-tabs').getByRole('tab', { name, exact: true })
 
 await page.getByRole('radio', { name: 'Half-wave', exact: true }).click()
 await page.getByRole('radio', { name: 'RL', exact: true }).click()
@@ -33,9 +37,15 @@ await page.waitForTimeout(500)
 check((await page.locator('.circuit .diode').count()) === 2, 'Dfw ON: schematic shows D1 and Dfw')
 check(/freewheeling diode/.test(await page.locator('.bench-title').innerText()), 'bench title names the freewheeling diode')
 check(await page.locator('.legend').getByText('Ifw', { exact: true }).isVisible(), 'scope offers the Ifw channel')
-check(await page.locator('.legend').getByText('WL', { exact: true }).isVisible(), 'scope offers the E_L (WL) channel')
+await page.getByRole('button', { name: '+ Add channel' }).click()
+check(await page.locator('.channel-pop').getByRole('checkbox', { name: /^WL/ }).isVisible(), 'the E_L (WL) channel can be added')
+await page.keyboard.press('Escape')
+await page.locator('.bench-title').click()
 check((await page.locator('.flag[role="alert"]').count()) === 0, 'simulation agrees with theory (no ⚠ flag)')
-check(await page.getByText('Dfw conduction per cycle').isVisible(), 'measurement table has the Dfw rows')
+await page.getByRole('button', { name: /^Measurements/ }).click()
+await page.locator('.drawer').getByRole('tab', { name: 'Diodes', exact: true }).click()
+check(await page.locator('.drawer').getByText('Dfw conduction per cycle').isVisible(), 'Measurements → Diodes has the Dfw rows')
+await page.keyboard.press('Escape')
 
 // Step through conduction: step 5 = freewheel current flows
 await page.getByRole('button', { name: /Step through conduction/ }).click()
@@ -45,15 +55,19 @@ check(/Freewheel current flows/.test(await page.locator('.step-panel h2').innerT
 const fwState = await page.locator('.fw-state-big').innerText()
 check(fwState === 'ON', `freewheel card follows the cursor: Dfw ${fwState}`)
 check(/Dfw ON/.test(await page.locator('.state-headline').innerText()), 'state panel headline: Dfw ON')
-const path = await page.locator('.facts-path').innerText()
-check(/L[\s\S]*R[\s\S]*Dfw/.test(path), 'current path L → R → Dfw')
-const why = await page.locator('#fw-why li').count()
-check(why === 7, `"Why is Dfw ON?" has 7 steps (${why})`)
-check(/E_L = ½·L·i²/.test(await page.locator('#fw-why').innerText()), 'WHY quotes E_L = ½·L·i²')
 const vout = await page.locator('.fw-instant').innerText()
 check(/−0\.700 V/.test(vout), 'paused instant: Vout clamped at −Vf')
 check((await page.locator('svg.circuit path.wire--active').count()) > 0, 'active wires highlighted')
 await page.screenshot({ path: OUT + 'fw-10-freewheeling.png' })
+await page.getByRole('button', { name: /Current path/ }).click()
+const path = await page.locator('.path-vertical').innerText()
+check(/L[\s\S]*R[\s\S]*Dfw/.test(path), 'current path L → R → Dfw')
+await page.keyboard.press('Escape')
+await page.getByRole('button', { name: 'WHY?' }).click()
+await page.getByRole('button', { name: 'Show detailed explanation' }).click()
+const why = await page.locator('#fw-why li').count()
+check(why === 7, `"Why is Dfw ON?" has 7 steps (${why})`)
+check(/E_L = ½·L·i²/.test(await page.locator('#fw-why').innerText()), 'WHY quotes E_L = ½·L·i²')
 
 // Physics Lens: ten stages
 await page.getByRole('button', { name: /Physics Lens/ }).click()
@@ -64,8 +78,8 @@ check((await page.locator('svg.circuit.lens--fw-on').count()) === 1, 'schematic 
 await page.getByRole('button', { name: 'Close Physics Lens' }).click()
 await page.getByRole('button', { name: 'Close step-through' }).click()
 
-// Comparison
-await page.getByRole('button', { name: /Compare with \/ without Dfw/ }).click()
+// Comparison (a primary view of its own)
+await page.locator('.view-seg').getByRole('tab', { name: 'With / without Dfw' }).click()
 await page.waitForTimeout(800)
 const cmp = await page.locator('.compare').innerText()
 check(/never goes below −0\.700 V/.test(cmp), 'comparison: Vout clamped at −Vf with Dfw vs negative without')
@@ -75,7 +89,7 @@ check((await page.locator('.compare .cmp-band').count()) > 0, 'comparison shades
 await page.locator('.compare').screenshot({ path: OUT + 'fw-11-compare.png' })
 
 // Guided experiment 2
-await page.getByRole('tab', { name: 'Experiment' }).click()
+await mode('Experiment').click()
 await page.getByRole('button', { name: /2 · Enable the freewheeling diode/ }).click()
 await page.waitForTimeout(800)
 const exp = await page.locator('.mode-panel').first().innerText()
@@ -83,12 +97,12 @@ check(/Freewheeling diode added/.test(exp) && /What does the physics say\?/i.tes
 await page.screenshot({ path: OUT + 'fw-12-experiment.png' })
 
 // Prediction A–D
-await page.getByRole('tab', { name: 'Predict' }).click()
+await mode('Predict').click()
 await page.getByRole('button', { name: /B\. Becomes smoother/ }).click()
 await page.getByRole('button', { name: 'Run the simulation' }).click()
 await page.waitForTimeout(600)
 check(/Your prediction was right/.test(await page.locator('.mode-panel').first().innerText()), 'prediction: the simulation says the current becomes smoother')
-await page.getByRole('tab', { name: 'Explore' }).click()
+await mode('Explore').click()
 
 // Toggle OFF again: original circuit
 await page.getByRole('button', { name: /Freewheeling diode: ON/ }).click()

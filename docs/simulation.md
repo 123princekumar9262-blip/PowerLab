@@ -274,7 +274,7 @@ refined switching instants. ΔE_L equals their sum to within the backward-Euler 
 
 ## 11. Validation
 
-`npm test` runs 410 tests:
+`npm test` runs 406 tests:
 
 - **Physics.** Conduction and blocking, the real-diode dead zone, KVL/KCL/Ohm at every sample,
   periodicity, bridge diode pairing, the symmetric blocking split, PIV for each topology, the RL hold-on and
@@ -301,6 +301,8 @@ refined switching instants. ΔE_L equals their sum to within the backward-Euler 
   Σp = 0; the analytic freewheel decay; theory within 1 % on seven parameter sets; with vs without (Vdc
   rises to Vm/π − Vf, Vo,min → −Vf, β → 180°, continuous current, lower ripple factor, E_L,min > 0). The WHY,
   lens, step-through, experiments and what-ifs are checked against the simulation, and the other circuits are unchanged.
+- **Presentation.** Channel presets, the short WHY / current-path / state line, Inspect mode and the
+  panel state (tabs, drawers, density) are tested against the simulation; density never changes parameters.
 
-`npm run smoke`, `npm run smoke3` and `npm run smoke-fw` drive the real UI in Edge: 54 + 24 + 29 checks,
+`npm run smoke`, `npm run smoke3` and `npm run smoke-fw` drive the real UI in Edge: 56 + 40 + 29 checks,
 plus screenshots in `scripts/out/`.

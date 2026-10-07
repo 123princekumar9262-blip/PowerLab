@@ -10,13 +10,15 @@ interface Props {
   onToggleCompare: () => void
   stepOn: boolean
   onToggleStep: () => void
+  /** Show the "why is Dfw ON/OFF?" steps here (they also live in the WHY tab). */
+  showWhy?: boolean
 }
 
 /**
  * Freewheeling-diode card: the state of Dfw, the instant's key values, the inductor's stored
  * energy and where it is going, and "why is Dfw ON / OFF?" — all from the simulated sample.
  */
-export function FreewheelPanel({ result, ex, compareOn, onToggleCompare, stepOn, onToggleStep }: Props) {
+export function FreewheelPanel({ result, ex, compareOn, onToggleCompare, stepOn, onToggleStep, showWhy = true }: Props) {
   const [whyOpen, setWhyOpen] = useState(true)
   const fi = ex.freewheel!
   const s = ex.sample
@@ -113,11 +115,13 @@ export function FreewheelPanel({ result, ex, compareOn, onToggleCompare, stepOn,
         </p>
       </div>
 
+      {showWhy && (
       <button className={`why-btn ${whyOpen ? 'why-btn--open' : ''}`} onClick={() => setWhyOpen((o) => !o)} aria-expanded={whyOpen} aria-controls="fw-why">
         <span>WHY?</span>
         <span className="why-btn-sub">{fi.whyTitle}</span>
       </button>
-      {whyOpen && (
+      )}
+      {showWhy && whyOpen && (
         <ol className="fw-why" id="fw-why">
           {fi.why.map((t, k) => (
             <li key={k}>{t}</li>

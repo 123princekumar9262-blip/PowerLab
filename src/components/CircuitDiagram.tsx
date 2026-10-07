@@ -5,6 +5,13 @@ import { formatA, formatSI, formatV, formatCapacitance } from '../utils/format.t
 import { CapacitorSym, DiodeSym, diodeEnds, hopV, inductorPath, resistorPath, SourceSym, type DeviceState } from './circuit/symbols.tsx'
 
 interface Props {
+  /** Highlight only the conducting path (the "Current path" view). */
+  showPath?: boolean
+  /** Inspect mode: components are clickable. */
+  inspecting?: boolean
+  /** The component being inspected (outlined). */
+  selectedPart?: string | null
+  onPart?: (part: string) => void
   topology: RectifierTopology
   load: LoadType
   params: ResolvedParams
@@ -34,8 +41,24 @@ const ohm = (r: number) => formatSI(r, 'Ω').replace(/\.0+ /, ' ')
  * Every highlighted wire and every moving particle corresponds to a simulated branch current.
  */
 export function CircuitDiagram(props: Props) {
-  if (isThreePhase(props.topology)) return <ThreePhaseDiagram params={props.params} sample={props.sample} result={props.result} lens={props.lens} />
-  return <SinglePhaseDiagram {...props} />
+  const wrap = useRef<HTMLDivElement>(null)
+  // Outline the inspected component (the diagrams stay pure drawings of the simulated state).
+  useEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    el.querySelectorAll('.is-selected-part').forEach((n) => n.classList.remove('is-selected-part'))
+    if (props.selectedPart) el.querySelectorAll(`[data-part="${props.selectedPart}"]`).forEach((n) => n.classList.add('is-selected-part'))
+  })
+  const onClick = (e: React.MouseEvent) => {
+    if (!props.inspecting || !props.onPart) return
+    const part = (e.target as Element).closest('[data-part]')?.getAttribute('data-part')
+    if (part) props.onPart(part)
+  }
+  return (
+    <div ref={wrap} className={`circuit-wrap ${props.showPath ? 'show-path' : ''} ${props.inspecting ? 'inspecting' : ''}`} onClick={onClick}>
+      {isThreePhase(props.topology) ? <ThreePhaseDiagram params={props.params} sample={props.sample} result={props.result} lens={props.lens} /> : <SinglePhaseDiagram {...props} />}
+    </div>
+  )
 }
 
 function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Props) {
@@ -102,15 +125,15 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
     const { anode, cathode } = diodeEnds(dx, YT, 0)
     const fe = diodeEnds(FW_X, 180, -90, 18)
     const act = (i: number) => (i > 0 ? 'wire--active' : '')
-    srcParts.push(<SourceSym key="S" {...S} />)
+    srcParts.push(<SourceSym key="S" {...S} part="source" />)
     srcParts.push(<path key="w1" className={`wire ${act(iD(0))}`} d={`M${S.cx},${S.cy - S.r} V${YT} H${anode.x}`} />)
     srcParts.push(<path key="w2" className={`wire ${act(iD(0))}`} d={`M${cathode.x},${YT} H${FW_X}`} />)
     srcParts.push(<path key="w3" className={`wire ${act(iD(0))}`} d={`M${FW_X},${YB} H${S.cx} V${S.cy + S.r}`} />)
-    srcParts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label="D1" />)
+    srcParts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label="D1" part="D1" />)
     parts.push(<path key="w4" className={`wire ${act(io)}`} d={`M${FW_X},${YT} H${EX}`} />)
     parts.push(<path key="w5" className={`wire ${act(io)}`} d={`M${nLeft},${YB} H${FW_X}`} />)
     fwParts.push(<path key="fw" className={`wire ${act(ifw)}`} d={`M${FW_X},${YT} V${fe.cathode.y} M${FW_X},${fe.anode.y} V${YB}`} />)
-    fwParts.push(<DiodeSym key="Dfw" x={FW_X} y={180} angle={-90} size={18} state={devState(fwK)} label="Dfw" labelDx={30} labelDy={6} />)
+    fwParts.push(<DiodeSym key="Dfw" x={FW_X} y={180} angle={-90} size={18} state={devState(fwK)} label="Dfw" labelDx={30} labelDy={6} part="Dfw" />)
     parts.push(<circle key="jt" className="junction" cx={FW_X} cy={YT} r={3.5} />, <circle key="jb" className="junction" cx={FW_X} cy={YB} r={3.5} />)
     flows.push({ key: 'src', d: `M${S.cx},${S.cy - S.r} V${YT} H${FW_X}`, current: iD(0) })
     flows.push({ key: 'rail', d: `M${FW_X},${YT} H${EX}`, current: io })
@@ -130,11 +153,11 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
     const dx = 302
     const { anode, cathode } = diodeEnds(dx, YT, 0)
     const act = irect > 0 ? 'wire--active' : ''
-    parts.push(<SourceSym key="S" {...S} />)
+    parts.push(<SourceSym key="S" {...S} part="source" />)
     parts.push(<path key="w1" className={`wire ${act}`} d={`M${S.cx},${S.cy - S.r} V${YT} H${anode.x}`} />)
     parts.push(<path key="w2" className={`wire ${act}`} d={`M${cathode.x},${YT} H${EX}`} />)
     parts.push(<path key="w3" className={`wire ${act}`} d={`M${nLeft},${YB} H${S.cx} V${S.cy + S.r}`} />)
-    parts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label="D1" />)
+    parts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label="D1" part="D1" />)
     flows.push({ key: 'loop', d: `M${S.cx},${S.cy - S.r} V${YT} H${EX}`, current: iD(0) })
     flows.push({ key: 'ret', d: `M${nLeft},${YB} H${S.cx} V${S.cy + S.r}`, current: irect })
     labels.push(srcLabel(S.cx, S.cy, 's', 'vin', vin), polarity(S.cx, S.cy - 18, S.cy + 18, vin ?? 0, 'pol'))
@@ -149,15 +172,15 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
     const e1 = diodeEnds(dx, YT, 0)
     const e2 = diodeEnds(dx, yD2, 0)
     const riser = 830
-    parts.push(<SourceSym key="S1" {...S1} />, <SourceSym key="S2" {...S2} />)
+    parts.push(<SourceSym key="S1" {...S1} part="source" />, <SourceSym key="S2" {...S2} part="source" />)
     parts.push(<path key="ctw" className="wire" d={`M${S1.cx},${S1.cy + S1.r} V${S2.cy - S2.r}`} />)
     parts.push(<circle key="ctj" className="junction" cx={ct.x} cy={ct.y} r={3.5} />)
     parts.push(<path key="a" className={`wire ${iD(0) > 0 ? 'wire--active' : ''}`} d={`M${S1.cx},${S1.cy - S1.r} V${YT} H${e1.anode.x} M${e1.cathode.x},${YT} H${EX}`} />)
     parts.push(<path key="b" className={`wire ${iD(1) > 0 ? 'wire--active' : ''}`} d={`M${S2.cx},${S2.cy + S2.r} V${yD2} H${e2.anode.x} M${e2.cathode.x},${yD2} H${riser} V${YT} H${EX}`} />)
     parts.push(<circle key="pj" className="junction" cx={EX} cy={YT} r={3.5} />)
     parts.push(<path key="n" className={`wire ${irect > 0 ? 'wire--active' : ''}`} d={`M${nLeft},${YB} H160 V${ct.y} H${ct.x}`} />)
-    parts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label={dLabel(0)} />)
-    parts.push(<DiodeSym key="D2" x={dx} y={yD2} angle={0} state={devState(1)} label={dLabel(1)} labelDy={-26} />)
+    parts.push(<DiodeSym key="D1" x={dx} y={YT} angle={0} state={devState(0)} label={dLabel(0)} part="D1" />)
+    parts.push(<DiodeSym key="D2" x={dx} y={yD2} angle={0} state={devState(1)} label={dLabel(1)} labelDy={-26} part="D2" />)
     flows.push({ key: 'a', d: `M${S1.cx},${S1.cy - S1.r} V${YT} H${EX}`, current: iD(0) })
     flows.push({ key: 'b', d: `M${S2.cx},${S2.cy + S2.r} V${yD2} H${riser} V${YT} H${EX}`, current: iD(1) })
     flows.push({ key: 'n', d: `M${nLeft},${YB} H160 V${ct.y} H${ct.x}`, current: irect })
@@ -182,7 +205,7 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
       { k: 2, from: n, to: a }, // D3: n → a
       { k: 3, from: n, to: b }, // D4: n → b
     ]
-    parts.push(<SourceSym key="S" {...S} />)
+    parts.push(<SourceSym key="S" {...S} part="source" />)
     const iSrcA = iD(0) - iD(2) // current delivered into terminal a
     parts.push(<path key="sa" className={`wire ${Math.abs(iSrcA) > 0 ? 'wire--active' : ''}`} d={`M${S.cx},${S.cy - S.r} V${a.y} H${a.x}`} />)
     parts.push(<path key="sb" className={`wire ${Math.abs(iSrcA) > 0 ? 'wire--active' : ''}`} d={`M${b.x},${b.y} H${S.cx} V${S.cy + S.r}`} />)
@@ -195,7 +218,7 @@ function SinglePhaseDiagram({ topology, load, params, sample, result, lens }: Pr
       parts.push(<path key={`e${e.k}`} className={`wire ${iD(e.k) > 0 ? 'wire--active' : ''}`} d={`M${e.from.x},${e.from.y} L${ends.anode.x},${ends.anode.y} M${ends.cathode.x},${ends.cathode.y} L${e.to.x},${e.to.y}`} />)
       const offX = e.k === 0 || e.k === 1 ? 26 : -26
       const offY = e.k === 0 || e.k === 2 ? -12 : 26
-      parts.push(<DiodeSym key={`D${e.k + 1}`} x={m.x} y={m.y} angle={an} size={16} state={devState(e.k)} label={dLabel(e.k)} labelDx={offX} labelDy={offY} />)
+      parts.push(<DiodeSym key={`D${e.k + 1}`} x={m.x} y={m.y} angle={an} size={16} state={devState(e.k)} label={dLabel(e.k)} labelDx={offX} labelDy={offY} part={`D${e.k + 1}`} />)
       flows.push({ key: `d${e.k}`, d: `M${e.from.x},${e.from.y} L${e.to.x},${e.to.y}`, current: iD(e.k) })
     }
     for (const v of [a, b, p, n]) parts.push(<circle key={`j${v.x}-${v.y}`} className="junction" cx={v.x} cy={v.y} r={3.5} />)
@@ -325,6 +348,7 @@ export function renderLoad(c: LoadCtx): number {
       parts.push(lGlow(EX, lTop, lBot))
       parts.push(<path key="Lw" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${rTop}`} />)
       parts.push(<path key="L" className={`wire coil ${io > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
+      parts.push(<rect key="Lhit" className="part-hit" data-part="L" x={EX - 22} y={lTop} width={44} height={lBot - lTop} />)
       flows.push({ key: 'e-l', d: `M${EX},${YT} V${rTop}`, current: io })
       labels.push(lLabel(EX, lTop, lBot))
     } else {
@@ -333,6 +357,7 @@ export function renderLoad(c: LoadCtx): number {
     }
     parts.push(heatGlow(EX, rTop, rBot))
     parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={resistorPath(EX, rTop, rBot) + ` M${EX},${rBot} V${YB}`} />)
+    parts.push(<rect key="Rhit" className="part-hit" data-part="R" x={EX - 22} y={rTop} width={44} height={rBot - rTop} />)
     flows.push({ key: 'R', d: resistorPath(EX, rTop, rBot) + ` V${YB}`, current: io })
     labels.push(rLabel(EX, rTop, rBot))
     labels.push(outBracket(EX + 44, YT + 20, YB - 20, idle ? null : (x.vout ?? 0)))
@@ -348,6 +373,7 @@ export function renderLoad(c: LoadCtx): number {
       parts.push(lGlow(EX, lTop, lBot))
       parts.push(<path key="Lw" className={`wire ${il > 0 ? 'wire--active' : ''}`} d={`M${EX},${YT} V${lTop} M${EX},${lBot} V${ys}`} />)
       parts.push(<path key="L" className={`wire coil ${il > 0 ? 'wire--active' : ''}`} d={inductorPath(EX, lTop, lBot)} />)
+      parts.push(<rect key="Lhit" className="part-hit" data-part="L" x={EX - 22} y={lTop} width={44} height={lBot - lTop} />)
       flows.push({ key: 'e-l', d: `M${EX},${YT} V${ys}`, current: il })
       labels.push(lLabel(EX, lTop, lBot))
       if (!idle) labels.push(<text key="il" className="value value--small" x={EX + 20} y={lTop - 2}>iL {formatA(il)}</text>)
@@ -358,11 +384,13 @@ export function renderLoad(c: LoadCtx): number {
     const cMid = (ys + YB) / 2
     parts.push(<path key="splitc" className={`wire ${Math.abs(ic) > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${cx}`} />)
     parts.push(<CapacitorSym key="C" x={cx} y0={ys} y1={YB} fill={capFill} />)
+    parts.push(<rect key="Chit" className="part-hit" data-part="C" x={cx - 26} y={cMid - 26} width={52} height={52} />)
     flows.push({ key: 'c', d: `M${EX},${ys} H${cx} V${cMid - 5} M${cx},${cMid + 5} V${YB}`, current: ic })
     const rTop = ys + 30
     const rBot = YB - 30
     parts.push(heatGlow(rx, rTop, rBot))
     parts.push(<path key="R" className={`wire ${io > 0 ? 'wire--active' : ''}`} d={`M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`} />)
+    parts.push(<rect key="Rhit" className="part-hit" data-part="R" x={rx - 22} y={rTop} width={44} height={rBot - rTop} />)
     parts.push(<circle key="jt" className="junction" cx={EX} cy={ys} r={3.5} />)
     parts.push(<circle key="jb" className="junction" cx={cx} cy={YB} r={3.5} />)
     flows.push({ key: 'r', d: `M${EX},${ys} H${rx} V${rTop} ` + resistorPath(rx, rTop, rBot).replace(/^M[^ ]+ /, '') + ` V${YB} H${cx}`, current: io })

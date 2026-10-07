@@ -2,12 +2,33 @@ import { DEFAULT_PARAMS, sanitizeParams, THREE_PHASE_DEFAULTS } from '../simulat
 import type { CircuitId, LabParams, LoadType, RectifierTopology, SignalId } from '../types/simulation.ts'
 import type { Viewport } from '../visualization/scopeRenderer.ts'
 import { SIGNAL_META, type ScopeLayoutMode } from '../visualization/signals.ts'
+import type { ChannelPreset } from '../visualization/presets.ts'
 import type { StepMode } from './stepping.ts'
+import { loadJSON, saveJSON } from '../utils/storage.ts'
 
 export type AppMode = 'lab' | 'learn' | 'experiment' | 'predict' | 'challenge' | 'reverse'
 
 /** Single-phase or three-phase rectifiers. Each section keeps its own parameter set. */
 export type Section = 'single' | 'three'
+
+/**
+ * Information density. It decides what is VISIBLE by default — never what exists: every
+ * panel, channel and measurement stays reachable at every level.
+ */
+export type Density = 'beginner' | 'standard' | 'engineer'
+/** Right-hand panel: one tab at a time. 'mode' = the active mode's panel (lesson, experiment…). */
+export type RightTab = 'mode' | 'state' | 'why' | 'learn' | 'energy'
+/** The primary visualization under the circuit (only one at a time). */
+export type ScopeView = 'waveforms' | 'angle' | 'events' | 'compare'
+/** On-demand detail panels (drawers / bottom sheets). */
+export type DrawerKind = 'path' | 'why' | 'energy' | 'measure' | 'theory' | 'inspect' | 'event'
+export interface Drawer {
+  kind: DrawerKind
+  /** Inspect: the component clicked (e.g. 'D1', 'R', 'phase-a'). */
+  part?: string
+}
+
+const KEY_DENSITY = 'rectifier-lab.density'
 
 /** UI state. Physics lives in the simulation result, derived from `params` — never stored here. */
 export interface LabState {
@@ -37,6 +58,17 @@ export interface LabState {
   whyOpen: boolean
   /** Guided-flow progress (steps 4–6 of the onboarding strip). */
   progress: { cursorMoved: boolean; sawOn: boolean; sawOff: boolean; whyPressed: boolean }
+  // ── Presentation (progressive disclosure) ──
+  density: Density
+  /** Focus mode: circuit, primary waveform, state and playback only. */
+  focus: boolean
+  rightTab: RightTab
+  scopeView: ScopeView
+  drawer: Drawer | null
+  /** Inspect mode: clicking a component opens its details. */
+  inspecting: boolean
+  /** Channel preset; 'custom' once the student picks channels by hand (then `visible` rules). */
+  preset: ChannelPreset
 }
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4] as const
@@ -75,6 +107,13 @@ export const initialLabState: LabState = {
   selectedEventGroupId: null,
   whyOpen: false,
   progress: { cursorMoved: false, sawOn: false, sawOff: false, whyPressed: false },
+  density: loadJSON<{ d: Density }>(KEY_DENSITY, { d: 'standard' }).d,
+  focus: false,
+  rightTab: 'state',
+  scopeView: 'waveforms',
+  drawer: null,
+  inspecting: false,
+  preset: 'basic',
 }
 
 export type LabAction =
@@ -104,6 +143,14 @@ export type LabAction =
   | { type: 'setWhy'; open: boolean }
   | { type: 'setEnergy'; on: boolean }
   | { type: 'observedDiode'; on: boolean }
+  | { type: 'setDensity'; density: Density }
+  | { type: 'setFocus'; on: boolean }
+  | { type: 'setRightTab'; tab: RightTab }
+  | { type: 'setScopeView'; view: ScopeView }
+  | { type: 'openDrawer'; drawer: Drawer }
+  | { type: 'closeDrawer' }
+  | { type: 'setInspecting'; on: boolean }
+  | { type: 'setChannels'; preset: ChannelPreset; visible?: Record<SignalId, boolean> }
 
 export function circuitIdOf(state: Pick<LabState, 'topology' | 'load'>): CircuitId {
   return `${state.topology ?? 'half-wave'}:${state.load ?? 'R'}`
@@ -117,7 +164,7 @@ function withCycles(params: LabParams, load: LoadType): LabParams {
 export function labReducer(state: LabState, action: LabAction): LabState {
   switch (action.type) {
     case 'setMode':
-      return { ...state, mode: action.mode, playing: false, selectedEventGroupId: null }
+      return { ...state, mode: action.mode, playing: false, selectedEventGroupId: null, rightTab: action.mode === 'lab' ? 'state' : 'mode', drawer: null, focus: false }
     case 'setSection': {
       if (action.section === state.section) return state
       const three = action.section === 'three'
@@ -133,12 +180,15 @@ export function labReducer(state: LabState, action: LabAction): LabState {
         selectedEventGroupId: null,
         playing: false,
         lensStage: null,
+        drawer: null,
+        scopeView: state.scopeView === 'angle' || state.scopeView === 'compare' ? 'waveforms' : state.scopeView,
       }
     }
     case 'setLens':
-      return { ...state, lensStage: action.stage }
+      // The Physics Lens lives in the WHY tab (or the WHY drawer in focus mode).
+      return action.stage === null ? { ...state, lensStage: null } : { ...state, lensStage: action.stage, rightTab: state.focus ? state.rightTab : 'why', drawer: state.focus ? { kind: 'why' } : state.drawer }
     case 'chooseTopology':
-      return { ...state, topology: action.topology, selectedEventGroupId: null, viewport: null }
+      return { ...state, topology: action.topology, selectedEventGroupId: null, viewport: null, drawer: state.drawer?.kind === 'inspect' ? null : state.drawer }
     case 'chooseLoad':
       return { ...state, load: action.load, params: withCycles(state.params, action.load), selectedEventGroupId: null, viewport: null }
     case 'run':
@@ -202,6 +252,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
     case 'selectEventGroup':
       return {
         ...state,
+        drawer: action.id ? { kind: 'event' } : state.drawer?.kind === 'event' ? null : state.drawer,
         selectedEventGroupId: action.id,
         cursorTime: action.time ?? state.cursorTime,
         playing: action.id ? false : state.playing,
@@ -209,6 +260,29 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       }
     case 'toggleWhy':
       return { ...state, whyOpen: !state.whyOpen, progress: { ...state.progress, whyPressed: true } }
+    case 'setDensity':
+      saveJSON(KEY_DENSITY, { d: action.density })
+      return {
+        ...state,
+        density: action.density,
+        // Beginner has no energy tab and no angle view: fall back to what it shows.
+        rightTab: action.density === 'beginner' && state.rightTab === 'energy' ? 'state' : state.rightTab,
+        scopeView: action.density === 'beginner' && state.scopeView === 'angle' ? 'waveforms' : state.scopeView,
+      }
+    case 'setFocus':
+      return { ...state, focus: action.on, drawer: null, inspecting: false }
+    case 'setRightTab':
+      return { ...state, rightTab: action.tab, progress: action.tab === 'why' ? { ...state.progress, whyPressed: true } : state.progress }
+    case 'setScopeView':
+      return { ...state, scopeView: action.view }
+    case 'openDrawer':
+      return { ...state, drawer: action.drawer, progress: action.drawer.kind === 'why' ? { ...state.progress, whyPressed: true } : state.progress }
+    case 'closeDrawer':
+      return { ...state, drawer: null, selectedEventGroupId: state.drawer?.kind === 'event' ? null : state.selectedEventGroupId }
+    case 'setInspecting':
+      return { ...state, inspecting: action.on, drawer: action.on ? state.drawer : state.drawer?.kind === 'inspect' ? null : state.drawer }
+    case 'setChannels':
+      return { ...state, preset: action.preset, visible: action.visible ?? state.visible }
     case 'observedDiode': {
       const key = action.on ? 'sawOn' : 'sawOff'
       if (state.progress[key] || !state.progress.cursorMoved) return state
@@ -225,7 +299,10 @@ function advancedOf(state: LabState): Partial<Record<SignalId, boolean>> {
 function withEnergy(state: LabState, on: boolean): LabState {
   const visible = { ...state.visible }
   for (const s of Object.keys(SIGNAL_META) as SignalId[]) if (SIGNAL_META[s].advanced) visible[s] = on
-  return { ...state, showEnergy: on, visible }
+  // In Explore, showing energy opens the ENERGY tab. In a mode (e.g. a lesson step that asks for
+  // the energy view) the mode's panel stays in front and shows the energy panel itself.
+  const explore = state.mode === 'lab' && !state.focus
+  return { ...state, showEnergy: on, visible, rightTab: on && explore ? 'energy' : state.rightTab === 'energy' && !on ? 'state' : state.rightTab }
 }
 
 /**

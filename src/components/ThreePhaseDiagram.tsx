@@ -83,7 +83,7 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
     const missing = p.faults.missingPhase === q
     parts.push(
       <g key={`src${q}`} className={`source source--${q} ${missing ? 'is-missing' : ''}`}>
-        <SourceSym cx={SRC_X} cy={y} r={20} />
+        <SourceSym cx={SRC_X} cy={y} r={20} part={`phase-${q}`} />
       </g>,
     )
     parts.push(<path key={`bus${q}`} className="wire" d={`M${BUS_X},${y} H${SRC_X - 20}`} />)
@@ -148,7 +148,7 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
       parts.push(<path key={`pl${q}`} className={`wire phase-wire phase-wire--${q} ${active(iUp(q))}`} d={`M${SRC_X + 20},${y} H${e.anode.x} M${e.cathode.x},${y} H${BUS}`} />)
       parts.push(
         <g key={`d${q}`}>
-          <DiodeSym x={330} y={y} angle={0} size={16} state={stateOf(up[q])} label="" />
+          <DiodeSym x={330} y={y} angle={0} size={16} state={stateOf(up[q])} label="" part={up[q]} />
           {upperScr && <GateLead x={330} y={y} angle={0} on={gateOf(up[q])} />}
         </g>,
       )
@@ -179,13 +179,13 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
       parts.push(<path key={`ll${q}`} className={`wire ${active(iLo(q))}`} d={`M${lx},${y} V${el.cathode.y} M${lx},${el.anode.y} V${YB}`} />)
       parts.push(
         <g key={`du${q}`}>
-          <DiodeSym x={lx} y={UPPER_Y} angle={-90} size={16} state={stateOf(up[q])} label="" />
+          <DiodeSym x={lx} y={UPPER_Y} angle={-90} size={16} state={stateOf(up[q])} label="" part={up[q]} />
           {upperScr && <GateLead x={lx} y={UPPER_Y} angle={-90} on={gateOf(up[q])} />}
         </g>,
       )
       parts.push(
         <g key={`dl${q}`}>
-          <DiodeSym x={lx} y={LOWER_Y} angle={-90} size={16} state={stateOf(lo[q])} label="" />
+          <DiodeSym x={lx} y={LOWER_Y} angle={-90} size={16} state={stateOf(lo[q])} label="" part={lo[q]} />
           {lowerScr && <GateLead x={lx} y={LOWER_Y} angle={-90} on={gateOf(lo[q])} />}
         </g>,
       )
@@ -220,7 +220,7 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
   if (p.control.freewheel) {
     const e = diodeEnds(FW_X, 180, -90, 16)
     parts.push(<path key="fw" className={`wire ${active(iOf('Dfw'))}`} d={`M${FW_X},${YT} V${e.cathode.y} M${FW_X},${e.anode.y} V${YB}`} />)
-    parts.push(<DiodeSym key="Dfw" x={FW_X} y={180} angle={-90} size={16} state={stateOf('Dfw')} label="" />)
+    parts.push(<DiodeSym key="Dfw" x={FW_X} y={180} angle={-90} size={16} state={stateOf('Dfw')} label="" part="Dfw" />)
     parts.push(<circle key="fwj1" className="junction" cx={FW_X} cy={YT} r={3.5} />, <circle key="fwj2" className="junction" cx={FW_X} cy={YB} r={3.5} />)
     flows.push({ key: 'fw', d: `M${FW_X},${YB} V${YT}`, current: iOf('Dfw') })
     labels.push(deviceTag('Dfw', FW_X - 22, 180))

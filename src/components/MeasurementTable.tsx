@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { RELATIVE_TOLERANCE, ROW_GROUPS, type Comparison } from '../measurements/compare.ts'
+import { RELATIVE_TOLERANCE, ROW_GROUPS, type Comparison, type RowGroup } from '../measurements/compare.ts'
 import { formatPercent, formatSI, formatTime, formatW } from '../utils/format.ts'
 
 function fmt(v: number | null, unit: string): string {
@@ -13,8 +13,9 @@ function fmt(v: number | null, unit: string): string {
 const GROUP_ORDER = ROW_GROUPS
 
 /** Measurements from the simulated waveforms, next to closed-form theory, with the error. */
-export function MeasurementTable({ comparison }: { comparison: Comparison }) {
+export function MeasurementTable({ comparison, groups }: { comparison: Comparison; groups?: RowGroup[] }) {
   const { rows, measurements: m, theory, allWithinTolerance } = comparison
+  const shownGroups = groups ? GROUP_ORDER.filter((g) => groups.includes(g)) : GROUP_ORDER
   const bad = rows.filter((r) => !r.withinTolerance)
   return (
     <section className="measure" aria-labelledby="measure-title">
@@ -50,7 +51,7 @@ export function MeasurementTable({ comparison }: { comparison: Comparison }) {
             </tr>
           </thead>
           <tbody>
-            {GROUP_ORDER.map((g) => {
+            {shownGroups.map((g) => {
               const gr = rows.filter((r) => r.group === g)
               const approx = theory.approximations.filter((a) => gr.some((r) => r.key === a.key))
               if (!gr.length) return null

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { SignalId, SimulationResult } from '../types/simulation.ts'
 import { eventTitle } from '../explanations/index.ts'
 import type { EventGroup } from '../visualization/eventGroups.ts'
@@ -24,9 +24,12 @@ interface Props {
   onCursorTime: (t: number) => void
   onScrubStart: () => void
   visible: Record<SignalId, boolean>
-  onToggleSignal: (s: SignalId) => void
-  /** Channels offered in the legend (the circuit's signals, minus hidden advanced ones). */
+  /** Channels that may be drawn (the visible ones among them are). */
   channels: SignalId[]
+  /** Channel selection UI (presets, active channels, "+ Add channel"), rendered in the toolbar. */
+  channelBar?: ReactNode
+  /** Show the Overlay / Grouped / Separate switch (hidden for beginners). */
+  showLayoutSwitch?: boolean
   layoutMode: ScopeLayoutMode
   onLayoutMode: (m: ScopeLayoutMode) => void
   showConduction: boolean
@@ -46,12 +49,6 @@ export function Scope(props: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [colors, setColors] = useState<ScopeColors | null>(null)
   const [hover, setHover] = useState<{ group: EventGroup; x: number } | null>(null)
-  // Progressive disclosure: optional channels (diode currents, line voltages) behind a toggle,
-  // unless one of them is already switched on.
-  const optional = channels.filter((sid) => metaFor(sid, result.params.topology).optional)
-  const [showMore, setShowMore] = useState(false)
-  const moreOpen = showMore || optional.some((sid) => visible[sid])
-  const legendChannels = channels.filter((sid) => moreOpen || !metaFor(sid, result.params.topology).optional)
   const drag = useRef<{ mode: 'cursor' | 'pan'; startX: number; startVp: Viewport } | null>(null)
 
   // Track container size (canvas is sized in device pixels for crisp lines).
@@ -201,25 +198,8 @@ export function Scope(props: Props) {
   return (
     <div className="scope">
       <div className="scope-toolbar">
-        <div className="legend" role="group" aria-label="Waveform visibility">
-          {legendChannels.map((sid) => (
-            <button
-              key={sid}
-              className={`chip ${visible[sid] ? 'chip--on' : ''}`}
-              aria-pressed={visible[sid]}
-              title={metaFor(sid, result.params.topology).name}
-              onClick={() => props.onToggleSignal(sid)}
-            >
-              <span className={`swatch ${metaFor(sid, result.params.topology).dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${metaFor(sid, result.params.topology).cssVar})` }} />
-              {metaFor(sid, result.params.topology).label}
-            </button>
-          ))}
-          {optional.length > 0 && (
-            <button className="chip chip--more" onClick={() => setShowMore((v) => !v)} aria-expanded={moreOpen}>
-              {moreOpen ? '− fewer' : `+ ${optional.length} more channels`}
-            </button>
-          )}
-        </div>
+        {props.channelBar}
+        {props.showLayoutSwitch !== false && (
         <div className="seg seg--layout" role="radiogroup" aria-label="Graph layout">
           {(
             [
@@ -233,6 +213,7 @@ export function Scope(props: Props) {
             </button>
           ))}
         </div>
+        )}
         <div className="zoom" role="group" aria-label="Time zoom">
           <span className="zoom-info">{periods >= 0.995 ? `${periods.toFixed(periods % 1 < 0.01 ? 0 : 1)} cyc` : formatTime(span)}</span>
           <button className="icon-btn" onClick={() => zoomAt(ZOOM_STEP, (viewport.t0 + viewport.t1) / 2)} aria-label="Zoom out" title="Zoom out">

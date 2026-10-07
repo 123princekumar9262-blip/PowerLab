@@ -7,7 +7,7 @@ import { FREEWHEEL_EXPERIMENTS } from '../src/experiment/freewheel.ts'
 import { measure } from '../src/measurements/measurements.ts'
 import { indexAtTime, runSimulation, sampleAt } from '../src/simulation/engine.ts'
 import { THREE_PHASE_DEFAULTS } from '../src/simulation/params.ts'
-import { fwParams } from './freewheel.test.ts'
+import { fwParams } from './helpers.ts'
 
 const run = (fw: boolean, over: Parameters<typeof fwParams>[1] = {}) => runSimulation(fwParams(fw, over), 'half-wave:RL')
 const ex = getExplainer('half-wave:RL')

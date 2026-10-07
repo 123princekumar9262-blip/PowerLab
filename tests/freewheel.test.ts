@@ -2,19 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { getModel } from '../src/circuits/registry.ts'
 import { compareWithTheory } from '../src/measurements/compare.ts'
 import { measure } from '../src/measurements/measurements.ts'
-import { DEFAULT_PARAMS, sanitizeParams } from '../src/simulation/params.ts'
+import { sanitizeParams } from '../src/simulation/params.ts'
 import { runSimulation } from '../src/simulation/engine.ts'
-import type { LabParams } from '../src/types/simulation.ts'
+import { fwParams } from './helpers.ts'
 
-/** Half-wave + RL with or without the freewheeling diode (educational defaults). */
-export const fwParams = (freewheel: boolean, over: { vf?: number; ron?: number; model?: 'ideal' | 'real'; L?: number; R?: number; f?: number; cycles?: number } = {}): LabParams => ({
-  ...DEFAULT_PARAMS,
-  source: { ...DEFAULT_PARAMS.source, frequency: over.f ?? 50 },
-  diode: { model: over.model ?? 'real', vf: over.vf ?? 0.7, ron: over.ron ?? 0 },
-  load: { ...DEFAULT_PARAMS.load, resistance: over.R ?? 10, inductance: over.L ?? 0.05 },
-  control: { device: 'diode', alphaDeg: 0, freewheel },
-  sim: { ...DEFAULT_PARAMS.sim, cycles: over.cycles ?? 10 },
-})
 const run = (fw: boolean, over: Parameters<typeof fwParams>[1] = {}) => runSimulation(fwParams(fw, over), 'half-wave:RL')
 const lastCycle = (r: ReturnType<typeof run>) => {
   const n = r.trace.length

@@ -18,8 +18,8 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 - **Freewheeling diode** (half-wave + RL): toggle Dfw ON/OFF and compare the two circuits side by side.
 
-Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 410 unit tests pass, along with
-three browser smoke suites (54 single-phase, 24 three-phase and 29 freewheeling-diode checks).
+Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 406 unit tests pass, along with
+three browser smoke suites (56 single-phase, 40 three-phase and 29 freewheeling-diode checks).
 
 ## Run it
 
@@ -40,15 +40,27 @@ Chrome instead) and saves screenshots to `scripts/out/`.
 
 ## Using the lab
 
-1. **Choose rectifier**: Half-wave, Center-tap or Bridge. 2. **Choose load**: R, RL, RC or RLC.
-3. **Run simulation**.
-4. **Move the cursor**: drag on the scope, or use ← / →.
-5. **Observe the circuit**: each diode shows ON (green) or OFF (red). Charge particles move
-   along every branch carrying current, at a speed proportional to that branch's simulated
-   current and in its direction. You can watch a capacitor's current reverse as it discharges
-   into R. Polarity marks show the actual voltage polarity at that instant.
-6. **Press WHY**: the causal chain source → circuit condition → diode states →
-   current path → energy → output → waveform, generated from the state at the cursor.
+**Everything is available, but not everything is visible at once.** The screen shows only what
+you need to follow the circuit. The rest opens when you ask for it, and nothing in the simulation
+changes when you open or close a panel.
+
+| Level | Always visible | On request |
+|---|---|---|
+| 1 · Essential | the circuit; the state strip (what conducts, Vo, Io, t, θ); playback; one primary view; Basic parameters (V, f, R) | |
+| 2 · Context | | **⇢ Current path** (drawer, path highlighted on the circuit) · **WHY?** · **⚡ Energy** · **🔎 Inspect** (click a component) · Events view · Angle view · channel presets and **+ Add channel** |
+| 3 · Analysis | | **Measurements** (Summary, Output, Load, Diodes, Timing, Theory vs Simulation) · **Theory & equations** (concept, formula, theory, simulation, error, *Explain formula*) |
+| 4 · Learning | | right-panel tabs **State · Why · Learn · Energy**; the Physics Lens inside Why; the modes Learn, Experiment, Predict, Challenge, Reverse |
+
+- **Beginner / Standard / Engineer** (top right) sets how much is shown, never what exists.
+  - **Beginner**: the circuit, Vo and Io, the basic waveforms, WHY and the current path.
+  - **Standard** (default) adds device states, the angle view, measurements and energy.
+  - **Engineer** adds every reading, more channel presets, timing, the theory comparison, and opens the advanced parameters.
+- **◎ Focus** hides everything except the circuit, the waveform and the state, with WHY and the current path one click away.
+- **What do you want to study?** (above the circuit) sets things up for you: channels, view, highlighting and the panel. Choices include how the diodes switch, how the output is formed, the load current, the firing angle, energy flow, measurements and theory.
+- **Primary view**: **Waveforms**, **Angle view** (three-phase), **Events**, or **With / without Dfw** (freewheel circuit), one at a time.
+- **Channels**: presets **Basic · Diode analysis · Load analysis · Power electronics · Everything**, or pick channels one by one with **+ Add channel**. Click a channel chip to hide it.
+- **Parameters**: Basic shows V, f and R. **Advanced parameters** holds load elements (L, C), devices (diode model, Vf, Ron, SCRs and α, freewheeling diode), source (φ, sequence, Rs, Ls) and simulation settings. It opens by itself when a challenge unlocks a field inside it.
+- Drawers are non-modal: the cursor and playback keep working behind them, and **Esc** closes them.
 
 | Control | Action |
 |---|---|
@@ -56,13 +68,11 @@ Chrome instead) and saves screenshots to `scripts/out/`.
 | Wheel / ＋ − | zoom time axis around the pointer |
 | Shift + drag, horizontal wheel | pan |
 | Double-click, **Fit**, **1 cycle** | whole run / zoom to one cycle |
-| **Overlay · Grouped · Separate** | graph layout. Overlay: all traces on one screen (V left axis, A right axis, zeros aligned). Grouped: one graph per quantity. Separate: one graph per signal |
-| Legend chips | show / hide each signal |
-| ◆ / ○ markers, event chips | jump to an event and read *What happened? / Why?* |
+| **Overlay · Grouped · Separate** | graph layout (Standard and up) |
+| ◆ / ○ markers, Events view | open an event's *What happened? / Why?* |
 | Space, ←, →, Home | play/pause, step back/forward, reset |
 | Step size: Event · 15° · Δt | next detected event · next 15° of θ · one timestep |
 | Speed 0.25×–4× | 1× = one source cycle every 4 s (slow motion) |
-| ⚡ Energy view | power ledger (who supplies, who absorbs, with a live Σp = 0 check), energy stored in L and C, energy/power channels on the scope |
 
 ### Freewheeling diode
 
@@ -70,18 +80,18 @@ Choose **Half-wave** + **RL** and press **Freewheeling diode: OFF** in the bench
 toggle under Parameters). Dfw is a real circuit element across the load, with its anode on the − output and its
 cathode on the + output. Nothing about its behaviour is scripted: the solver decides at every step whether it conducts.
 
-- **Freewheeling diode card** (right column): Dfw ON/OFF with its bias, current and voltage, plus Vin,
+- **Freewheeling diode card** (State tab): Dfw ON/OFF with its bias, current and voltage, plus Vin,
   Vout, IL and the state of D1 at the cursor. Below that are the inductor energy E_L = ½·L·i² and where
   it is going, and a numbered **"Why is the freewheeling diode ON / OFF?"** written from the simulated state.
 - **Schematic**: the rails are split at Dfw's junctions, so each wire carries its own simulated current.
   While the diode freewheels, only the L → R → Dfw loop is lit. The scope shades D1's conduction green
   and Dfw's violet, and offers Ifw, Vfw and E_L (WL) channels.
-- **⇄ Compare with / without Dfw**: the same circuit simulated twice, drawn on shared axes (Vout, Io,
+- **With / without Dfw** (primary view): the same circuit simulated twice, drawn on shared axes (Vout, Io,
   Ifw, E_L), with bands where the outputs differ and a table of measured differences. Drag on it to move the master cursor.
 - **⏭ Step through conduction**: seven stops found from the simulation's events (D1 ON → D1 OFF →
   current must continue → Dfw forward biased → freewheel current → energy decreasing → Dfw OFF).
   **Auto** plays and pauses at each one.
-- **Physics Lens**: ten stages, from the source to the decaying current.
+- **Physics Lens** (Why tab): ten stages, from the source to the decaying current.
 - **Experiment** mode offers five guided experiments, and **Predict → What if…?** puts the freewheel
   questions first (e.g. "what happens to the current ripple when Dfw is added?", A–D).
 
@@ -156,19 +166,22 @@ src/
     theory/freewheel.ts      half-wave RL + freewheeling diode: closed-form periodic solution
     compare.ts               simulation vs theory, tolerance, steady-state gating
   explanations/
+    concise.ts               short WHY (5 steps), current-path card, state line
     rectifier.ts             WHY engine for every single-phase circuit (state + event explanations)
     threePhase.ts            three-phase WHY: highest/lowest phase, conducting pair, gates, faults
     freewheel.ts             freewheeling diode: mode, why Dfw is ON/OFF, freewheel intervals, step-through
     lens.ts                  Physics Lens stages built from the same explanation (10 for the freewheel circuit)
+  inspect/                   Inspect mode: one component's values from the trace
   experiment/                before/after snapshots, measured differences, WHY per change, freewheel experiments
   reverse/                   reverse-engineering tasks (hidden circuit)
   learning/                  lessons (Phase 8), facts read from the simulation, cursor targets
   prediction/                sketch tasks and scoring (Phase 9); what-if questions
   challenges/                design challenges and evaluation (Phase 10)
-  visualization/             scope renderer (overlay/grouped/separate), signals, scales, events
+  visualization/             scope renderer (overlay/grouped/separate), signals, channel presets, scales, events
   state/                     reducer, playback, stepping, mode logic (useModes)
   components/                Header, CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
-                             FreewheelPanel, CompareView, StepThrough,
+                             ChannelBar, FreewheelPanel, CompareView, StepThrough, ui/Drawer,
+                             panels/* (State, Why, Learn, Path, Inspect, Measurements, Theory, Events),
                              PhysicsLens, Scope, Transport, StatePanel, EnergyPanel, ParameterPanel,
                              MeasurementTable, EventPanels, modes/*
   styles/index.css           design tokens + layout

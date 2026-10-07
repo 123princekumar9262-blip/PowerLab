@@ -5,10 +5,10 @@
 export type DeviceState = 'on' | 'off' | 'idle'
 
 /** Diode centered at (x, y), pointing from anode to cathode along `angle` degrees. */
-export function DiodeSym(props: { x: number; y: number; angle: number; state: DeviceState; label: string; labelDx?: number; labelDy?: number; size?: number }) {
-  const { x, y, angle, state, label, labelDx = 0, labelDy = -26, size = 20 } = props
+export function DiodeSym(props: { x: number; y: number; angle: number; state: DeviceState; label: string; labelDx?: number; labelDy?: number; size?: number; part?: string }) {
+  const { x, y, angle, state, label, labelDx = 0, labelDy = -26, size = 20, part } = props
   return (
-    <g className={`diode diode--${state}`}>
+    <g className={`diode diode--${state}`} data-part={part}>
       <g transform={`translate(${x} ${y}) rotate(${angle})`}>
         <rect className="diode-hit" x={-size - 8} y={-size - 6} width={2 * size + 16} height={2 * size + 12} rx={8} />
         <path className="diode-body" d={`M${-size},${-size} L${-size},${size} L${size},0 Z`} />
@@ -29,11 +29,12 @@ export function diodeEnds(x: number, y: number, angle: number, size = 20) {
   return { anode: { x: x - size * c, y: y - size * s }, cathode: { x: x + size * c, y: y + size * s } }
 }
 
-export function SourceSym(props: { cx: number; cy: number; r: number }) {
-  const { cx, cy, r } = props
+export function SourceSym(props: { cx: number; cy: number; r: number; part?: string }) {
+  const { cx, cy, r, part } = props
   const w = r * 0.55
   return (
-    <g className="source">
+    <g className="source" data-part={part}>
+      <circle className="part-hit" cx={cx} cy={cy} r={r + 6} />
       <circle cx={cx} cy={cy} r={r} />
       <path d={`M${cx - w},${cy} q${w / 2},${-w * 1.1} ${w},0 t${w},0`} />
     </g>

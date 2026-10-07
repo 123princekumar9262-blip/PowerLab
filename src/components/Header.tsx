@@ -1,5 +1,5 @@
 import { LOADS, TOPOLOGIES } from '../circuits/registry.ts'
-import type { AppMode, LabState, Section } from '../state/labState.ts'
+import type { AppMode, Density, LabState, Section } from '../state/labState.ts'
 import type { LoadType, RectifierTopology } from '../types/simulation.ts'
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   onRun: () => void
   onMode: (m: AppMode) => void
   onSection: (s: Section) => void
+  onDensity: (d: Density) => void
   /** True while a lesson, challenge or prediction owns the circuit choice. */
   circuitLocked: boolean
 }
@@ -23,7 +24,13 @@ const MODES: Array<{ id: AppMode; label: string; title: string }> = [
 ]
 
 /** Product header + the guided flow: choose → run → explore → ask WHY. */
-export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, circuitLocked }: Props) {
+const DENSITIES: Array<{ id: Density; label: string; title: string }> = [
+  { id: 'beginner', label: 'Beginner', title: 'Circuit, Vo, Io, basic waveforms, WHY and the current path' },
+  { id: 'standard', label: 'Standard', title: 'Adds device states, the angle view, measurements and energy' },
+  { id: 'engineer', label: 'Engineer', title: 'Adds every channel, device voltages, timing, theory comparison and advanced parameters' },
+]
+
+export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, onDensity, circuitLocked }: Props) {
   const three = state.section === 'three'
   const { progress } = state
   const steps = [
@@ -113,9 +120,18 @@ export function Header({ state, onTopology, onLoad, onRun, onMode, onSection, ci
             <b>3</b> Run simulation
           </button>
         )}
+        {state.hasRun && (
+          <div className="seg density-seg" role="radiogroup" aria-label="Information level" title="How much information is shown at once — everything stays reachable">
+            {DENSITIES.map((d) => (
+              <button key={d.id} role="radio" aria-checked={state.density === d.id} className={state.density === d.id ? 'on' : ''} title={d.title} onClick={() => onDensity(d.id)}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {state.mode === 'lab' && (
+      {state.mode === 'lab' && (!state.hasRun || state.density === 'beginner') && (
         <ol className="guide" aria-label="Guided steps">
           {steps.map((s, k) => (
             <li key={s.label} className={s.done ? 'done' : k === current ? 'current' : ''} title={s.hint}>
