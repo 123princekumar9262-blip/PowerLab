@@ -1,9 +1,10 @@
 import { useEffect, useId, useState } from 'react'
 import { LIMITS } from '../simulation/params.ts'
-import type { LabParams, ParamIssue, ResolvedParams } from '../types/simulation.ts'
+import type { LabParams, LoadType, ParamIssue, ResolvedParams } from '../types/simulation.ts'
 import { formatSI } from '../utils/format.ts'
 
 interface Props {
+  load: LoadType
   params: LabParams
   resolved: ResolvedParams | null
   issues: ParamIssue[]
@@ -13,7 +14,9 @@ interface Props {
   onReset: () => void
 }
 
-export function ParameterPanel({ params, resolved, issues, computeMs, samples, onChange, onReset }: Props) {
+export function ParameterPanel({ load, params, resolved, issues, computeMs, samples, onChange, onReset }: Props) {
+  const hasL = load === 'RL' || load === 'RLC'
+  const hasC = load === 'RC' || load === 'RLC'
   const set = <K extends keyof LabParams>(group: K, patch: Partial<LabParams[K]>) => onChange({ ...params, [group]: { ...params[group], ...patch } })
   const ideal = params.diode.model === 'ideal'
 
@@ -31,6 +34,28 @@ export function ParameterPanel({ params, resolved, issues, computeMs, samples, o
         <NumberField label="Vrms" hint="Source RMS voltage" unit="V" value={params.source.vrms} limits={LIMITS.vrms} slider={{ min: 1, max: 50, step: 0.5 }} onCommit={(v) => set('source', { vrms: v })} />
         <NumberField label="Frequency" hint="Source frequency f" unit="Hz" value={params.source.frequency} limits={LIMITS.frequency} slider={{ min: 1, max: 1000, log: true }} onCommit={(v) => set('source', { frequency: v })} />
         <NumberField label="Resistance" hint="Load resistance R" unit="Ω" value={params.load.resistance} limits={LIMITS.resistance} slider={{ min: 0.1, max: 100000, log: true }} onCommit={(v) => set('load', { resistance: v })} />
+        {hasL && (
+          <NumberField
+            label="Inductance"
+            hint={load === 'RL' ? 'Load inductance L' : 'Filter choke L'}
+            unit="mH"
+            value={roundSig(params.load.inductance * 1e3)}
+            limits={{ min: LIMITS.inductance.min * 1e3, max: LIMITS.inductance.max * 1e3 }}
+            slider={{ min: 0.1, max: 5000, log: true }}
+            onCommit={(v) => set('load', { inductance: v / 1e3 })}
+          />
+        )}
+        {hasC && (
+          <NumberField
+            label="Capacitance"
+            hint="Filter capacitor C"
+            unit="µF"
+            value={roundSig(params.load.capacitance * 1e6)}
+            limits={{ min: LIMITS.capacitance.min * 1e6, max: LIMITS.capacitance.max * 1e6 }}
+            slider={{ min: 1, max: 100000, log: true }}
+            onCommit={(v) => set('load', { capacitance: v / 1e6 })}
+          />
+        )}
         <div className="field">
           <span className="field-label">Diode model</span>
           <div className="seg seg--full" role="radiogroup" aria-label="Diode model">
@@ -156,6 +181,11 @@ function NumberField({ label, hint, unit, value, limits, slider, disabled, onCom
       </span>
     </div>
   )
+}
+
+/** Round to 6 significant figures (removes float noise from unit conversion, e.g. 50.000000001 mH). */
+function roundSig(v: number): number {
+  return Number(v.toPrecision(6))
 }
 
 /** Round to 3 significant figures so log-slider values read cleanly (e.g. 47.3 Ω, not 47.2831 Ω). */

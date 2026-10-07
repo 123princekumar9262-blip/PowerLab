@@ -215,9 +215,12 @@ function detectOutputExtrema(time: Float64Array, vout: Float64Array, push: (k: E
   for (let k = 1; k < n - 1; k++) {
     const a = vout[k - 1]
     const b = vout[k]
-    const c = vout[k + 1]
-    const isMax = b > a + eps && b >= c + eps
-    const isMin = b < a - eps && b <= c - eps
+    // Plateau-aware: skip samples equal to b (a crest can span two equal samples).
+    let j = k + 1
+    while (j < n - 1 && Math.abs(vout[j] - b) <= eps) j++
+    const c = vout[j]
+    const isMax = b > a + eps && b > c + eps
+    const isMin = b < a - eps && b < c - eps
     if (!isMax && !isMin) continue
     // Parabolic refinement: vertex of the parabola through the three samples.
     const denom = a - 2 * b + c
@@ -226,6 +229,7 @@ function detectOutputExtrema(time: Float64Array, vout: Float64Array, push: (k: E
     const t = time[k] + Math.max(-0.5, Math.min(0.5, off)) * dt
     const v = b - 0.25 * (a - c) * Math.max(-0.5, Math.min(0.5, off))
     push(isMax ? 'vout-max' : 'vout-min', t, { vout: v })
+    k = j - 1
   }
 }
 

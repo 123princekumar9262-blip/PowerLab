@@ -1,26 +1,23 @@
 import type { StateExplanation } from '../explanations/index.ts'
-import { SIGNAL_META } from '../visualization/signals.ts'
-import { formatA, formatDeg, formatTime, formatV } from '../utils/format.ts'
 import type { SignalId } from '../types/simulation.ts'
+import { formatDeg, formatSI, formatTime } from '../utils/format.ts'
+import { SIGNAL_META } from '../visualization/signals.ts'
 
 interface Props {
   ex: StateExplanation
+  /** The circuit's signals (readings shown for the non-advanced ones). */
+  signalIds: readonly SignalId[]
   whyOpen: boolean
   onToggleWhy: () => void
 }
 
 const TREND_ARROW = { increasing: '↗', decreasing: '↘', 'at peak': '⤒', zero: '' } as const
 const SOURCE_TREND = { rising: 'rising', falling: 'falling', peak: 'at + peak', trough: 'at − peak', flat: 'steady' } as const
+const BIAS = { 'forward-conducting': 'conducting', 'forward-below-threshold': 'below Vf', reverse: 'reverse biased', zero: 'zero bias' } as const
 
-export function StatePanel({ ex, whyOpen, onToggleWhy }: Props) {
+export function StatePanel({ ex, signalIds, whyOpen, onToggleWhy }: Props) {
   const s = ex.sample
-  const readings: Array<[SignalId, string]> = [
-    ['vin', formatV(s.vin)],
-    ['vout', formatV(s.vout)],
-    ['vd', formatV(s.vd)],
-    ['io', formatA(s.io)],
-    ['id', formatA(s.id)],
-  ]
+  const readings = signalIds.filter((id) => !SIGNAL_META[id].advanced)
 
   return (
     <section className="state" aria-labelledby="state-title">
@@ -32,18 +29,18 @@ export function StatePanel({ ex, whyOpen, onToggleWhy }: Props) {
         </div>
       </header>
 
-      <p className={`state-headline ${ex.diode.on ? 'is-on' : 'is-off'}`} aria-live="polite">
+      <p className={`state-headline ${ex.diodes.some((d) => d.on) ? 'is-on' : 'is-off'}`} aria-live="polite">
         {ex.headline}
       </p>
 
       <dl className="readings">
-        {readings.map(([sid, val]) => (
+        {readings.map((sid) => (
           <div key={sid}>
             <dt>
               <span className={`swatch ${SIGNAL_META[sid].dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${SIGNAL_META[sid].cssVar})` }} />
               {SIGNAL_META[sid].label}
             </dt>
-            <dd>{val}</dd>
+            <dd>{formatSI(s.values[sid] ?? 0, SIGNAL_META[sid].unit, { signed: SIGNAL_META[sid].unit === 'V' || sid === 'ic' })}</dd>
           </div>
         ))}
       </dl>
@@ -57,27 +54,28 @@ export function StatePanel({ ex, whyOpen, onToggleWhy }: Props) {
           </dd>
         </div>
         <div>
-          <dt>Diode D1</dt>
-          <dd>
-            <span className={`status ${ex.diode.on ? 'status--on' : 'status--off'}`}>{ex.diode.on ? '● ON' : '✕ OFF'}</span>
-            <span className="muted"> · {biasLabel(ex.diode.bias)}</span>
+          <dt>{ex.diodes.length > 1 ? 'Diodes' : 'Diode D1'}</dt>
+          <dd className="diode-list">
+            {ex.diodes.map((d) => (
+              <span key={d.id} className={`status ${d.on ? 'status--on' : 'status--off'}`} title={BIAS[d.bias]}>
+                {d.on ? '●' : '✕'} {ex.diodes.length > 1 ? d.id : ''} {d.on ? 'ON' : 'OFF'}
+                {ex.diodes.length === 1 && <span className="muted"> · {BIAS[d.bias]}</span>}
+              </span>
+            ))}
           </dd>
         </div>
         <div>
-          <dt>Current</dt>
+          <dt>Load current</dt>
           <dd>
-            {formatA(s.io)}
-            <span className="muted">
-              {' '}
-              · {ex.current.trend === 'zero' ? 'no current' : `${TREND_ARROW[ex.current.trend]} ${ex.current.trend}`}
-            </span>
+            {formatSI(s.io, 'A')}
+            <span className="muted"> · {ex.current.trend === 'zero' ? 'no current' : `${TREND_ARROW[ex.current.trend]} ${ex.current.trend}`}</span>
           </dd>
         </div>
         <div>
           <dt>Output</dt>
           <dd>
-            {ex.output.conducting ? 'Conducting' : 'No output'}
-            <span className="muted"> · Vout {formatV(s.vout)}</span>
+            {ex.output.conducting ? 'Supplied' : 'No output'}
+            <span className="muted"> · Vout {formatSI(s.vout, 'V', { signed: true })}</span>
           </dd>
         </div>
         <div className="facts-path">
@@ -90,7 +88,7 @@ export function StatePanel({ ex, whyOpen, onToggleWhy }: Props) {
                 ))}
               </ol>
             ) : (
-              <span className="muted">None — loop open at D1</span>
+              <span className="muted">None — loop open at the diodes</span>
             )}
           </dd>
         </div>
@@ -115,17 +113,4 @@ export function StatePanel({ ex, whyOpen, onToggleWhy }: Props) {
       )}
     </section>
   )
-}
-
-function biasLabel(b: StateExplanation['diode']['bias']): string {
-  switch (b) {
-    case 'forward-conducting':
-      return 'forward biased'
-    case 'forward-below-threshold':
-      return 'forward, below Vf'
-    case 'reverse':
-      return 'reverse biased'
-    case 'zero':
-      return 'zero bias'
-  }
 }

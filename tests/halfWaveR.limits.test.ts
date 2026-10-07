@@ -48,7 +48,7 @@ describe('limiting cases', () => {
   it('Vf = 0 on the real model reproduces the ideal diode exactly', () => {
     const a = runSimulation(ideal())
     const b = runSimulation(real({ diode: { vf: 0 } }))
-    expect(Array.from(b.trace.signals.vout)).toEqual(Array.from(a.trace.signals.vout))
+    expect(Array.from(b.trace.signals.vout!)).toEqual(Array.from(a.trace.signals.vout!))
     expect(Array.from(b.trace.diodes[0].on)).toEqual(Array.from(a.trace.diodes[0].on))
   })
 

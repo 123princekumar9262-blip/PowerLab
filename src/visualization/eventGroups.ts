@@ -10,8 +10,8 @@ export interface EventGroup {
   id: string
   time: number
   events: CircuitEvent[]
-  /** 'diode' if any event in the group is a diode/current event. */
-  category: 'diode' | 'source'
+  /** 'diode' if any event is a diode/current event; 'output' for ripple crests/valleys. */
+  category: 'diode' | 'source' | 'output'
 }
 
 const DIODE_KINDS = new Set<CircuitEvent['kind']>(['diode-on', 'diode-off', 'current-start', 'current-stop'])
@@ -26,7 +26,12 @@ const ORDER: Record<CircuitEvent['kind'], number> = {
   'vin-zero-falling': 2,
   'vin-positive-peak': 3,
   'vin-negative-peak': 3,
+  'vout-max': 4,
+  'vout-min': 4,
 }
+
+const categoryOf = (k: CircuitEvent['kind']): EventGroup['category'] => (DIODE_KINDS.has(k) ? 'diode' : k === 'vout-max' || k === 'vout-min' ? 'output' : 'source')
+const RANK = { diode: 2, source: 1, output: 0 } as const
 
 export function groupEvents(result: SimulationResult): EventGroup[] {
   // Events closer than this are the same instant (refined times agree to ~1e-15 s).
@@ -36,9 +41,10 @@ export function groupEvents(result: SimulationResult): EventGroup[] {
     const last = groups[groups.length - 1]
     if (last && e.time - last.time <= tol) {
       last.events.push(e)
-      if (DIODE_KINDS.has(e.kind)) last.category = 'diode'
+      const c = categoryOf(e.kind)
+      if (RANK[c] > RANK[last.category]) last.category = c
     } else {
-      groups.push({ id: `g${groups.length}`, time: e.time, events: [e], category: DIODE_KINDS.has(e.kind) ? 'diode' : 'source' })
+      groups.push({ id: `g${groups.length}`, time: e.time, events: [e], category: categoryOf(e.kind) })
     }
   }
   for (const g of groups) g.events.sort((a, b) => ORDER[a.kind] - ORDER[b.kind])
@@ -54,6 +60,7 @@ export function groupEvents(result: SimulationResult): EventGroup[] {
  */
 export function groupIndex(result: SimulationResult, g: EventGroup): number {
   if (g.category !== 'diode') return indexAtTime(result, g.time)
+  // (Switching events land on the first sample showing the new state.)
   let i = indexAtOrAfter(result, g.time)
   // An event can sit a few ulps after a sample (e.g. ideal diode turn-off at t = T/2, where
   // floating-point sin(π) is still +1e-16). Confirm against the trace that the landing sample
@@ -61,8 +68,8 @@ export function groupIndex(result: SimulationResult, g: EventGroup): number {
   const sw = g.events.find((e) => e.kind === 'diode-on' || e.kind === 'diode-off')
   if (sw) {
     const want = sw.kind === 'diode-on' ? 1 : 0
-    const on = result.trace.diodes[0].on
-    while (i < result.trace.length - 1 && on[i] !== want) i++
+    const on = result.trace.diodes.find((d) => d.id === sw.device)?.on ?? result.trace.diodes[0].on
+    for (let guard = 0; guard < 3 && i < result.trace.length - 1 && on[i] !== want; guard++) i++
   }
   return i
 }

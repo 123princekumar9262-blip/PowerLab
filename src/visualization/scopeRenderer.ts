@@ -1,14 +1,18 @@
 import type { SignalId, SimulationResult } from '../types/simulation.ts'
+import { formatSI } from '../utils/format.ts'
 import type { EventGroup } from './eventGroups.ts'
 import { axisPrefix, niceTicks, tickLabel } from './scales.ts'
-import { LANES, SIGNAL_META, type LaneSpec } from './signals.ts'
-import { formatSI } from '../utils/format.ts'
+import { lanesFor, SIGNAL_META, type ScopeLayoutMode, type Unit } from './signals.ts'
 
 /**
  * Canvas rendering of the oscilloscope. Pure drawing: it reads the simulation
  * trace and never computes physics. Two layers:
  *   base    — grid, conduction shading, traces, axes (redrawn on data/view change)
  *   overlay — event markers, cursor, readouts       (redrawn on cursor/hover change)
+ *
+ * Layouts: 'grouped' (one lane per physical quantity), 'separate' (one lane per signal),
+ * 'overlay' (every trace on one screen, like an oscilloscope: each unit keeps its own
+ * scale — the first on the left axis, the second on the right — and all zero lines align).
  */
 
 export interface Viewport {
@@ -26,20 +30,29 @@ export interface ScopeColors {
   text2: string
   text3: string
   conduction: string
+  conduction2: string
   cursor: string
   marker: string
   markerDiode: string
   signals: Record<SignalId, string>
 }
 
-export interface LaneLayout extends LaneSpec {
-  top: number
-  height: number
-  visibleSignals: SignalId[]
+/** Value → pixel mapping for one unit inside a lane. */
+export interface UnitAxis {
+  unit: Unit
   yMin: number
   yMax: number
   scale: number
   prefix: string
+}
+
+export interface LaneLayout {
+  id: string
+  title: string
+  signals: SignalId[]
+  top: number
+  height: number
+  axes: UnitAxis[]
 }
 
 export interface ScopeLayout {
@@ -53,13 +66,15 @@ export interface ScopeLayout {
   lanesTop: number
   lanesBottom: number
   axisTop: number
+  mode: ScopeLayoutMode
 }
 
-const M = { left: 58, right: 14, top: 4, eventRow: 24, laneGap: 6, laneTitle: 18, axis: 30 }
+const M = { left: 58, right: 14, rightAxis: 56, top: 4, eventRow: 24, laneGap: 6, laneTitle: 18, axis: 30 }
 
 export function readColors(el: Element): ScopeColors {
   const cs = getComputedStyle(el)
   const v = (name: string) => cs.getPropertyValue(name).trim() || '#888'
+  const signals = Object.fromEntries((Object.keys(SIGNAL_META) as SignalId[]).map((s) => [s, v(SIGNAL_META[s].cssVar)])) as Record<SignalId, string>
   return {
     surface: v('--scope-bg'),
     laneBg: v('--scope-lane'),
@@ -70,22 +85,34 @@ export function readColors(el: Element): ScopeColors {
     text2: v('--text-2'),
     text3: v('--text-3'),
     conduction: v('--scope-conduction'),
+    conduction2: v('--scope-conduction-2'),
     cursor: v('--scope-cursor'),
     marker: v('--text-3'),
     markerDiode: v('--text-1'),
-    signals: {
-      vin: v('--sig-vin'),
-      vout: v('--sig-vout'),
-      vd: v('--sig-vd'),
-      io: v('--sig-io'),
-      id: v('--sig-id'),
-    },
+    signals,
   }
 }
 
-/** Lay out lanes for the currently visible signals. Lanes with nothing visible collapse. */
-export function computeLayout(width: number, height: number, result: SimulationResult, visible: Record<SignalId, boolean>): ScopeLayout {
-  const specs = LANES.map((l) => ({ ...l, visibleSignals: l.signals.filter((s) => visible[s]) })).filter((l) => l.visibleSignals.length > 0)
+/** Data range of a set of signals over the whole run (fixed, so panning never rescales). */
+function rangeOf(result: SimulationResult, signals: SignalId[]): { lo: number; hi: number } {
+  let lo = 0
+  let hi = 0
+  for (const s of signals) {
+    const arr = result.trace.signals[s]
+    if (!arr) continue
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] < lo) lo = arr[i]
+      if (arr[i] > hi) hi = arr[i]
+    }
+  }
+  return { lo, hi }
+}
+
+/** Lay out lanes for the visible signals in the chosen mode. */
+export function computeLayout(width: number, height: number, result: SimulationResult, visible: SignalId[], mode: ScopeLayoutMode): ScopeLayout {
+  const specs = lanesFor(visible, mode)
+  const units = (sigs: SignalId[]) => [...new Set(sigs.map((s) => SIGNAL_META[s].unit))]
+  const twoAxes = mode === 'overlay' && specs.length > 0 && units(specs[0].signals).length > 1
   const eventRowTop = M.top
   const eventRowBottom = eventRowTop + M.eventRow
   const lanesTop = eventRowBottom
@@ -94,34 +121,45 @@ export function computeLayout(width: number, height: number, result: SimulationR
   const laneH = specs.length ? avail / specs.length : avail
 
   const lanes: LaneLayout[] = specs.map((spec, k) => {
-    // Fixed y-range from the whole run (not the visible window), so panning never rescales.
-    let lo = 0
-    let hi = 0
-    for (const s of spec.visibleSignals) {
-      const arr = result.trace.signals[s]
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i] < lo) lo = arr[i]
-        if (arr[i] > hi) hi = arr[i]
-      }
-    }
-    if (hi - lo < 1e-15) {
-      // Flat-zero signal (e.g. no conduction): give the axis a sensible span.
-      hi = spec.unit === 'V' ? 1 : 1e-3
-      lo = -hi
-    }
-    const pad = (hi - lo) * 0.1
-    const { scale, prefix } = axisPrefix(Math.max(Math.abs(lo), Math.abs(hi)))
-    // Each lane = a title band (outside the plot, so it never hides a trace) + the plot itself.
+    // Per-unit data ranges; every unit's zero is placed at the same height (aligned zeros).
+    const ranges = units(spec.signals).map((u) => {
+      const r = rangeOf(result, spec.signals.filter((s) => SIGNAL_META[s].unit === u))
+      return { u, ...r, flat: r.hi - r.lo < 1e-15 }
+    })
+    // Fraction of the lane height below zero: the largest any unit needs.
+    let z = 0
+    for (const r of ranges) if (!r.flat) z = Math.max(z, -r.lo / (r.hi - r.lo))
+    z = Math.min(0.9, z)
+    const axes: UnitAxis[] = ranges.map((r) => {
+      // Units per lane height, so this unit fits with its zero at height z.
+      let span = r.flat ? (r.u === 'V' ? 2 : 2e-3) : Math.max(r.hi / (1 - z), z > 0 ? -r.lo / z : 0)
+      span *= 1.16 // headroom
+      const { scale, prefix } = axisPrefix(Math.max(span * (1 - z), span * z))
+      return { unit: r.u, yMin: -z * span, yMax: (1 - z) * span, scale, prefix }
+    })
     const bandTop = lanesTop + k * (laneH + M.laneGap)
-    return { ...spec, top: bandTop + M.laneTitle, height: laneH - M.laneTitle, yMin: lo - (lo < 0 ? pad : 0), yMax: hi + (hi > 0 ? pad : 0), scale, prefix }
+    return { id: spec.id, title: spec.title, signals: spec.signals, top: bandTop + M.laneTitle, height: laneH - M.laneTitle, axes }
   })
 
-  return { width, height, plotLeft: M.left, plotRight: width - M.right, eventRowTop, eventRowBottom, lanes, lanesTop, lanesBottom: axisTop, axisTop }
+  return {
+    width,
+    height,
+    plotLeft: M.left,
+    plotRight: width - (twoAxes ? M.rightAxis : M.right),
+    eventRowTop,
+    eventRowBottom,
+    lanes,
+    lanesTop,
+    lanesBottom: axisTop,
+    axisTop,
+    mode,
+  }
 }
 
 export const timeToX = (L: ScopeLayout, vp: Viewport, t: number) => L.plotLeft + ((t - vp.t0) / (vp.t1 - vp.t0)) * (L.plotRight - L.plotLeft)
 export const xToTime = (L: ScopeLayout, vp: Viewport, x: number) => vp.t0 + ((x - L.plotLeft) / (L.plotRight - L.plotLeft)) * (vp.t1 - vp.t0)
-const valueToY = (lane: LaneLayout, v: number) => lane.top + lane.height - ((v - lane.yMin) / (lane.yMax - lane.yMin)) * lane.height
+const axisFor = (lane: LaneLayout, s: SignalId) => lane.axes.find((a) => a.unit === SIGNAL_META[s].unit) ?? lane.axes[0]
+const valueToY = (lane: LaneLayout, ax: UnitAxis, v: number) => lane.top + lane.height - ((v - ax.yMin) / (ax.yMax - ax.yMin)) * lane.height
 
 /** Time-axis unit chosen from the visible span. */
 export function timeUnit(span: number): { scale: number; label: string } {
@@ -133,14 +171,7 @@ export function timeUnit(span: number): { scale: number; label: string } {
 const FONT = '11px "Cascadia Code", "JetBrains Mono", Consolas, ui-monospace, monospace'
 const FONT_UI = '600 11px "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif'
 
-export function drawBase(
-  ctx: CanvasRenderingContext2D,
-  L: ScopeLayout,
-  result: SimulationResult,
-  vp: Viewport,
-  colors: ScopeColors,
-  showConduction: boolean,
-) {
+export function drawBase(ctx: CanvasRenderingContext2D, L: ScopeLayout, result: SimulationResult, vp: Viewport, colors: ScopeColors, showConduction: boolean) {
   const { trace } = result
   const n = trace.length
   const dt = result.params.dt
@@ -151,8 +182,7 @@ export function drawBase(
   const plotW = L.plotRight - L.plotLeft
   const i0 = Math.max(0, Math.floor(vp.t0 / dt) - 1)
   const i1 = Math.min(n - 1, Math.ceil(vp.t1 / dt) + 1)
-  const span = vp.t1 - vp.t0
-  const tu = timeUnit(span)
+  const tu = timeUnit(vp.t1 - vp.t0)
   const tTicks = niceTicks(vp.t0 / tu.scale, vp.t1 / tu.scale, Math.max(2, Math.floor(plotW / 90)))
   const tStep = tTicks.length > 1 ? tTicks[1] - tTicks[0] : 1
 
@@ -160,21 +190,22 @@ export function drawBase(
     ctx.fillStyle = colors.laneBg
     ctx.fillRect(L.plotLeft, lane.top, plotW, lane.height)
 
-    // Conduction shading: the diode's ON intervals, shared visually by every lane.
+    // Conduction shading: D1 (and D2 for full-wave) ON intervals, shared by every lane.
     if (showConduction) {
-      ctx.fillStyle = colors.conduction
-      const on = trace.diodes[0].on
-      let runStart = -1
-      for (let i = i0; i <= i1 + 1; i++) {
-        const isOn = i <= i1 && on[i] === 1
-        if (isOn && runStart < 0) runStart = i
-        if (!isOn && runStart >= 0) {
-          const xa = Math.max(L.plotLeft, timeToX(L, vp, trace.time[runStart]))
-          const xb = Math.min(L.plotRight, timeToX(L, vp, trace.time[i - 1]))
-          if (xb > xa) ctx.fillRect(xa, lane.top, xb - xa, lane.height)
-          runStart = -1
+      trace.diodes.slice(0, 2).forEach((d, j) => {
+        ctx.fillStyle = j === 0 ? colors.conduction : colors.conduction2
+        let runStart = -1
+        for (let i = i0; i <= i1 + 1; i++) {
+          const isOn = i <= i1 && d.on[i] === 1
+          if (isOn && runStart < 0) runStart = i
+          if (!isOn && runStart >= 0) {
+            const xa = Math.max(L.plotLeft, timeToX(L, vp, trace.time[runStart]))
+            const xb = Math.min(L.plotRight, timeToX(L, vp, trace.time[i - 1]))
+            if (xb > xa) ctx.fillRect(xa, lane.top, xb - xa, lane.height)
+            runStart = -1
+          }
         }
-      }
+      })
     }
 
     // Vertical (time) grid
@@ -188,37 +219,43 @@ export function drawBase(
     }
     ctx.stroke()
 
-    // Horizontal (value) grid + labels
-    const yTicks = niceTicks(lane.yMin / lane.scale, lane.yMax / lane.scale, Math.max(3, Math.floor(lane.height / 26)))
-    const yStep = yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1
+    // Horizontal grid from the first unit; tick labels on the left (1st unit) and right (2nd unit).
     ctx.font = FONT
-    ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
-    for (const yk of yTicks) {
-      const y = Math.round(valueToY(lane, yk * lane.scale)) + 0.5
-      if (y < lane.top + 6 || y > lane.top + lane.height - 4) continue
-      ctx.strokeStyle = yk === 0 ? colors.zero : colors.grid
-      ctx.lineWidth = yk === 0 ? 1.25 : 1
-      ctx.beginPath()
-      ctx.moveTo(L.plotLeft, y)
-      ctx.lineTo(L.plotRight, y)
-      ctx.stroke()
-      ctx.fillStyle = yk === 0 ? colors.text2 : colors.text3
-      ctx.fillText(tickLabel(yk, yStep), L.plotLeft - 8, y)
-    }
+    lane.axes.slice(0, 2).forEach((ax, a) => {
+      const yTicks = niceTicks(ax.yMin / ax.scale, ax.yMax / ax.scale, Math.max(3, Math.floor(lane.height / 26)))
+      const yStep = yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1
+      ctx.textAlign = a === 0 ? 'right' : 'left'
+      for (const yk of yTicks) {
+        const y = Math.round(valueToY(lane, ax, yk * ax.scale)) + 0.5
+        if (y < lane.top + 6 || y > lane.top + lane.height - 4) continue
+        if (a === 0) {
+          ctx.strokeStyle = yk === 0 ? colors.zero : colors.grid
+          ctx.lineWidth = yk === 0 ? 1.25 : 1
+          ctx.beginPath()
+          ctx.moveTo(L.plotLeft, y)
+          ctx.lineTo(L.plotRight, y)
+          ctx.stroke()
+        }
+        ctx.fillStyle = yk === 0 ? colors.text2 : colors.text3
+        ctx.fillText(tickLabel(yk, yStep), a === 0 ? L.plotLeft - 8 : L.plotRight + 8, y)
+      }
+    })
 
     // Traces
     ctx.save()
     ctx.beginPath()
     ctx.rect(L.plotLeft, lane.top, plotW, lane.height)
     ctx.clip()
-    for (const sid of lane.visibleSignals) {
-      const meta = SIGNAL_META[sid]
+    for (const sid of lane.signals) {
+      const arr = trace.signals[sid]
+      if (!arr) continue
+      const ax = axisFor(lane, sid)
       ctx.strokeStyle = colors.signals[sid]
       ctx.lineWidth = 2
       ctx.lineJoin = 'round'
-      ctx.setLineDash(meta.dashed ? [6, 5] : [])
-      drawTrace(ctx, trace.time, trace.signals[sid], i0, i1, (t) => timeToX(L, vp, t), (v) => valueToY(lane, v), plotW)
+      ctx.setLineDash(SIGNAL_META[sid].dash ?? (SIGNAL_META[sid].dashed ? [6, 5] : []))
+      drawTrace(ctx, trace.time, arr, i0, i1, (t) => timeToX(L, vp, t), (v) => valueToY(lane, ax, v), plotW)
     }
     ctx.setLineDash([])
     ctx.restore()
@@ -228,7 +265,8 @@ export function drawBase(
     ctx.textAlign = 'left'
     ctx.textBaseline = 'bottom'
     ctx.fillStyle = colors.text2
-    ctx.fillText(`${lane.title}  [${lane.prefix}${lane.unit}]`, L.plotLeft + 1, lane.top - 4)
+    const units = lane.axes.map((ax, k) => `${ax.prefix}${ax.unit}${lane.axes.length > 1 && k < 2 ? (k === 0 ? ' ← left' : ' → right') : ''}`).join(' · ')
+    ctx.fillText(`${L.mode === 'overlay' ? 'All channels' : lane.title}  [${units}]`, L.plotLeft + 1, lane.top - 4)
 
     ctx.strokeStyle = colors.gridStrong
     ctx.lineWidth = 1
@@ -254,16 +292,7 @@ export function drawBase(
  * Draw samples i0..i1. When there are more samples than pixels, draw a min/max
  * envelope per pixel column — the rendering is decimated, the data is not.
  */
-function drawTrace(
-  ctx: CanvasRenderingContext2D,
-  time: Float64Array,
-  y: Float64Array,
-  i0: number,
-  i1: number,
-  xOf: (t: number) => number,
-  yOf: (v: number) => number,
-  plotW: number,
-) {
+function drawTrace(ctx: CanvasRenderingContext2D, time: Float64Array, y: Float64Array, i0: number, i1: number, xOf: (t: number) => number, yOf: (v: number) => number, plotW: number) {
   const count = i1 - i0 + 1
   ctx.beginPath()
   if (count <= plotW * 2) {
@@ -309,7 +338,8 @@ export function drawOverlay(
   ctx.clearRect(0, 0, L.width, L.height)
   const { trace } = result
 
-  // Event markers (top row). Diode events: filled diamond; source events: hollow circle.
+  // Event markers (top row). Diode events: filled diamond; output crests/valleys: hollow
+  // diamond; source events: hollow circle.
   const rowMid = (L.eventRowTop + L.eventRowBottom) / 2
   for (const g of groups) {
     const x = timeToX(L, vp, g.time)
@@ -317,15 +347,22 @@ export function drawOverlay(
     const active = g.id === selectedGroupId || g.id === hoverGroupId
     const r = active ? 6 : 4.5
     ctx.lineWidth = 1.5
-    if (g.category === 'diode') {
-      ctx.fillStyle = active ? colors.cursor : colors.markerDiode
+    const diamond = () => {
       ctx.beginPath()
       ctx.moveTo(x, rowMid - r)
       ctx.lineTo(x + r, rowMid)
       ctx.lineTo(x, rowMid + r)
       ctx.lineTo(x - r, rowMid)
       ctx.closePath()
+    }
+    if (g.category === 'diode') {
+      ctx.fillStyle = active ? colors.cursor : colors.markerDiode
+      diamond()
       ctx.fill()
+    } else if (g.category === 'output') {
+      ctx.strokeStyle = active ? colors.cursor : colors.marker
+      diamond()
+      ctx.stroke()
     } else {
       ctx.strokeStyle = active ? colors.cursor : colors.marker
       ctx.beginPath()
@@ -356,7 +393,6 @@ export function drawOverlay(
   ctx.moveTo(xr, L.eventRowBottom - 4)
   ctx.lineTo(xr, L.lanesBottom)
   ctx.stroke()
-  // Grab handle
   ctx.fillStyle = colors.cursor
   ctx.beginPath()
   ctx.moveTo(xr - 5, L.eventRowBottom - 9)
@@ -372,7 +408,8 @@ export function drawOverlay(
   const lw = ctx.measureText(label).width + 12
   const lx = Math.min(L.plotRight - lw, Math.max(L.plotLeft, xr - lw / 2))
   ctx.fillStyle = colors.cursor
-  roundRect(ctx, lx, L.axisTop + 4, lw, 19, 4)
+  ctx.beginPath()
+  ctx.roundRect(lx, L.axisTop + 4, lw, 19, 4)
   ctx.fill()
   ctx.fillStyle = colors.surface
   ctx.textAlign = 'left'
@@ -380,12 +417,14 @@ export function drawOverlay(
   ctx.fillText(label, lx + 6, L.axisTop + 8)
 
   // Value dots and readouts per lane
-  const flip = x > L.plotLeft + (L.plotRight - L.plotLeft) * 0.68
+  const flip = x > L.plotLeft + (L.plotRight - L.plotLeft) * 0.62
   for (const lane of L.lanes) {
     const rows: Array<{ sid: SignalId; text: string }> = []
-    for (const sid of lane.visibleSignals) {
-      const v = trace.signals[sid][cursorIndex]
-      const y = valueToY(lane, v)
+    for (const sid of lane.signals) {
+      const arr = trace.signals[sid]
+      if (!arr) continue
+      const v = arr[cursorIndex]
+      const y = valueToY(lane, axisFor(lane, sid), v)
       ctx.fillStyle = colors.surface
       ctx.beginPath()
       ctx.arc(xr, y, 5.5, 0, Math.PI * 2)
@@ -394,22 +433,24 @@ export function drawOverlay(
       ctx.beginPath()
       ctx.arc(xr, y, 3.75, 0, Math.PI * 2)
       ctx.fill()
-      const txt = `${SIGNAL_META[sid].label} ${formatSI(v, lane.unit, { signed: true })}`
-      rows.push({ sid, text: txt })
+      rows.push({ sid, text: `${SIGNAL_META[sid].label} ${formatSI(v, SIGNAL_META[sid].unit, { signed: true })}` })
     }
+    if (!rows.length) continue
     ctx.font = FONT
     const w = Math.max(...rows.map((r) => ctx.measureText(r.text).width)) + 26
     const h = rows.length * 16 + 8
     const bx = flip ? xr - 10 - w : xr + 10
-    const by = lane.top + lane.height - h - 6
+    const by = Math.max(lane.top + 4, lane.top + lane.height - h - 6)
     ctx.fillStyle = colors.surface
     ctx.globalAlpha = 0.92
-    roundRect(ctx, bx, by, w, h, 5)
+    ctx.beginPath()
+    ctx.roundRect(bx, by, w, h, 5)
     ctx.fill()
     ctx.globalAlpha = 1
     ctx.strokeStyle = colors.gridStrong
     ctx.lineWidth = 1
-    roundRect(ctx, bx + 0.5, by + 0.5, w - 1, h - 1, 5)
+    ctx.beginPath()
+    ctx.roundRect(bx + 0.5, by + 0.5, w - 1, h - 1, 5)
     ctx.stroke()
     rows.forEach((r, k) => {
       const ry = by + 6 + k * 16
@@ -421,9 +462,4 @@ export function drawOverlay(
       ctx.fillText(r.text, bx + 21, ry + 1)
     })
   }
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath()
-  ctx.roundRect(x, y, w, h, r)
 }

@@ -148,8 +148,13 @@ export function measure(result: SimulationResult): Measurements {
   let crests = 0
   const vspan = Math.max(...[maxOf(vout), -minOf(vout), 1e-12])
   const crestEps = vspan * 1e-9
+  // Plateau-aware: a crest can span equal samples (e.g. a peak exactly midway between two).
   for (let i = Math.max(1, i0); i < i1; i++) {
-    if (vout[i] > vout[i - 1] + crestEps && vout[i] >= vout[i + 1] + crestEps) crests++
+    if (!(vout[i] > vout[i - 1] + crestEps)) continue
+    let j = i + 1
+    while (j < i1 && Math.abs(vout[j] - vout[i]) <= crestEps) j++
+    if (vout[j] < vout[i] - crestEps) crests++
+    i = j - 1
   }
   // A crest exactly at a window edge may be missed or doubled; snap to an integer count per cycle.
   const rippleFrequency = crests > 0 ? crests / T : null

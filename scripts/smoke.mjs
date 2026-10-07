@@ -31,7 +31,6 @@ page.on('pageerror', (e) => errors.push(String(e)))
 await page.goto(APP_URL)
 await page.screenshot({ path: OUT + '01-intro.png' })
 check(await page.getByRole('button', { name: /Run simulation/ }).isDisabled(), 'Run is disabled until rectifier and load are chosen')
-check(await page.getByRole('radio', { name: /Full-wave/ }).isDisabled(), 'Full-wave is honestly marked unavailable')
 
 await page.getByRole('radio', { name: 'Half-wave' }).click()
 await page.getByRole('radio', { name: /^R$/ }).click()
@@ -45,7 +44,7 @@ const headline = () => page.locator('.state-headline').innerText()
 const stateTime = () => page.locator('.state-time').innerText()
 check(/ON/.test(await headline()), `initial cursor (first positive peak) shows D1 ON — "${await headline()}"`)
 check((await page.locator('.circuit--on').count()) === 1, 'circuit diagram shows the ON state')
-check((await page.locator('.circuit .flow').count()) === 1, 'current-flow particles are present while conducting')
+check((await page.locator('.circuit .flow').count()) >= 1, 'current-flow particles are present while conducting')
 
 // Drag the cursor into the negative half-cycle of cycle 1 (θ ≈ 270° → t ≈ 15 ms of 80 ms).
 const overlay = page.locator('.scope-layer--overlay')
@@ -163,6 +162,69 @@ const body = await page.locator('body').innerText()
 check(!/NaN|Infinity|undefined/.test(body), 'no NaN / Infinity / undefined anywhere on the page')
 await page.evaluate(() => window.scrollTo(0, 0))
 await page.screenshot({ path: OUT + '08-final.png', fullPage: true })
+
+// ── Phase 2–7: every circuit, graph layouts, inductor hold-on, energy view ─────────────
+await page.evaluate(() => window.scrollTo(0, 0))
+const pick = async (topo, load) => {
+  await page.getByRole('radio', { name: topo, exact: true }).click()
+  await page.getByRole('radio', { name: load, exact: true }).click()
+  await page.waitForTimeout(250)
+}
+await page.getByRole('button', { name: 'Defaults' }).click()
+for (const topo of ['Half-wave', 'Center-tap', 'Bridge']) {
+  for (const load of ['R', 'RL', 'RC', 'RLC']) {
+    await pick(topo, load)
+    const text = await page.locator('main').innerText()
+    const flagged = await page.locator('.flag[role="alert"]').count()
+    const diodes = await page.locator('.circuit .diode').count()
+    check(!/NaN|Infinity|undefined/.test(text) && flagged === 0 && diodes === (topo === 'Half-wave' ? 1 : topo === 'Center-tap' ? 2 : 4), `${topo} ${load}: renders, ${diodes} diode(s), theory within tolerance, no NaN`)
+    if ((topo === 'Bridge' && load === 'RC') || (topo === 'Center-tap' && load === 'RLC') || (topo === 'Half-wave' && load === 'RL')) {
+      await page.screenshot({ path: OUT + `10-${topo}-${load}.png`.toLowerCase() })
+    }
+  }
+}
+
+// Graph layout: overlay / grouped / separate (user's choice)
+await pick('Bridge', 'RC')
+for (const [mode, label] of [['overlay', 'Overlay'], ['separate', 'Separate'], ['grouped', 'Grouped']]) {
+  await page.getByRole('radio', { name: label, exact: true }).click()
+  await page.waitForTimeout(200)
+  const aria = await page.locator('.scope-layer--overlay').getAttribute('aria-label')
+  check(aria.includes(`${mode} layout`), `graph layout "${label}" applied`)
+  await page.locator('.instrument').screenshot({ path: OUT + `11-layout-${mode}.png` })
+}
+
+// Half-wave RL: past the zero crossing the inductor holds D1 on (vout < 0)
+await pick('Half-wave', 'RL')
+await page.getByRole('radio', { name: 'Event', exact: true }).click()
+await page.getByRole('button', { name: 'Reset to t = 0' }).click()
+let held = false
+for (let k = 0; k < 12 && !held; k++) {
+  await page.getByRole('button', { name: 'Step forward' }).click()
+  await page.waitForTimeout(60)
+  const t = await page.locator('.state-time').innerText()
+  const th = Number(t.match(/θ = ([\d.]+)°/)?.[1])
+  if (th > 185 && th < 230) held = /held on by the inductor/.test(await headline())
+}
+if (!held) {
+  // step by angle into the hold-on region
+  await page.getByRole('radio', { name: '15°' }).click()
+  for (let k = 0; k < 30 && !held; k++) {
+    await page.getByRole('button', { name: 'Step forward' }).click()
+    await page.waitForTimeout(40)
+    held = /held on by the inductor/.test(await headline())
+  }
+}
+check(held, 'half-wave RL: WHY engine reports D1 held ON by the inductor after vin < 0')
+await page.screenshot({ path: OUT + '12-rl-held.png' })
+
+// Energy view (Phase 6): power ledger balances
+await page.getByRole('button', { name: /Energy view/ }).click()
+await page.waitForTimeout(200)
+const bal = await page.locator('.balance').innerText()
+check(/conserved/.test(bal), `energy ledger balances at the cursor (${bal.trim()})`)
+await page.screenshot({ path: OUT + '13-energy.png' })
+await page.getByRole('button', { name: /Energy view/ }).click()
 
 // Phone-width layout
 await page.setViewportSize({ width: 390, height: 844 })

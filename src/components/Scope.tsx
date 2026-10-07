@@ -13,7 +13,7 @@ import {
   type ScopeLayout,
   type Viewport,
 } from '../visualization/scopeRenderer.ts'
-import { SIGNAL_META } from '../visualization/signals.ts'
+import { SIGNAL_META, type ScopeLayoutMode } from '../visualization/signals.ts'
 import { formatTime } from '../utils/format.ts'
 
 interface Props {
@@ -25,6 +25,10 @@ interface Props {
   onScrubStart: () => void
   visible: Record<SignalId, boolean>
   onToggleSignal: (s: SignalId) => void
+  /** Channels offered in the legend (the circuit's signals, minus hidden advanced ones). */
+  channels: SignalId[]
+  layoutMode: ScopeLayoutMode
+  onLayoutMode: (m: ScopeLayoutMode) => void
   showConduction: boolean
   groups: EventGroup[]
   selectedGroupId: string | null
@@ -34,7 +38,8 @@ interface Props {
 const ZOOM_STEP = 1.5
 
 export function Scope(props: Props) {
-  const { result, viewport, onViewport, cursorIndex, visible, showConduction, groups, selectedGroupId } = props
+  const { result, viewport, onViewport, cursorIndex, visible, showConduction, groups, selectedGroupId, channels, layoutMode } = props
+  const shown = useMemo(() => channels.filter((s) => visible[s]), [channels, visible])
   const wrapRef = useRef<HTMLDivElement>(null)
   const baseRef = useRef<HTMLCanvasElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
@@ -57,8 +62,8 @@ export function Scope(props: Props) {
   }, [])
 
   const layout: ScopeLayout | null = useMemo(
-    () => (size.w > 0 && size.h > 0 ? computeLayout(size.w, size.h, result, visible) : null),
-    [size, result, visible],
+    () => (size.w > 0 && size.h > 0 ? computeLayout(size.w, size.h, result, shown, layoutMode) : null),
+    [size, result, shown, layoutMode],
   )
 
   const prepare = (canvas: HTMLCanvasElement | null) => {
@@ -191,7 +196,7 @@ export function Scope(props: Props) {
     <div className="scope">
       <div className="scope-toolbar">
         <div className="legend" role="group" aria-label="Waveform visibility">
-          {(Object.keys(SIGNAL_META) as SignalId[]).map((sid) => (
+          {channels.map((sid) => (
             <button
               key={sid}
               className={`chip ${visible[sid] ? 'chip--on' : ''}`}
@@ -201,6 +206,19 @@ export function Scope(props: Props) {
             >
               <span className={`swatch ${SIGNAL_META[sid].dashed ? 'swatch--dashed' : ''}`} style={{ ['--c' as string]: `var(${SIGNAL_META[sid].cssVar})` }} />
               {SIGNAL_META[sid].label}
+            </button>
+          ))}
+        </div>
+        <div className="seg seg--layout" role="radiogroup" aria-label="Graph layout">
+          {(
+            [
+              ['overlay', 'Overlay', 'All traces on one oscilloscope screen (V on the left axis, A on the right)'],
+              ['grouped', 'Grouped', 'One graph per quantity: voltages, diode voltages, currents…'],
+              ['separate', 'Separate', 'Every signal on its own graph'],
+            ] as const
+          ).map(([m, label, title]) => (
+            <button key={m} role="radio" aria-checked={layoutMode === m} className={layoutMode === m ? 'on' : ''} title={title} onClick={() => props.onLayoutMode(m)}>
+              {label}
             </button>
           ))}
         </div>
@@ -224,24 +242,24 @@ export function Scope(props: Props) {
           >
             1 cycle
           </button>
-          <button className="text-btn" onClick={() => onViewport(null)} title="Show the whole run">
+          <button className="text-btn" onClick={() => onViewport({ t0: 0, t1: duration })} title="Show the whole run">
             Fit
           </button>
         </div>
       </div>
-      <div className="scope-canvas" ref={wrapRef}>
+      <div className="scope-canvas" ref={wrapRef} style={{ height: scopeHeight(layoutMode, shown.length) }}>
         <canvas ref={baseRef} className="scope-layer" aria-hidden="true" />
         <canvas
           ref={overlayRef}
           className="scope-layer scope-layer--overlay"
           role="img"
-          aria-label="Oscilloscope: Vin, Vout, Vd, Io and Id on a shared time axis. Click or drag to move the time cursor."
+          aria-label={`Oscilloscope (${layoutMode} layout): ${shown.map((s) => SIGNAL_META[s].label).join(', ')} on a shared time axis. Click or drag to move the time cursor.`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           onPointerLeave={() => setHover(null)}
-          onDoubleClick={() => onViewport(null)}
+          onDoubleClick={() => onViewport({ t0: 0, t1: duration })}
         />
         {hover && layout && (
           <div className="scope-tip" style={{ left: Math.min(Math.max(hover.x, 90), layout.width - 90), top: layout.eventRowBottom + 4 }}>
@@ -253,7 +271,13 @@ export function Scope(props: Props) {
           </div>
         )}
       </div>
-      <p className="scope-hint">Drag to move the cursor · wheel to zoom · Shift+drag to pan · double-click to fit · click a ◆ marker for its explanation</p>
+      <p className="scope-hint">Drag to move the cursor · wheel to zoom · Shift+drag to pan · double-click to show the whole run · click a ◆ marker for its explanation</p>
     </div>
   )
+}
+
+/** Separate mode gives every signal its own lane, so the scope grows to keep lanes readable. */
+function scopeHeight(mode: ScopeLayoutMode, channels: number): number | undefined {
+  if (mode !== 'separate') return undefined
+  return Math.max(430, 60 + channels * 78)
 }

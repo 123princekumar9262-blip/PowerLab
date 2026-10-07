@@ -34,7 +34,6 @@ export interface StateExplanation {
 }
 
 const V = (v: number) => formatV(v)
-const ohm = (r: number) => formatSI(r, 'Ω').replace(/\.0+ /, ' ')
 
 /**
  * Explain the circuit state at one sample, for any rectifier × load. Everything is read

@@ -22,6 +22,14 @@
   --sig-io: #199e70;
   --sig-id: #c98500;
   --sig-vd: #d55181;
+  /* Extra entities, from the same dark categorical palette. Validated per scope lane
+     (adjacent pairs, dark mode, this surface): currents io·iL·iC·iD1·iD2 pass with one CVD
+     warning (io↔iL ΔE 6.5) — iL therefore also carries a long-dash pattern. D2 green,
+     inductor red, capacitor violet; the pre-filter rectifier voltage is neutral grey. */
+  --sig-d2: #008300;
+  --sig-l: #e66767;
+  --sig-c: #9085e9;
+  --sig-vrect: #aeb7c5;
 
   /* Status (reserved: diode state). Always paired with an icon + label. */
   --good: #22b14c;
@@ -41,6 +49,7 @@
   --scope-grid-strong: #222c38;
   --scope-zero: #3a4656;
   --scope-conduction: rgba(47, 194, 141, 0.07);
+  --scope-conduction-2: rgba(110, 168, 255, 0.07);
   --scope-cursor: #f2f5f9;
 
   --font-ui: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
@@ -643,6 +652,7 @@ button:disabled {
 .legend,
 .zoom {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
 }
@@ -1278,6 +1288,13 @@ tbody th {
   .setup {
     justify-content: flex-start;
   }
+  .top--compact {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'brand' 'modes' 'setup' 'guide';
+  }
+  .picker {
+    flex-wrap: wrap;
+  }
   .lab {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1306,5 +1323,265 @@ tbody th {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+  }
+}
+
+/* ── Phase 2–10 additions ─────────────────────────────────────────────────── */
+.circuit .junction {
+  fill: #6b7787;
+}
+.circuit .circuit--idle .junction {
+  fill: #3a4554;
+}
+.circuit .label--device {
+  font-size: 13px;
+  font-style: normal;
+}
+.circuit .value--small {
+  font-size: 12px;
+  fill: var(--text-2);
+}
+.circuit .cap-plate {
+  stroke: var(--text-2);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.circuit .cap-charge {
+  fill: var(--sig-c);
+}
+.circuit .coil {
+  stroke-width: 2.4;
+}
+
+.bench-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 0;
+}
+.bench-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-2);
+}
+.energy-toggle.is-on {
+  border-color: var(--warning);
+  color: var(--text-1);
+  background: var(--warning-bg);
+}
+
+.modes {
+  grid-area: brand;
+  justify-self: end;
+  margin: 0;
+}
+.top--compact {
+  grid-template-columns: auto auto 1fr;
+  grid-template-areas: 'brand modes setup' 'guide guide guide';
+}
+.top--compact .modes {
+  grid-area: modes;
+  justify-self: start;
+}
+.modes button {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.setup[aria-disabled='true'] .pick:not(.on) {
+  opacity: 0.4;
+}
+
+.seg--layout {
+  margin-left: auto;
+}
+.diode-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+tr.group-row th {
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border-bottom-color: var(--border-strong);
+}
+tr.row-approx th,
+tr.row-approx td {
+  color: var(--text-3);
+  font-size: 12px;
+  border-bottom-style: dashed;
+}
+.approx-tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.flag--info {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.notes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.notes li + li {
+  margin-top: 4px;
+}
+
+/* Energy panel (Phase 6) */
+.energy {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.balance {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.balance--ok {
+  color: var(--good);
+  background: var(--good-bg);
+}
+.balance--bad {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+.ledger {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+.ledger-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 108px;
+  margin-right: 96px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ledger-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 88px;
+  gap: 8px;
+  align-items: center;
+}
+.ledger-label {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.ledger-bar {
+  position: relative;
+  height: 14px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ledger-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+}
+.ledger-fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 3px;
+}
+.ledger-fill--src {
+  background: var(--sig-vin);
+}
+.ledger-fill--d {
+  background: var(--sig-id);
+}
+.ledger-fill--l {
+  background: var(--sig-l);
+}
+.ledger-fill--c {
+  background: var(--sig-c);
+}
+.ledger-fill--r {
+  background: var(--sig-io);
+}
+.ledger-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+}
+.stores {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.store {
+  display: grid;
+  grid-template-columns: 100px 1fr 88px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.store-bar {
+  height: 10px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.store-fill {
+  display: block;
+  height: 100%;
+}
+.store-fill--l {
+  background: var(--sig-l);
+}
+.store-fill--c {
+  background: var(--sig-c);
+}
+.store-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  color: var(--text-1);
+}
+
+/* Phone: the compact header stacks (must follow the .top--compact rule above). */
+@media (max-width: 900px) {
+  .top--compact {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'brand' 'modes' 'setup' 'guide';
+  }
+  .top--compact .modes {
+    justify-self: start;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .seg--layout {
+    margin-left: 0;
+  }
+  .ledger-axis {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .ledger-row,
+  .store {
+    grid-template-columns: 84px 1fr 76px;
   }
 }

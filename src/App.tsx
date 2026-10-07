@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react'
 import { CircuitDiagram } from './components/CircuitDiagram.tsx'
+import { EnergyPanel } from './components/EnergyPanel.tsx'
 import { EventDetail, EventStrip } from './components/EventPanels.tsx'
 import { Header } from './components/Header.tsx'
 import { MeasurementTable } from './components/MeasurementTable.tsx'
@@ -12,26 +13,36 @@ import { compareWithTheory } from './measurements/compare.ts'
 import { indexAtTime, runSimulation } from './simulation/engine.ts'
 import { sanitizeParams } from './simulation/params.ts'
 import { sineSource } from './simulation/source.ts'
-import { initialLabState, labReducer } from './state/labState.ts'
+import { circuitIdOf, initialLabState, labReducer } from './state/labState.ts'
 import { stepTarget } from './state/stepping.ts'
 import { usePlayback } from './state/usePlayback.ts'
-import type { CircuitId } from './types/simulation.ts'
+import { getModel } from './circuits/registry.ts'
+import { SIGNAL_META } from './visualization/signals.ts'
 import { groupEvents, groupIndex, type EventGroup } from './visualization/eventGroups.ts'
 
 export function App() {
   const [state, dispatch] = useReducer(labReducer, initialLabState)
-  const circuitId: CircuitId = `${state.topology ?? 'half-wave'}:${state.load ?? 'R'}`
+  const circuitId = circuitIdOf(state)
 
   // ── Simulation: the single source of truth. Re-runs whenever parameters change. ──
   const result = useMemo(() => (state.hasRun ? runSimulation(state.params, circuitId) : null), [state.hasRun, state.params, circuitId])
-  const preview = useMemo(() => sanitizeParams(state.params), [state.params])
+  const preview = useMemo(() => sanitizeParams(state.params, circuitId), [state.params, circuitId])
   const comparison = useMemo(() => (result ? compareWithTheory(result) : null), [result])
   const groups = useMemo(() => (result ? groupEvents(result) : []), [result])
   const explainer = getExplainer(circuitId)
 
+  const channels = useMemo(
+    () => (result ? result.signalIds.filter((sid) => state.showEnergy || !SIGNAL_META[sid].advanced) : []),
+    [result, state.showEnergy],
+  )
   const cursorIndex = result ? indexAtTime(result, state.cursorTime) : 0
   const explanation = useMemo(() => (result ? explainer.state(result, cursorIndex) : null), [result, cursorIndex, explainer])
-  const viewport = result ? (state.viewport ?? { t0: 0, t1: result.params.duration }) : null
+  // Default view: the whole run, or for long runs the last 4 cycles (the settled steady state
+  // the measurements use) — "Fit" still shows everything.
+  const viewport = result
+    ? (state.viewport ??
+      (result.params.cycles > 6 ? { t0: result.params.duration - 4 * result.params.period, t1: result.params.duration } : { t0: 0, t1: result.params.duration }))
+    : null
 
   const setCursor = useCallback((time: number, byUser = false) => dispatch({ type: 'setCursor', time, byUser }), [])
 
@@ -127,6 +138,7 @@ export function App() {
         onTopology={(topology) => dispatch({ type: 'chooseTopology', topology })}
         onLoad={(load) => dispatch({ type: 'chooseLoad', load })}
         onRun={onRun}
+        onMode={(mode) => dispatch({ type: 'setMode', mode })}
       />
 
       {!result || !explanation || !viewport || !comparison ? (
@@ -134,10 +146,10 @@ export function App() {
           <section className="bench bench--intro">
             {state.topology && state.load ? (
               <>
-                <CircuitDiagram sample={null} params={preview.params} ioPeak={0} pPeak={0} />
+                <CircuitDiagram topology={state.topology} load={state.load} sample={null} result={null} params={preview.params} />
                 <p className="intro-caption">
-                  Half-wave rectifier with a resistive load is on the bench. Press <b>Run simulation</b> — every waveform, highlight
-                  and explanation you will see comes from solving this circuit, instant by instant.
+                  {getModel(circuitId).name} is on the bench. Press <b>Run simulation</b> — every waveform, highlight and explanation you will
+                  see comes from solving this circuit, instant by instant.
                 </p>
               </>
             ) : (
@@ -155,6 +167,7 @@ export function App() {
         <main className="lab">
           <aside className="col-params">
             <ParameterPanel
+              load={result.params.load}
               params={state.params}
               resolved={result.params}
               issues={result.diagnostics.issues}
@@ -167,8 +180,16 @@ export function App() {
 
           <div className="col-main">
             <section className="bench" aria-label="Circuit">
-              <CircuitDiagram sample={explanation.sample} params={result.params} ioPeak={m!.ioPeak} pPeak={m!.voutPeak * m!.ioPeak} />
+              <div className="bench-bar">
+                <h2 className="bench-title">{getModel(circuitId).name}</h2>
+                <button className={`text-btn energy-toggle ${state.showEnergy ? 'is-on' : ''}`} aria-pressed={state.showEnergy} onClick={() => dispatch({ type: 'toggleEnergy' })}>
+                  ⚡ Energy view
+                </button>
+              </div>
+              <CircuitDiagram topology={result.params.topology} load={result.params.load} sample={explanation.sample} result={result} params={result.params} />
             </section>
+
+            {state.showEnergy && <EnergyPanel result={result} sample={explanation.sample} measurements={m!} />}
 
             <section className="instrument" aria-label="Oscilloscope">
               <Transport
@@ -196,6 +217,9 @@ export function App() {
                   if (state.selectedEventGroupId) dispatch({ type: 'selectEventGroup', id: null })
                 }}
                 visible={state.visible}
+                channels={channels}
+                layoutMode={state.layoutMode}
+                onLayoutMode={(mode) => dispatch({ type: 'setLayoutMode', mode })}
                 onToggleSignal={(signal) => dispatch({ type: 'toggleSignal', signal })}
                 showConduction={state.showConduction}
                 groups={groups}
@@ -223,7 +247,7 @@ export function App() {
                 onClose={() => dispatch({ type: 'selectEventGroup', id: null })}
               />
             )}
-            <StatePanel ex={explanation} whyOpen={state.whyOpen} onToggleWhy={() => dispatch({ type: 'toggleWhy' })} />
+            <StatePanel ex={explanation} signalIds={result.signalIds} whyOpen={state.whyOpen} onToggleWhy={() => dispatch({ type: 'toggleWhy' })} />
           </aside>
         </main>
       )}
