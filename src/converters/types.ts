@@ -91,6 +91,7 @@ export type RunEventKind =
   | 'igbt-on' // a gated (non-latching) device starts conducting
   | 'igbt-off'
   | 'il-zero' // DC-DC: inductor current reaches zero (DCM begins)
+  | 'mode' // a PWL system changes mode (a device region, a core saturating…); `device` names it
 export type ConverterEventKind = RunEventKind
 
 export interface RunEvent {

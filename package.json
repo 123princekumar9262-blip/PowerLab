@@ -16,7 +16,8 @@
     "smoke-fw": "node scripts/smoke-fw.mjs",
     "smoke-ctl": "node scripts/smoke-ctl.mjs",
     "smoke-dcdc": "node scripts/smoke-dcdc.mjs",
-    "smoke-inv": "node scripts/smoke-inv.mjs"
+    "smoke-inv": "node scripts/smoke-inv.mjs",
+    "smoke-modules": "node scripts/smoke-modules.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

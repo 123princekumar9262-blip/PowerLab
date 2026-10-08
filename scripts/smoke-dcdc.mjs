@@ -37,9 +37,9 @@ const clickScope = async (frac) => {
 check(await modules.getByRole('tab', { name: 'Rectifiers' }).getAttribute('aria-selected') === 'true', 'platform opens on Rectifiers (existing lab unchanged)')
 check(await page.getByRole('heading', { name: 'Rectifier Lab' }).isVisible(), 'rectifier lab header is shown')
 for (const name of ['Devices', 'Drives', 'Magnetics', 'Control', 'EV', 'Engineering']) {
-  if (!(await modules.getByRole('tab', { name, exact: true }).isDisabled())) check(false, `${name} is shown as planned (disabled)`)
+  if (await modules.getByRole('tab', { name, exact: true }).isDisabled()) check(false, `${name} module is open`)
 }
-check(true, 'unbuilt modules are shown as the roadmap (disabled)')
+check(true, 'every module of the roadmap is built and open (checked in detail by smoke-modules)')
 await modules.getByRole('tab', { name: 'DC-DC' }).click()
 await page.waitForTimeout(500)
 check(page.url().endsWith('#dcdc'), 'DC-DC is addressable (#dcdc)')

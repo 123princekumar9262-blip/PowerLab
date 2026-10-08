@@ -3,12 +3,20 @@
 **Understand the circuit by watching it work.**
 
 An interactive power-electronics laboratory. The top bar holds the modules:
-- **Built:** Rectifiers, DC-DC (buck, boost, buck-boost), PWM (the PWM lab) and Inverters
-  (single-phase, three-phase, SPWM, SVPWM).
-- **Roadmap (disabled):** Devices, Drives, Magnetics, Control, EV and Engineering.
+- **Rectifiers**
+- **DC-DC:** buck, boost, buck-boost
+- **PWM:** the PWM lab
+- **Inverters:** single-phase, three-phase, SPWM, SVPWM
+- **Devices:** MOSFET double-pulse test
+- **Drives:** DC motor on a 1Q/2Q chopper
+- **Magnetics:** gapped inductor, saturation
+- **Control:** closed-loop buck and boost
+- **EV:** drivetrain on a drive cycle, 0–100 km/h
+- **Engineering:** switch losses and thermal path
 
-See [DC-DC converters](#dc-dc-converters-buck), [PWM and inverters](#pwm-lab-and-inverters),
-`docs/converters.md` and `docs/pwm-inverters.md`.
+Every module is built. See [DC-DC converters](#dc-dc-converters-buck),
+[PWM and inverters](#pwm-lab-and-inverters) and [the other modules](#control-devices-drives-magnetics-ev-engineering).
+The design documents are `docs/converters.md`, `docs/pwm-inverters.md` and `docs/modules.md`.
 
 The Rectifiers module is an interactive laboratory for rectifiers. Move a time cursor
 across the waveforms and the circuit diagram, the diode states, the current paths
@@ -31,7 +39,7 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
-**Tests.** 644 unit tests pass:
+**Tests.** 757 unit tests pass:
 
 | Area | Tests |
 |---|---|
@@ -40,8 +48,14 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Boost / buck-boost | 78 |
 | PWM | 48 |
 | Inverter | 37 |
+| Control | 19 |
+| Devices | 18 |
+| Drives | 22 |
+| Magnetics | 17 |
+| EV | 18 |
+| Engineering | 19 |
 
-**Browser smoke suites.** Six suites pass:
+**Browser smoke suites.** Seven suites pass (336 checks):
 
 | Suite | Checks |
 |---|---|
@@ -51,6 +65,7 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Controlled / compare | 36 |
 | DC-DC | 55 |
 | PWM / inverters | 33 |
+| Control, Devices, Drives, Magnetics, EV, Engineering | 87 |
 
 ## Run it
 
@@ -67,6 +82,7 @@ npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw && 
 npm run smoke-ctl
 npm run smoke-dcdc   # DC-DC converters (http://localhost:5199/#dcdc)
 npm run smoke-inv    # PWM lab and inverters (#pwm, #inverters)
+npm run smoke-modules # Control, Devices, Drives, Magnetics, EV, Engineering
 ```
 
 The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
@@ -289,6 +305,26 @@ Open **Inverters** (`#inverters`). The sub-navigation is Single-phase · Three-p
 - **Analyze:** the simulation against the exact ideal-switch theory (closed-form and Bessel spectra,
   the exact R-L current) and per-device conduction.
 
+## Control, Devices, Drives, Magnetics, EV, Engineering
+
+Each module opens from the top bar (`#control`, `#devices`, `#drives`, `#magnetics`, `#ev`,
+`#engineering`) in the same five-mode lab. Details, equations and validation are in `docs/modules.md`.
+
+| Module | What you simulate | THEORY it is checked against |
+|---|---|---|
+| **Control** | buck/boost with a digital PID: reference step, load step, line step; Bode side tab | averaged model with the same PID; discrete loop gain; spectral-radius stability |
+| **Devices** | MOSFET double-pulse test: delay, current rise, Miller plateau, ohmic, turn-off | exact piecewise-linear solution; textbook phase formulas |
+| **Drives** | DC motor on a one- or two-quadrant chopper: start-up inrush, soft start, load step, regenerative braking, discontinuous conduction | exact PWL solution (period means, t90); averaged model |
+| **Magnetics** | gapped core with saturation on a square-wave bridge: volt-seconds, DC bias, start-up flux doubling; B–i side tab | exact PWL solution; L = N²μ0Ae/(lg + le/μr), ΔB = V·d·T/(N·Ae) |
+| **EV** | car + battery + motor envelope on urban/highway cycles; 0–100 km/h; regeneration and friction brakes | Gauss–Legendre energy integrals of the followed cycle; t(v) quadrature; top speed |
+| **Engineering** | conduction + switching losses rising with Tj through a Foster thermal network; pulsed load (ΔTj); thermal runaway | exact matrix-exponential solution, periodic state, spectral radius; Ta + P·Rth and Zth(ton) estimates |
+
+The four hybrid-system modules (Devices, Drives, Magnetics, Engineering) share one piecewise-linear
+toolkit (`src/converters/pwl.ts`):
+
+- **SIMULATION** is trapezoidal time-stepping with exact event location.
+- **THEORY** is the matrix-exponential solution of the same equations.
+
 ## Project structure
 
 ```
@@ -342,14 +378,17 @@ src/
                              EnergyPanel, ParameterPanel, MeasurementTable, EventPanels, modes/*
   styles/index.css           design tokens + layout
   styles/dcdc.css            platform bar + DC-DC module
-  Platform.tsx               module bar (Rectifiers · DC-DC · roadmap); #dcdc deep link
+  Platform.tsx               module bar (all ten modules); #module deep links
   converters/                generic switched-circuit engine (gate schedules, exact switching, trapezoidal +
                              backward-Euler restarts, shooting steady state), schedule, fourier (+ Bessel), expm;
                              dcdc/ (buck, boost, buck-boost: model, exact + textbook theory, measure, compare,
                              explain, learn; buck/ = aliases), pwm/ (modulator, analysis, content),
                              inverter/ (modulation incl. SVPWM, IGBT bridge model, analysis, content)
   lab/types.ts               the Topic interface every module implements
-  topics/                    dcdc.tsx, pwm.tsx, inverters.tsx — topic definitions
+  converters/pwl.ts          PWL hybrid systems: simulatePwl (trapezoidal + events) and exactPwl (matrix exponential)
+  converters/control|devices|drives|magnetics|ev|engineering/  model + simulation, independent theory, content
+                             (state, WHY, compare, lessons, experiments, predictions)
+  topics/                    dcdc, pwm, inverters, control, devices, drives, magnetics, ev, engineering — topic definitions
   components/lab/            LabShell (five modes, progressive disclosure), LabScope, ParamsPanel, Panels,
                              Analyze, Modes, SpectrumChart
   components/dcdc|pwm|inverter/  schematics (DC-DC, PWM block diagram, bridges + space-vector hexagon), DC-DC views
@@ -360,9 +399,11 @@ scripts/smoke-fw.mjs         Playwright end-to-end check (freewheeling diode)
 scripts/smoke-ctl.mjs        Playwright end-to-end check (controlled rectifiers, μ, Compare)
 scripts/smoke-dcdc.mjs       Playwright end-to-end check (platform + DC-DC converters)
 scripts/smoke-inv.mjs        Playwright end-to-end check (PWM lab + inverters)
+scripts/smoke-modules.mjs    Playwright end-to-end check (Control, Devices, Drives, Magnetics, EV, Engineering)
 docs/simulation.md           the mathematical model (rectifiers)
 docs/converters.md           switched-circuit engine + DC-DC: equations, steady state, theory, validation, limitations
 docs/pwm-inverters.md        PWM lab and inverters: modulators, theory, validation, limitations
+docs/modules.md              Control, Devices, Drives, Magnetics, EV, Engineering: models, theory, validation, limitations
 ```
 
 ## Architecture
@@ -467,8 +508,20 @@ Platform milestones, each validated before the next:
 | Three-phase inverter | ✅ |
 | SPWM | ✅ |
 | SVPWM | ✅ |
+| Control (closed-loop buck, boost) | ✅ |
+| Devices (MOSFET double-pulse test) | ✅ |
+| Drives (DC motor chopper drive) | ✅ |
+| Magnetics (gapped inductor, saturation) | ✅ |
+| EV (drivetrain on a drive cycle) | ✅ |
+| Engineering (losses and thermal) | ✅ |
 
-Next modules: Devices, Magnetics, Drives, Control (closed-loop converters), EV, Engineering.
+Possible next steps:
+
+- Drives: an induction or PMSM motor on the three-phase inverter, with field-oriented control.
+- Magnetics: a transformer, and core loss.
+- Devices: IGBT tail current and diode reverse recovery.
+- EV: a battery model with SOC-dependent voltage.
+- Bundle: code-splitting per module (the build is one 1 MB chunk).
 
 Possible rectifier next steps: a back-EMF load (battery, DC motor), a closed-form theory for commutation
 overlap (it is shown only as an approximation now), and twelve-pulse arrangements.

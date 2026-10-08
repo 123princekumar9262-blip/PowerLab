@@ -24,7 +24,9 @@ const DISPLAY_ZERO = 1e-9
 export function formatSI(value: number, unit: string, opts: { signed?: boolean; digits?: number } = {}): string {
   if (!Number.isFinite(value)) return `— ${unit}`
   const signed = opts.signed ?? false
-  if (Math.abs(value) < DISPLAY_ZERO) return `${(0).toFixed(opts.digits ?? 3)} ${unit}`
+  // Dust suppression applies to electrical quantities only: picofarads, nanoseconds and microjoules are real.
+  const dust = unit === 'V' || unit === 'A' || unit === 'W' ? DISPLAY_ZERO : 1e-24
+  if (Math.abs(value) < dust) return `${(0).toFixed(opts.digits ?? 3)} ${unit}`
   const abs = Math.abs(value)
   // Values ≥ 0.1 stay in base units so "0.700 V" reads naturally; smaller ones get a prefix.
   let scale = 1

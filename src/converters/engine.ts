@@ -27,6 +27,8 @@ export interface CircuitModel<P, R extends RunParams> {
   build(p: R): BuiltCircuit
   /** Periods a start-up run lasts (default 20). */
   startupPeriods?(p: R): number
+  /** Initial storage state [iL…, vC…] of a start-up / transient run (default: everything at rest). */
+  initialState?(p: R): number[]
 }
 /** Back-compatible name used by the DC-DC models. */
 export type ConverterModel<P, R extends RunParams> = CircuitModel<P, R>
@@ -45,6 +47,11 @@ export interface BuiltCircuit {
   initialGuess?: number[]
   /** A diode whose turn-off while every switch is off means DCM (emits 'il-zero'). */
   dcmDiode?: string
+  /**
+   * A sampled-data controller: called at every multiple of `period` with the solved circuit at that
+   * instant (k-th sample), BEFORE the next step is integrated — so it can set the next duty ratio.
+   */
+  periodic?: { period: number; update(m: number, sol: NetlistSolution, t: number): void }
 }
 
 const MAX_SWITCHES_PER_STEP = 12
@@ -210,6 +217,9 @@ function integrateRun(
 ): SimState {
   const { dt } = st.p
   const first = st.step(s0, tStart, dt * 1e-9)
+  const ctl = st.b.periodic
+  const atBoundary = (t: number) => ctl && Math.abs(t / ctl.period - Math.round(t / ctl.period)) * ctl.period < EDGE_EPS * dt
+  if (ctl && atBoundary(tStart)) ctl.update(Math.round(tStart / ctl.period), first.sol, tStart)
   onSample?.(0, tStart, first.sol)
   let s: SimState = { storage: s0.storage, combo: first.combo, be: true }
   if (push) for (const e of edgesIn(st.b, tStart - dt * EDGE_EPS, tStart + dt * EDGE_EPS)) push(e.rising ? 'gate-on' : 'gate-off', tStart, first.sol, e.id)
@@ -242,6 +252,7 @@ function integrateRun(
       s = r.s
       sol = r.sol
     }
+    if (ctl && atBoundary(tb)) ctl.update(Math.round(tb / ctl.period), sol!, tb)
     onSample?.(k, tb, sol!)
   }
   return s
@@ -322,7 +333,8 @@ export function simulateCircuit<P, R extends RunParams>(model: CircuitModel<P, R
     const periods = model.startupPeriods?.(p) ?? 20
     const spp = Math.max(50, Math.min(p.stepsPerPeriod, Math.floor(120_000 / periods)))
     p = { ...p, periods, stepsPerPeriod: spp, dt: p.period / spp, duration: periods * p.period }
-    s0 = zeroState(model.build(p))
+    const bz = model.build(p)
+    s0 = model.initialState ? unpack(bz, model.initialState(p)) : zeroState(bz)
     steady = { method: 'startup', iterations: 0, residual: NaN, converged: false }
   } else {
     const b0 = model.build(p)

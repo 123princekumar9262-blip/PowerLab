@@ -49,7 +49,7 @@ export type Element =
    * combination search. The gate is evaluated at the middle of the solved interval; the engine
    * splits steps at gate edges (breakpoints) so an interval never straddles one.
    */
-  | { kind: 'S'; id: DiodeId; a: number; b: number; ron: number; gate: (t: number) => boolean }
+  | { kind: 'S'; id: string; a: number; b: number; ron: number; gate: (t: number) => boolean }
 
 export interface Netlist {
   /** Number of nodes excluding the reference node 0. */
@@ -76,7 +76,7 @@ export interface NetlistSolution {
   i: Float64Array
   diodes: Array<{ id: DiodeId; on: boolean; current: number; voltage: number; gate?: boolean }>
   /** Controlled switches (element order): gate state, current a → b, voltage va − vb. */
-  switches: Array<{ id: DiodeId; on: boolean; current: number; voltage: number }>
+  switches: Array<{ id: string; on: boolean; current: number; voltage: number }>
   storage: StorageState
   /** True if every diode satisfies its assumed state (ON: i > 0, OFF: v ≤ Vf). */
   consistent: boolean

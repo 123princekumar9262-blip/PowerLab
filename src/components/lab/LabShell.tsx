@@ -370,7 +370,7 @@ function TopicLab({ topic, eyebrow, entries, onTopic }: { topic: AnyTopic; eyebr
               </label>
             )}
             <span className="small muted">← → step the cursor · Shift + ← → jump between switching events</span>
-            {result.diagnostics.steady.method === 'startup' && (
+            {result.diagnostics.steady.method === 'startup' && viewKey && (
               <span className="small">
                 Start-up from rest · {p.periods} {topic.periodName}s ({formatTime(p.duration)}) · {result.diagnostics.steady.converged ? 'settled at the end' : 'still settling at the end'}
               </span>
