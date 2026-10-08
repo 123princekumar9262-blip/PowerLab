@@ -64,6 +64,7 @@ check((await page.locator('.circuit .flow').count()) >= 1, 'current-flow particl
 
 // Drag the cursor into the negative half-cycle of cycle 1 (θ ≈ 270° → t ≈ 15 ms of 80 ms).
 const overlay = page.locator('.scope-layer--overlay')
+await overlay.scrollIntoViewIfNeeded() // the platform module bar pushes the scope lower on a 900 px viewport
 const box = await overlay.boundingBox()
 const plotLeft = box.x + 58
 const plotRight = box.x + box.width - 14

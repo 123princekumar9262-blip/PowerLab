@@ -222,7 +222,7 @@ export type SignalId =
   | 'ifw'
   | 'vfw'
 
-export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'Da' | 'Db' | 'Dc' | 'Dfw'
+export type DiodeId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6' | 'Da' | 'Db' | 'Dc' | 'Dfw' | 'Q1'
 
 export type SignalValues = Partial<Record<SignalId, number>>
 

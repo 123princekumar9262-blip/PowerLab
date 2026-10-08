@@ -1,8 +1,16 @@
-# Rectifier Lab
+# Power Electronics Lab
 
 **Understand the circuit by watching it work.**
 
-An interactive power-electronics laboratory for rectifiers. Move a time cursor
+An interactive power-electronics laboratory. The top bar holds the modules:
+- **Built:** Rectifiers, DC-DC (buck, boost, buck-boost), PWM (the PWM lab) and Inverters
+  (single-phase, three-phase, SPWM, SVPWM).
+- **Roadmap (disabled):** Devices, Drives, Magnetics, Control, EV and Engineering.
+
+See [DC-DC converters](#dc-dc-converters-buck), [PWM and inverters](#pwm-lab-and-inverters),
+`docs/converters.md` and `docs/pwm-inverters.md`.
+
+The Rectifiers module is an interactive laboratory for rectifiers. Move a time cursor
 across the waveforms and the circuit diagram, the diode states, the current paths
 and a cause → effect explanation all update to that same instant. Every value comes
 from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" waveform.
@@ -21,8 +29,28 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 - **Commutation overlap μ** (three-phase, source inductance Ls): measured from the switching events, compared with the overlap relation when its assumptions hold.
 - **Compare** mode: two rectifiers simulated side by side on a declared basis (same Vph, same VLL, same output or input power).
 
-Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse. 426 unit tests pass, along with
-four browser smoke suites (56 single-phase, 40 three-phase, 29 freewheeling-diode and 36 controlled/compare checks).
+Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
+
+**Tests.** 644 unit tests pass:
+
+| Area | Tests |
+|---|---|
+| Rectifier | 426 |
+| Buck | 55 |
+| Boost / buck-boost | 78 |
+| PWM | 48 |
+| Inverter | 37 |
+
+**Browser smoke suites.** Six suites pass:
+
+| Suite | Checks |
+|---|---|
+| Single-phase | 56 |
+| Three-phase | 40 |
+| Freewheeling diode | 29 |
+| Controlled / compare | 36 |
+| DC-DC | 55 |
+| PWM / inverters | 33 |
 
 ## Run it
 
@@ -37,6 +65,8 @@ npm run smoke        # browser smoke tests — need the dev server on port 5199:
 npm run smoke3       #   npm run dev -- --port 5199     (then, in another terminal)
 npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw && npm run smoke-ctl
 npm run smoke-ctl
+npm run smoke-dcdc   # DC-DC converters (http://localhost:5199/#dcdc)
+npm run smoke-inv    # PWM lab and inverters (#pwm, #inverters)
 ```
 
 The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
@@ -186,6 +216,79 @@ sit under **Advanced**. Changing any parameter, or the circuit, re-runs the simu
 - **Reverse**: the circuit is hidden and only the source and output channels are shown.
   Identify the rectifier, the load and the conducting devices at a probe instant.
 
+## DC-DC converters (buck)
+
+Click **DC-DC** in the top bar (or open `#dcdc`). The converter row is Buck → Boost → Buck-Boost →
+Advanced:
+- **Buck, Boost and Buck-Boost** are built and validated.
+- **Advanced** (Ćuk, SEPIC, flyback…) is planned.
+
+All three converters share the layout below; the boost and buck-boost have their own schematics,
+WHY texts ("the inductor voltage ADDS to Vin", "current is pulled OUT of the output"), lessons,
+experiments and predictions. The five modes:
+
+- **Explore**:
+  - Parameters Vin, D (10–90 %), fs, L, C, R (labelled *SIMULATION VALUES*). Advanced adds real
+    devices (Ron, Vf), DCR, ESR, the number of periods shown and the time steps per period.
+  - **Steady state** (shooting method) or **Start-up** from a discharged circuit.
+  - The schematic animates the conducting loop and shows Q1/D1 ON/OFF. Click any component to
+    inspect it.
+  - The oscilloscope starts with **Gate, Vsw, iL, Vout**. *+ Add channel* adds iD, iQ, iC, vC,
+    iin, iR, vL, vQ, vD, EL, EC, Pin and Pout. Lanes can be Separate or Grouped; the vertical
+    scale can be *From 0* or *Zoom to ripple*.
+  - The time cursor drives the state card: t, PWM, Q1, D1, iL (with diL/dt), vL, vC, Vout, EL, EC
+    and the current path.
+  - **Why?** offers What → Why → Equation → Physics → What-if, for the diode, iL, Vout and the
+    gate.
+  - Energy view: EL, EC and the instantaneous power flow.
+  - CCM/DCM is detected from the simulation, with a boundary indicator.
+  - ← → step the cursor; Shift + ← → jump between switching events.
+- **Learn**: two lessons, *How a buck converter works* (6 steps) and *CCM and DCM* (3 steps).
+- **Experiment**: duty, inductance, capacitance, frequency and the DCM transition. Each one runs
+  prediction → simulation → before/after table → WHY. There is also a free before/after capture.
+- **Predict**: Vout, ΔiL and CCM-or-DCM. The simulation answers first, then the theory is shown.
+- **Analyze**:
+  - SIMULATION vs THEORY. The theory is either the *textbook* (ideal relations, with assumptions
+    and *not applicable* reasons) or the *exact* analytic solution of the same equations, which
+    validates the solver.
+  - The volt-second derivation, checked on the simulated averages.
+  - A duty sweep (17 simulations on the ideal curve).
+  - Numerical checks: shooting residual, Δt, and convergence as Δt halves.
+
+## PWM lab and inverters
+
+### PWM lab
+
+Open **PWM** in the top bar (`#pwm`).
+
+- **Signals:** a triangle or sawtooth carrier against a DC or sine reference, with natural,
+  regular-symmetric or regular-asymmetric sampling, an optional N-bit counter, dead time and a
+  unipolar or bipolar output.
+- **Explore:** a block diagram, the comparator state, local duty and moving average at the cursor,
+  and a **Spectrum** side tab.
+- **Analyze:** every harmonic against its closed form (pulse-train Fourier series, Bessel
+  double-Fourier series).
+- **Learn:** carrier, comparator, average, spectrum, sampling.
+- **Experiment:** mf, M, overmodulation, sampling.
+- **Predict.**
+
+### Inverters
+
+Open **Inverters** (`#inverters`). The sub-navigation is Single-phase · Three-phase · SPWM · SVPWM.
+
+- **Circuit:** IGBTs (gated, forward only) with antiparallel diodes, simulated as a circuit. The
+  solver decides when a diode carries the returning inductive current, including during dead time.
+- **Single-phase:** half or full bridge, square or quasi-square (α).
+- **Three-phase:** six-step.
+- **SPWM:** bipolar, unipolar or three-phase.
+- **SVPWM:** a space-vector hexagon with the sector, the reference vector and the T1/T2/T0 bars of
+  the switching period under the cursor.
+- **Explore:** the conducting device of every leg, the load current and the DC power (negative when
+  energy returns), WHY cards ("Why does D2 conduct?", "Why does van have steps of Vdc/3?", "Which
+  vectors are applied now?") and spectra.
+- **Analyze:** the simulation against the exact ideal-switch theory (closed-form and Bessel spectra,
+  the exact R-L current) and per-device conduction.
+
 ## Project structure
 
 ```
@@ -238,12 +341,28 @@ src/
                              Firing, Overlap), compare/CompareLab, PhysicsLens, Scope, Transport,
                              EnergyPanel, ParameterPanel, MeasurementTable, EventPanels, modes/*
   styles/index.css           design tokens + layout
+  styles/dcdc.css            platform bar + DC-DC module
+  Platform.tsx               module bar (Rectifiers · DC-DC · roadmap); #dcdc deep link
+  converters/                generic switched-circuit engine (gate schedules, exact switching, trapezoidal +
+                             backward-Euler restarts, shooting steady state), schedule, fourier (+ Bessel), expm;
+                             dcdc/ (buck, boost, buck-boost: model, exact + textbook theory, measure, compare,
+                             explain, learn; buck/ = aliases), pwm/ (modulator, analysis, content),
+                             inverter/ (modulation incl. SVPWM, IGBT bridge model, analysis, content)
+  lab/types.ts               the Topic interface every module implements
+  topics/                    dcdc.tsx, pwm.tsx, inverters.tsx — topic definitions
+  components/lab/            LabShell (five modes, progressive disclosure), LabScope, ParamsPanel, Panels,
+                             Analyze, Modes, SpectrumChart
+  components/dcdc|pwm|inverter/  schematics (DC-DC, PWM block diagram, bridges + space-vector hexagon), DC-DC views
 tests/                       Vitest suites (physics, theory, limits, three-phase, controlled, freewheel, compare, UI, modes)
 scripts/smoke.mjs            Playwright end-to-end check (single-phase)
 scripts/smoke3.mjs           Playwright end-to-end check (three-phase)
 scripts/smoke-fw.mjs         Playwright end-to-end check (freewheeling diode)
 scripts/smoke-ctl.mjs        Playwright end-to-end check (controlled rectifiers, μ, Compare)
-docs/simulation.md           the mathematical model
+scripts/smoke-dcdc.mjs       Playwright end-to-end check (platform + DC-DC converters)
+scripts/smoke-inv.mjs        Playwright end-to-end check (PWM lab + inverters)
+docs/simulation.md           the mathematical model (rectifiers)
+docs/converters.md           switched-circuit engine + DC-DC: equations, steady state, theory, validation, limitations
+docs/pwm-inverters.md        PWM lab and inverters: modulators, theory, validation, limitations
 ```
 
 ## Architecture
@@ -336,5 +455,20 @@ waveforms, WHY engine, energy view, with/without comparison, prediction/experime
 Controlled single-phase rectifiers, single-phase freewheeling, measured commutation overlap and
 Compare mode: ✅
 
-Possible next steps: a back-EMF load (battery, DC motor), a closed-form theory for commutation
+Platform milestones, each validated before the next:
+
+| Milestone | Status |
+|---|---|
+| Buck | ✅ |
+| Boost | ✅ |
+| Buck-boost | ✅ |
+| PWM lab | ✅ |
+| Single-phase inverter | ✅ |
+| Three-phase inverter | ✅ |
+| SPWM | ✅ |
+| SVPWM | ✅ |
+
+Next modules: Devices, Magnetics, Drives, Control (closed-loop converters), EV, Engineering.
+
+Possible rectifier next steps: a back-EMF load (battery, DC motor), a closed-form theory for commutation
 overlap (it is shown only as an approximation now), and twelve-pulse arrangements.

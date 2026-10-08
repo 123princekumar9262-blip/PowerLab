@@ -23,6 +23,12 @@ export type Element =
        * its current falls to zero.
        */
       gate?: (t: number) => boolean
+      /**
+       * false = a gated device that does NOT latch (IGBT / MOSFET channel with forward conduction
+       * only): it conducts only while gated AND forward biased, and stops when the gate is removed.
+       * Its gate is evaluated at the middle of the solved interval (engines split steps at gate edges).
+       */
+      latch?: boolean
       /** Fault: 'open' never conducts; 'short' is a 1 mΩ path in both directions. */
       fault?: 'open' | 'short'
     }
@@ -37,6 +43,13 @@ export type Element =
    * vN = (vp + vn)/2 while every diode is off.
    */
   | { kind: 'REF'; id: string; a: number; b: number; p: number; n: number; watch?: number[] }
+  /**
+   * Controlled switch (MOSFET / ideal transistor channel): on-resistance Ron while its gate is
+   * high, open while low. Its state is SET by the gate — it is not part of the diode
+   * combination search. The gate is evaluated at the middle of the solved interval; the engine
+   * splits steps at gate edges (breakpoints) so an interval never straddles one.
+   */
+  | { kind: 'S'; id: DiodeId; a: number; b: number; ron: number; gate: (t: number) => boolean }
 
 export interface Netlist {
   /** Number of nodes excluding the reference node 0. */
@@ -51,6 +64,9 @@ export const SHORT_FAULT_R = 1e-3
 export interface StorageState {
   iL: Float64Array
   vC: Float64Array
+  /** Inductor voltages and capacitor currents at the same instant (needed by the trapezoidal rule). */
+  vL?: Float64Array
+  iC?: Float64Array
 }
 
 export interface NetlistSolution {
@@ -59,6 +75,8 @@ export interface NetlistSolution {
   /** Current through each element (a → b), indexed like `elements`. */
   i: Float64Array
   diodes: Array<{ id: DiodeId; on: boolean; current: number; voltage: number; gate?: boolean }>
+  /** Controlled switches (element order): gate state, current a → b, voltage va − vb. */
+  switches: Array<{ id: DiodeId; on: boolean; current: number; voltage: number }>
   storage: StorageState
   /** True if every diode satisfies its assumed state (ON: i > 0, OFF: v ≤ Vf). */
   consistent: boolean
@@ -91,7 +109,14 @@ export function solveNetlist(
   combo: number,
   /** Diode combination at the start of the step — an SCR that was conducting stays latched. */
   prevCombo: number = combo,
+  /**
+   * 'be' (default): backward Euler. 'tr': trapezoidal rule — second order and free of numerical
+   * dissipation, but it needs the storage derivatives at t (state.vL, state.iC) and must not be used
+   * on the first step after a switching instant (a jump in vL or iC would ring); the caller decides.
+   */
+  method: 'be' | 'tr' = 'be',
 ): NetlistSolution | null {
+  const tr = method === 'tr' && !!state.vL && !!state.iC
   const { elements } = net
   const nn = net.nodes
   // Assign branch-current unknowns.
@@ -135,6 +160,17 @@ export function solveNetlist(
       }
       case 'REF':
         break // applied after all stamps (it replaces a row)
+      case 'S': {
+        if (!e.gate(t + h / 2)) break // OFF: open circuit
+        const g = 1 / e.ron
+        if (e.a) at(node(e.a), node(e.a), g)
+        if (e.b) at(node(e.b), node(e.b), g)
+        if (e.a && e.b) {
+          at(node(e.a), node(e.b), -g)
+          at(node(e.b), node(e.a), -g)
+        }
+        break
+      }
       case 'V':
       case 'L':
       case 'C':
@@ -169,13 +205,15 @@ export function solveNetlist(
           at(row, row, -diode.ron)
           rhs[row] = e.vf ?? diode.vf
         } else if (e.kind === 'L') {
+          // BE: i − (h/L)·v = iL(t);  TR: i − (h/2L)·v = iL(t) + (h/2L)·vL(t)
           at(row, row, 1)
-          vab(-h / e.l)
-          rhs[row] = state.iL[li]
+          vab(tr ? -h / (2 * e.l) : -h / e.l)
+          rhs[row] = tr ? state.iL[li] + (h / (2 * e.l)) * state.vL![li] : state.iL[li]
         } else {
+          // BE: v − (h/C)·i = vC(t);  TR: v − (h/2C)·i = vC(t) + (h/2C)·iC(t)
           vab(1)
-          at(row, row, -h / e.c)
-          rhs[row] = state.vC[ci]
+          at(row, row, tr ? -h / (2 * e.c) : -h / e.c)
+          rhs[row] = tr ? state.vC[ci] + (h / (2 * e.c)) * state.iC![ci] : state.vC[ci]
         }
         break
       }
@@ -232,8 +270,8 @@ export function solveNetlist(
       const bit = 1 << dd
       dd++
       if (combo & bit || e.fault) continue
-      const gated = e.gate ? e.gate(t + h) : true
-      if (e.gate && !gated && !(prevCombo & bit)) continue // a blocking SCR may hold any forward voltage
+      const gated = e.gate ? e.gate(e.latch === false ? t + h / 2 : t + h) : true
+      if (e.gate && !gated && (e.latch === false || !(prevCombo & bit))) continue // a blocking SCR/IGBT may hold any forward voltage
       const vf = e.vf ?? diode.vf
       const v0 = v[e.a] - v[e.b]
       const aIn = floating.has(e.a)
@@ -252,7 +290,10 @@ export function solveNetlist(
   const i = new Float64Array(elements.length)
   const iL = new Float64Array(state.iL.length)
   const vC = new Float64Array(state.vC.length)
+  const vLo = new Float64Array(state.iL.length)
+  const iCo = new Float64Array(state.vC.length)
   const diodes: NetlistSolution['diodes'] = []
+  const switches: NetlistSolution['switches'] = []
   let violation = 0
   li = 0
   ci = 0
@@ -260,11 +301,23 @@ export function solveNetlist(
   elements.forEach((e, k) => {
     if (e.kind === 'REF') return
     const vab = v[e.a] - v[e.b]
+    if (e.kind === 'S') {
+      const on = e.gate(t + h / 2)
+      i[k] = on ? vab / e.ron : 0
+      switches.push({ id: e.id, on, current: i[k], voltage: vab })
+      return
+    }
     if (e.kind === 'R') i[k] = vab / e.r
     else if (e.kind === 'D' && e.fault === 'short') i[k] = vab / SHORT_FAULT_R
     else if (branchOf[k] >= 0) i[k] = x[nn + branchOf[k]]
-    if (e.kind === 'L') iL[li++] = i[k]
-    if (e.kind === 'C') vC[ci++] = vab
+    if (e.kind === 'L') {
+      vLo[li] = vab
+      iL[li++] = i[k]
+    }
+    if (e.kind === 'C') {
+      iCo[ci] = i[k]
+      vC[ci++] = vab
+    }
     if (e.kind === 'D') {
       const bit = 1 << dk
       dk++
@@ -279,8 +332,9 @@ export function solveNetlist(
       //   OFF is valid only if the diode voltage does not exceed its knee (v ≤ Vf)
       // SCR: it may only turn ON while gated (or if it was already conducting — latching),
       //   and while un-gated and not conducting it may block a FORWARD voltage.
-      const gated = e.gate ? e.gate(t + h) : true
-      const wasOn = (prevCombo & bit) !== 0
+      const gated = e.gate ? e.gate(e.latch === false ? t + h / 2 : t + h) : true
+      // A latching SCR keeps conducting after its gate pulse; a non-latching IGBT does not.
+      const wasOn = e.latch === false ? false : (prevCombo & bit) !== 0
       if (on && !(i[k] > 0)) violation += Math.abs(i[k]) + 1e-30
       if (on && !gated && !wasOn) violation += 1
       const canBlockForward = e.gate !== undefined && !gated && !wasOn
@@ -288,7 +342,7 @@ export function solveNetlist(
       diodes.push({ id: e.id, on, current: on ? i[k] : 0, voltage: vab, gate: e.gate ? gated : undefined })
     }
   })
-  return { v, i, diodes, storage: { iL, vC }, consistent: violation === 0, violation }
+  return { v, i, diodes, switches, storage: { iL, vC, vL: vLo, iC: iCo }, consistent: violation === 0, violation }
 }
 
 const floatingCache = new WeakMap<Element, Set<number>>()
