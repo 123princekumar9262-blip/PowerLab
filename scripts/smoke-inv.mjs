@@ -18,9 +18,76 @@ const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msed
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
-const mode = (name) => page.locator('.modes').getByRole('tab', { name, exact: true })
-const topicTab = (name) => page.locator('.dc-converters').getByRole('tab', { name, exact: true })
-const stateText = () => page.locator('.dc-state').innerText()
+// Every lab is in the universal workspace shell (Phase 5): modes as tabs (+ "More"), WHY, one Explore menu.
+const explore = async (name) => {
+  await page.locator('.ws-explore-btn').click()
+  await page.locator('.ws-explore-menu').getByRole(/Show current path|Focus/.test(name) ? 'menuitemcheckbox' : 'menuitem', { name, exact: true }).click()
+  await page.waitForTimeout(250)
+}
+const closePanels = async () => {
+  for (let i = 0; i < 3 && (await page.locator('.ws .ov').count()); i++) await page.locator('.ws .ov-close').first().click()
+}
+const openAnalyze = async () => {
+  if (!(await page.locator('.wv-analyze').count())) await explore('Measurements & theory')
+  await page.waitForTimeout(300)
+}
+const mode = (name) => ({
+  click: async () => {
+    if (name === 'Analyze') return openAnalyze()
+    await closePanels()
+    if (['Explore', 'Learn', 'Experiment'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+    else {
+      await page.locator('.ws-more-modes summary').click()
+      await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()
+    }
+    await page.waitForTimeout(200)
+  },
+})
+const openState = async () => {
+  if (!(await page.locator('.ov .dc-state').count())) await explore('State details')
+}
+const stateText = async () => {
+  await openState()
+  return page.locator('.ov .dc-state').innerText()
+}
+const openWhy = async () => {
+  if (!(await page.locator('.wv-why').count())) await page.locator('.ws-act--why').click()
+  await page.waitForTimeout(150)
+}
+const whyQ = async (name) => {
+  await openWhy()
+  return page.locator('.wv-why').getByRole('button', { name })
+}
+/** Measurements & theory → Theory vs Simulation → the exact solution: every row ✓. */
+const exactAllPass = async () => {
+  await openAnalyze()
+  await page.locator('.wv-analyze').getByRole('tab', { name: /Theory vs Simulation/ }).click()
+  const d = page.locator('.wp-more', { hasText: 'Textbook formulas compared' })
+  if ((await d.getAttribute('open')) === null) await d.locator('summary').click()
+  await page.getByRole('radio', { name: 'Exact solution' }).click()
+  const txt = await page.locator('.dc-table').innerText()
+  return txt.includes('✓') && !txt.includes('✗') && !(await page.locator('.wv-analyze .row-bad').count())
+}
+/** The lab's other topics, through the header's "Change circuit" menu (each has its own address). */
+const topicTab = (name) => ({
+  isVisible: async () => {
+    await page.getByLabel('Change circuit').click()
+    const v = await page.locator('.ws-switch-menu').getByRole('link', { name, exact: true }).isVisible()
+    await page.getByLabel('Change circuit').click()
+    return v
+  },
+  click: async () => {
+    await page.getByLabel('Change circuit').click()
+    await page.locator('.ws-switch-menu').getByRole('link', { name, exact: true }).click()
+    await page.waitForSelector('.ws .cscope canvas')
+    await page.waitForTimeout(400)
+  },
+})
+const density = async (name) => {
+  await page.locator('.ws-level select').selectOption(name.toLowerCase())
+  await page.waitForTimeout(200)
+}
+const h1 = () => page.locator('.ws-head h1').innerText()
 const scope = page.locator('.cscope canvas.scope-layer--overlay')
 const clickScope = async (frac) => {
   await scope.scrollIntoViewIfNeeded()
@@ -28,21 +95,14 @@ const clickScope = async (frac) => {
   await page.mouse.click(b.x + 64 + (b.width - 64 - 54) * frac, b.y + b.height / 2)
   await page.waitForTimeout(150)
 }
-const exactAllPass = async () => {
-  await mode('Analyze').click()
-  await page.getByRole('radio', { name: 'Exact solution' }).click()
-  const txt = await page.locator('.dc-table').innerText()
-  return txt.includes('✓') && !txt.includes('✗')
-}
 
 // ── PWM lab ───────────────────────────────────────────────────────────────────
-await page.goto(URL)
-await page.locator('.platform-bar').getByRole('tab', { name: 'PWM' }).click()
-await page.waitForTimeout(500)
-check(page.url().endsWith('#pwm'), 'PWM module is addressable (#pwm)')
-check(await page.getByRole('heading', { name: 'PWM modulator' }).isVisible(), 'PWM lab shows the modulator block diagram')
+await page.goto(URL + '#/labs/pwm/lab')
+await page.waitForTimeout(800)
+check(page.url().endsWith('#/labs/pwm/lab'), 'PWM lab is addressable (#/labs/pwm/lab)')
+check((await h1()) === 'PWM lab' && (await page.locator('.ws-bench svg').count()) > 0, 'PWM lab opens in the workspace with the modulator block diagram')
 check(/Gate (HIGH|LOW)/.test(await stateText()), 'state card reports the comparator output')
-check(await page.locator('.dc-why').getByRole('tab', { name: /Why is the gate (HIGH|LOW)\?/ }).isVisible(), 'WHY explains the gate from r and c')
+check(await (await whyQ(/Why is the gate (HIGH|LOW)\?/)).isVisible(), 'WHY explains the gate from r and c')
 check(await exactAllPass(), 'PWM: every harmonic agrees with the Bessel series (natural sampling)')
 await page.getByRole('tab', { name: 'Spectrum' }).click()
 check((await page.locator('.spectrum-chart .spec-bar').count()) > 30, 'PWM spectrum chart with simulated bars')
@@ -50,12 +110,7 @@ check((await page.locator('.spectrum-chart .spec-theory').count()) > 10, 'PWM sp
 await page.screenshot({ path: `${OUT}pwm-analyze.png`, fullPage: true })
 await page.getByRole('radio', { name: 'Regular (symmetric)' }).click()
 await page.waitForTimeout(300)
-await page.getByRole('tab', { name: 'Measurements' }).click()
-await page.getByRole('radio', { name: 'Exact solution' }).click()
-{
-  const t = await page.locator('.dc-table').innerText()
-  check(t.includes('✓') && !t.includes('✗'), 'PWM: regular sampling also agrees with its Bessel series')
-}
+check(await exactAllPass(), 'PWM: regular sampling also agrees with its Bessel series')
 await mode('Experiment').click()
 await page.getByRole('button', { name: /Double the carrier frequency/ }).click()
 await page.getByRole('radio', { name: /higher order/ }).click()
@@ -69,17 +124,18 @@ await page.getByRole('button', { name: '← Lessons' }).click()
 await mode('Explore').click()
 
 // ── Inverters: single-phase ───────────────────────────────────────────────────
-await page.locator('.platform-bar').getByRole('tab', { name: 'Inverters' }).click()
-await page.waitForTimeout(600)
-check(page.url().endsWith('#inverters'), 'Inverters module is addressable (#inverters)')
+await page.goto(URL + '#/labs/inverters/1ph')
+await page.waitForTimeout(800)
+check(page.url().endsWith('#/labs/inverters/1ph'), 'Inverters are addressable (#/labs/inverters/1ph)')
 for (const t of ['Single-phase', 'Three-phase', 'SPWM', 'SVPWM']) check(await topicTab(t).isVisible(), `inverter topic ${t}`)
-check(await page.getByRole('heading', { name: 'Single-phase inverter' }).isVisible(), 'single-phase H-bridge shown')
+check((await h1()) === 'Single-phase bridge' && (await page.locator('.inv-diagram').count()) > 0, 'single-phase H-bridge shown')
 // Just after the polarity reversal (cycle 2, θ ≈ 185°) the diodes carry the current.
 await clickScope((1 + 185 / 360) / 2)
-check(/freewheeling/.test(await page.locator('.dc-interval').innerText()), 'after the voltage reverses a diode freewheels (inductive load)')
-check(await page.locator('.dc-why').getByRole('tab', { name: /Why does D\d conduct/ }).isVisible(), 'WHY explains why the diode (not the IGBT) conducts')
+await openState()
+check(/freewheeling/.test(await page.locator('.ov .dc-interval').innerText()), 'after the voltage reverses a diode freewheels (inductive load)')
+check(await (await whyQ(/Why does D\d conduct/)).isVisible(), 'WHY explains why the diode (not the IGBT) conducts')
 await page.locator('.inv-diagram [data-part="S1"]').click()
-check(/IGBT S1/.test(await page.locator('.dc-inspect').innerText()), 'clicking S1 opens its inspector')
+check(/IGBT S1/.test(await page.locator('.wv-inspect').innerText()), 'clicking S1 opens its inspector')
 check(await exactAllPass(), 'single-phase: simulation agrees with the exact ideal-switch theory')
 await mode('Explore').click()
 await page.getByRole('radio', { name: 'Quasi-square (α)' }).click()
@@ -91,8 +147,8 @@ await mode('Explore').click()
 // ── Three-phase ───────────────────────────────────────────────────────────────
 await topicTab('Three-phase').click()
 await page.waitForTimeout(600)
-check(await page.getByRole('heading', { name: /Three-phase inverter/ }).isVisible(), 'three-phase six-step inverter shown')
-await page.getByRole('radio', { name: 'Standard' }).click()
+check(/Three-phase VSI/.test(await h1()), 'three-phase six-step inverter shown')
+await density('Standard')
 check(/vnN/.test(await stateText()), 'state card shows the load-neutral voltage (Standard)')
 check(await exactAllPass(), 'six-step: simulation agrees with the theory')
 await mode('Explore').click()
@@ -105,7 +161,8 @@ await mode('Explore').click()
 await page.getByRole('radio', { name: '1-ph unipolar' }).click()
 await page.waitForTimeout(800)
 check(await exactAllPass(), 'SPWM unipolar: simulation agrees with the theory')
-await page.getByRole('tab', { name: 'Spectrum' }).click()
+// the Analyze panel's own Spectrum tab (the side panel has one too once the level is Standard+)
+await page.getByRole('tablist', { name: 'Analysis' }).getByRole('tab', { name: 'Spectrum' }).click()
 check((await page.locator('.spectrum-chart').count()) >= 2, 'SPWM: voltage and current spectra')
 await page.screenshot({ path: `${OUT}inv-spwm.png`, fullPage: true })
 await mode('Explore').click()
@@ -115,7 +172,7 @@ await topicTab('SVPWM').click()
 await page.waitForTimeout(1000)
 check(await page.locator('.sv-diagram').isVisible(), 'SVPWM: space-vector hexagon with sector and dwell times')
 check(/Sector \d/.test(await page.locator('.sv-diagram').innerHTML()), 'SVPWM: the present sector is shown')
-await page.getByRole('radio', { name: 'Standard' }).click()
+await density('Standard')
 check(/sector/.test(await stateText()), 'SVPWM: dwell times in the state card')
 check(await exactAllPass(), 'SVPWM: simulation agrees with the exact ideal-switch theory')
 await mode('Predict').click()

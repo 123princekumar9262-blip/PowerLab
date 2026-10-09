@@ -43,6 +43,8 @@ export function ChannelBar({ result, channels, visible, preset, density, onPrese
 
   return (
     <div className="channel-bar">
+      {/* presets only where there is a choice (Beginner keeps the one essential set + "Add waveform") */}
+      {(PRESETS_FOR[density].length > 1 || preset === 'custom') && (
       <div className="seg seg--presets" role="radiogroup" aria-label="Channel preset">
         {PRESETS.filter((p) => PRESETS_FOR[density].includes(p.id)).map((p) => (
           <button key={p.id} role="radio" aria-checked={preset === p.id} className={preset === p.id ? 'on' : ''} title={p.title} onClick={() => onPreset(p.id)}>
@@ -55,6 +57,7 @@ export function ChannelBar({ result, channels, visible, preset, density, onPrese
           </button>
         )}
       </div>
+      )}
       <div className="legend" role="group" aria-label="Shown channels (click to hide)">
         {active.map((sid) => (
           <button key={sid} className="chip chip--on" aria-pressed title={`${meta(sid).name} — click to hide`} onClick={() => onToggle(sid)}>
@@ -65,7 +68,7 @@ export function ChannelBar({ result, channels, visible, preset, density, onPrese
       </div>
       <div className="add-channel" ref={pop}>
         <button className="chip chip--more" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((o) => !o)}>
-          + Add channel
+          + Add waveform
         </button>
         {open && (
           <div className="channel-pop" role="group" aria-label="Select channels">

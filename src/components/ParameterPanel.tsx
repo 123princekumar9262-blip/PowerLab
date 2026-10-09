@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { LIMITS } from '../simulation/params.ts'
 import type { FieldKey } from '../challenges/challenges.ts'
 import type { Density } from '../state/labState.ts'
@@ -20,9 +20,11 @@ interface Props {
   editable?: FieldKey[]
   /** Engineer density opens the advanced parameters by default. */
   density?: Density
+  /** Circuit choices shown first in Basic (the workspace shell puts the load selector here). */
+  loadPicker?: ReactNode
 }
 
-export function ParameterPanel({ topology, load, params, resolved, issues, computeMs, samples, onChange, onReset, editable, density }: Props) {
+export function ParameterPanel({ topology, load, params, resolved, issues, computeMs, samples, onChange, onReset, editable, density, loadPicker }: Props) {
   // Advanced parameters: open for engineers, or when a challenge unlocks one of them.
   const ADV_KEYS: FieldKey[] = ['inductance', 'capacitance', 'diode', 'phase', 'vf', 'ron', 'cycles', 'timestep']
   const advDefault = density === 'engineer' || !!editable?.some((k) => ADV_KEYS.includes(k))
@@ -58,6 +60,7 @@ export function ParameterPanel({ topology, load, params, resolved, issues, compu
 
       <div className="param-group">
         <h3 className="group-title">Basic</h3>
+        {loadPicker}
         <NumberField disabled={locked('vrms')} label={three ? 'Phase voltage' : 'Vrms'} hint={three ? `RMS per phase · VLL = √3·Vph = ${(Math.sqrt(3) * params.source.vrms).toFixed(2)} V` : 'Source RMS voltage'} unit="V" value={params.source.vrms} limits={LIMITS.vrms} slider={{ min: 1, max: 50, step: 0.5 }} onCommit={(v) => set('source', { vrms: v })} />
         <NumberField disabled={locked('frequency')} label="Frequency" hint="Source frequency f" unit="Hz" value={params.source.frequency} limits={LIMITS.frequency} slider={{ min: 1, max: 1000, log: true }} onCommit={(v) => set('source', { frequency: v })} />
         <NumberField disabled={locked('resistance')} label="Resistance" hint="Load resistance R" unit="Ω" value={params.load.resistance} limits={LIMITS.resistance} slider={{ min: 0.1, max: 100000, log: true }} onCommit={(v) => set('load', { resistance: v })} />

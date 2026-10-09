@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { voltSecondFromSim, type DcdcState } from '../../converters/dcdc/explain.ts'
 import { measureDcdc, type DcdcMeasurements } from '../../converters/dcdc/measure.ts'
 import { dcdcModel } from '../../converters/dcdc/model.ts'
@@ -280,22 +280,35 @@ export function DcdcTheory({ r, m }: { r: ConverterResult; m: DcdcMeasurements }
   )
 }
 
+/** D = 10 % … 90 % in 5 % steps (the same 17 values the loop `d += 0.05` rounded to). */
+const SWEEP_DUTIES = Array.from({ length: 17 }, (_, i) => Math.round((0.1 + 0.05 * i) * 100) / 100)
+
 /** Vout/Vin against D: the simulation (dots) and the ideal CCM / DCM relations (line). */
 export function DcdcSweep({ p }: { p: ConverterParams & { kind?: ConverterKind } }) {
   const kind = (p as { kind?: ConverterKind }).kind ?? 'buck'
   const [run, setRun] = useState(false)
-  const pts = useMemo(() => {
-    if (!run) return []
+  const [pts, setPts] = useState<Array<{ d: number; sim: number; mode: string; exact: number }>>([])
+  // keyed on the parameter VALUES: callers pass a fresh object each render
+  const key = JSON.stringify(p)
+  // One duty point per task, so the page stays responsive and the dots appear as they are computed.
+  useEffect(() => {
+    if (!run) return
     const model = dcdcModel(kind)
     const out: Array<{ d: number; sim: number; mode: string; exact: number }> = []
-    for (let d = 0.1; d <= 0.9001; d += 0.05) {
-      const pp = { ...p, duty: Math.round(d * 100) / 100, view: 'steady' as const, periods: 1 }
+    let i = 0
+    let timer = 0
+    setPts([])
+    const step = () => {
+      const pp = { ...p, duty: SWEEP_DUTIES[i], view: 'steady' as const, periods: 1 }
       const r = simulateCircuit(model, pp)
       const mm = measureDcdc(r)
       out.push({ d: pp.duty, sim: mm.voutAvg / p.vin, mode: mm.mode, exact: dcdcExact(r.params).metrics.voutAvg / p.vin })
+      setPts([...out])
+      if (++i < SWEEP_DUTIES.length) timer = window.setTimeout(step, 0)
     }
-    return out
-  }, [run, p, kind])
+    timer = window.setTimeout(step, 0)
+    return () => window.clearTimeout(timer)
+  }, [run, key, kind]) // eslint-disable-line react-hooks/exhaustive-deps
   const ideal = (d: number) => {
     const K = (2 * p.l * p.fs) / p.r
     const b = dcdcBoundary({ l: p.l, r: p.r, ts: 1 / p.fs, duty: d, fs: p.fs, kind })
@@ -321,6 +334,12 @@ export function DcdcSweep({ p }: { p: ConverterParams & { kind?: ConverterKind }
           Run duty sweep (17 simulations)
         </button>
       ) : (
+        <>
+        {pts.length < SWEEP_DUTIES.length && (
+          <p className="small muted" role="status">
+            Simulating D = {Math.round(SWEEP_DUTIES[pts.length] * 100)} % … ({pts.length} / {SWEEP_DUTIES.length})
+          </p>
+        )}
         <svg viewBox={`0 0 ${W} ${H}`} className="sweep-chart" role="img" aria-label="Output to input ratio versus duty ratio: simulation and theory">
           {ticks.map((v) => (
             <g key={v}>
@@ -361,6 +380,7 @@ export function DcdcSweep({ p }: { p: ConverterParams & { kind?: ConverterKind }
             </text>
           </g>
         </svg>
+        </>
       )}
       {pts.length > 0 && (
         <div className="table-wrap">

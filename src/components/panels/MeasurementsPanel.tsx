@@ -1,31 +1,10 @@
-import { useState } from 'react'
-import type { Comparison, RowGroup } from '../../measurements/compare.ts'
+import type { Comparison } from '../../measurements/compare.ts'
 import type { Density } from '../../state/labState.ts'
 import { formatA, formatV } from '../../utils/format.ts'
-import { MeasurementTable } from '../MeasurementTable.tsx'
-import { OverlapPanel } from './OverlapPanel.tsx'
-import type { SimulationResult, SimulationSample } from '../../types/simulation.ts'
-import { isThreePhase } from '../../types/simulation.ts'
 
-type Tab = 'summary' | 'output' | 'load' | 'diodes' | 'timing' | 'commutation' | 'theory'
-
-const TABS: Array<{ id: Tab; label: string; groups?: RowGroup[]; engineer?: boolean }> = [
-  { id: 'summary', label: 'Summary' },
-  { id: 'output', label: 'Output', groups: ['Output'] },
-  { id: 'load', label: 'Load', groups: ['Load current', 'Inductor energy'] },
-  { id: 'diodes', label: 'Diodes', groups: ['Diodes', 'Freewheeling diode', 'Power'] },
-  { id: 'timing', label: 'Timing', groups: ['Timing', 'Commutation'], engineer: true },
-  { id: 'commutation', label: 'Commutation / μ' },
-  { id: 'theory', label: 'Theory vs Simulation', engineer: true },
-]
-
-/** MEASUREMENTS — a six-number summary first; every detailed row in its own tab. */
-export function MeasurementsPanel({ comparison, density, result, sample, initialTab }: { comparison: Comparison; density: Density; result: SimulationResult; sample: SimulationSample; initialTab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'summary')
+/** The six-number summary: what the simulated waveforms measure over the last full cycle. */
+export function MeasureSummary({ comparison, density, hint }: { comparison: Comparison; density: Density; hint?: string }) {
   const m = comparison.measurements
-  const three = isThreePhase(result.params.topology)
-  const tabs = TABS.filter((t) => (!t.engineer || density === 'engineer') && (t.id !== 'commutation' || three))
-  const cur = tabs.find((t) => t.id === tab) ?? tabs[0]
   const summary: Array<[string, string, string]> = [
     ['Vdc', 'Average output', formatV(m.voutAvg)],
     ['Vrms', 'RMS output', formatV(m.voutRms)],
@@ -35,36 +14,21 @@ export function MeasurementsPanel({ comparison, density, result, sample, initial
     ['Ripple', 'Peak-to-peak output ripple', formatV(m.ripplePP, false)],
   ]
   return (
-    <div className="measure-panel">
-      <div className="seg tabs-seg" role="tablist" aria-label="Measurement group">
-        {tabs.map((t) => (
-          <button key={t.id} role="tab" aria-selected={cur.id === t.id} className={cur.id === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
+    <>
+      <dl className="summary-grid">
+        {summary.map(([sym, label, v]) => (
+          <div key={sym} title={label}>
+            <dt>
+              {sym} <span className="muted small">{label}</span>
+            </dt>
+            <dd>{v}</dd>
+          </div>
         ))}
-      </div>
-      {cur.id === 'commutation' ? (
-        <OverlapPanel result={result} sample={sample} />
-      ) : cur.id === 'summary' ? (
-        <>
-          <dl className="summary-grid">
-            {summary.map(([sym, label, v]) => (
-              <div key={sym} title={label}>
-                <dt>
-                  {sym} <span className="muted small">{label}</span>
-                </dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="muted small">
-            Measured on the simulated waveforms over the last full cycle{m.steady.reached ? ' (steady state)' : ' — not yet in steady state'}. Open a tab for the detailed rows
-            {density === 'engineer' ? ', or Theory vs Simulation for the full comparison.' : '. Switch to Engineer for timing and the full theory comparison.'}
-          </p>
-        </>
-      ) : (
-        <MeasurementTable comparison={comparison} groups={cur.groups} />
-      )}
-    </div>
+      </dl>
+      <p className="muted small">
+        Measured on the simulated waveforms over the last full cycle{m.steady.reached ? ' (steady state)' : ' — not yet in steady state'}.
+        {hint ?? (density === 'engineer' ? ' Open a tab for the detailed rows, or Theory vs Simulation for the full comparison.' : ' Open a tab for the detailed rows. Switch to Engineer for timing and the full theory comparison.')}
+      </p>
+    </>
   )
 }

@@ -28,32 +28,72 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, dev
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
 
-await page.goto(APP_URL)
-await page.evaluate(() => localStorage.clear())
+// Entry (Phase 1 of the redesign): Home → Rectifiers → Half-wave opens the circuit already running.
+await page.goto(APP_URL + '#/home')
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pel.prefs', JSON.stringify({ level: 'standard' })) })
+await page.goto(APP_URL + '#/labs/rectifiers/1ph-half-wave?load=R')
 await page.reload()
-await page.screenshot({ path: OUT + '01-intro.png' })
-check(await page.getByRole('button', { name: /Run simulation/ }).isDisabled(), 'Run is disabled until rectifier and load are chosen')
-
-await page.getByRole('radio', { name: 'Half-wave', exact: true }).click()
-await page.getByRole('radio', { name: /^R$/ }).click()
-await page.screenshot({ path: OUT + '02-chosen.png' })
-await page.getByRole('button', { name: /Run simulation/ }).click()
 await page.waitForSelector('.scope-canvas canvas')
+await page.screenshot({ path: OUT + '01-intro.png' })
+check((await page.getByRole('button', { name: /Run simulation/ }).count()) === 0, 'opening a circuit runs it at once — no separate Run step')
+check(await page.getByRole('heading', { level: 1, name: 'Single-phase half-wave' }).isVisible(), 'the route opened the half-wave rectifier (workspace header)')
+await page.screenshot({ path: OUT + '02-chosen.png' })
 await page.waitForTimeout(300)
 await page.screenshot({ path: OUT + '03-run.png' })
 
-// Helpers for the tabbed / on-demand UI
-const mode = (name) => page.locator('.modes').getByRole('tab', { name, exact: true })
-const panelTab = (name) => page.locator('.panel-tabs').getByRole('tab', { name, exact: true })
-const headline = async () => {
-  await panelTab('State').click()
-  return page.locator('.state-headline').innerText()
+// The simplified workspace (Phase 4): modes as tabs (+ "More"), WHY, and one Explore menu.
+const MENU = { 'Current path': 'Show current path', Inspect: 'Inspect a component', Analyze: 'Measurements & theory', Measurements: 'Measurements & theory', Energy: 'Energy', Events: 'Switching events', State: 'State details', Focus: 'Focus view' }
+const explore = async (name) => {
+  await page.locator('.ws-explore-btn').click()
+  await page.locator('.ws-explore-menu').getByRole(/Show current path|Focus/.test(name) ? 'menuitemcheckbox' : 'menuitem', { name }).click()
+  await page.waitForTimeout(150)
 }
-const stateTime = () => page.locator('.strip-state').innerText()
+const menuItems = async () => {
+  await page.locator('.ws-explore-btn').click()
+  const items = await page.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  await page.keyboard.press('Escape')
+  return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
+}
+const mode = (name) => ({
+  click: async () => {
+    if (['Explore', 'Learn', 'Experiment'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+    else {
+      await page.locator('.ws-more-modes summary').click()
+      await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()
+    }
+    await page.waitForTimeout(150)
+  },
+})
+const why = () => page.locator('.ws-act--why')
+const openWhy = async () => {
+  if (!(await page.locator('.wv-why').count())) await why().click()
+  if (!(await page.locator('.wv-more').count())) await page.locator('.wv-more-btn').click()
+}
+const openState = async () => {
+  if (!(await page.locator('.ov .state-headline').count())) await explore('State details')
+}
+const action = (name) => ({
+  click: async () => (name === 'WHY' ? openWhy() : explore(MENU[name])),
+  count: async () => (name === 'WHY' ? why().count() : (await menuItems()).includes(MENU[name]) ? 1 : 0),
+  innerText: async () => page.locator('.ws-explore-btn').innerText(),
+})
+const panelTab = (name) => ({
+  click: async () => {
+    if (name === 'State') return openState()
+    if (name === 'Why') return openWhy()
+    // the mode's own panel (lesson, experiment…) is always on the page: close whatever covers it
+    if (await page.locator('.ws-side .ov').count()) await page.locator('.ws-side .ov-close').click()
+  },
+})
+const headline = async () => {
+  await openState()
+  return page.locator('.ov .state-headline').innerText()
+}
+const stateTime = () => page.locator('.wp-status-line').innerText()
 const measureRow = async (tab, label) => {
-  await page.getByRole('button', { name: /^Measurements/ }).click()
-  await page.locator('.drawer').getByRole('tab', { name: tab, exact: true }).click()
-  const v = (await page.locator('.drawer tr', { hasText: label }).first().locator('td').first().innerText()).trim()
+  await action('Analyze').click()
+  await page.locator('.wv-analyze').getByRole('tab', { name: tab }).click()
+  const v = (await page.locator('.wv-analyze tr', { hasText: label }).first().locator('td').first().innerText()).trim()
   await page.keyboard.press('Escape')
   return v
 }
@@ -78,11 +118,11 @@ await page.screenshot({ path: OUT + '04-negative.png' })
 check(/OFF/.test(await headline()) && /reverse/.test(await headline()), `negative half-cycle shows D1 OFF, reverse biased — "${await headline()}"`)
 check((await page.locator('.circuit--off').count()) === 1, 'circuit diagram shows the OFF state')
 check((await page.locator('.circuit .flow').count()) === 0, 'no current-flow animation while blocking')
-const strip = await page.locator('.strip-state').innerText()
-check(/Vo = 0\.000 V/.test(strip) && /Io = 0\.000 A/.test(strip), 'Vout = 0 and Io = 0 while OFF (state strip)')
+const strip = await page.locator('.wp-status-line').innerText()
+check(/Vo = 0\.000 V/.test(strip) && /Io = 0\.000 A/.test(strip), 'Vout = 0 and Io = 0 while OFF (status line)')
 
 // WHY: short answer first, the full causal chain on request
-await page.getByRole('button', { name: 'WHY?' }).click()
+await action('WHY').click()
 await page.waitForTimeout(100)
 check((await page.locator('.why-steps li').count()) === 5, 'WHY? shows a five-step answer')
 await page.getByRole('button', { name: 'Show detailed explanation' }).click()
@@ -90,16 +130,15 @@ const chain = await page.locator('#why-chain').innerText()
 check(/Circuit condition/i.test(chain) && /reverse biased/.test(chain), 'detailed WHY explains the reverse-biased state')
 await page.screenshot({ path: OUT + '05-why.png', fullPage: false })
 
-// Events view: click the first switching event → WHAT HAPPENED / WHY drawer
-await page.getByRole('tab', { name: 'Events', exact: true }).click()
-await page.locator('.event-row').first().click()
+// Events panel (action bar): click the first switching event → WHAT HAPPENED / WHY
+await action('Events').click()
+await page.locator('.wv-event').first().click()
 await page.waitForTimeout(150)
-check((await page.locator('.drawer .event-detail').count()) === 1, 'clicking an event opens WHAT HAPPENED / WHY')
-const evText = await page.locator('.event-detail').innerText()
+check((await page.locator('.ov .wv-event-detail').count()) === 1, 'clicking an event opens WHAT HAPPENED / WHY')
+const evText = await page.locator('.wv-event-detail').innerText()
 check(/What happened\?/i.test(evText) && /Why did it happen\?/i.test(evText), 'event detail has both sections')
 await page.screenshot({ path: OUT + '06-event.png' })
 await page.keyboard.press('Escape')
-await page.getByRole('tab', { name: 'Waveforms', exact: true }).click()
 
 // Step forward through events: time must advance monotonically.
 const t0 = await stateTime()
@@ -132,12 +171,12 @@ await page.getByRole('button', { name: 'Pause' }).click()
 check(tp1 !== tp2, `playback advances time`)
 
 // Parameters: change R from 10 Ω to 100 Ω → peak current must drop 10× (Measurements → Load).
-const before = await measureRow('Load', 'Peak current')
+const before = await measureRow('Current', 'Peak current')
 const rInput = page.getByLabel(/^Resistance/).last()
 await rInput.fill('100')
 await rInput.press('Enter')
 await page.waitForTimeout(200)
-const after = await measureRow('Load', 'Peak current')
+const after = await measureRow('Current', 'Peak current')
 check(before !== after, `changing R re-runs the simulation (Io,pk ${before} → ${after})`)
 const num = (s) => parseFloat(s) * (/mA/.test(s) ? 1e-3 : 1)
 // Displayed values are rounded to 4 significant figures, so allow 0.5 %.
@@ -159,7 +198,7 @@ await dtInput.fill('1250')
 await dtInput.press('Enter')
 await page.waitForTimeout(200)
 check((await page.locator('.flag[role="alert"]').count()) === 1, 'coarse timestep raises the "disagrees with theory" alert')
-check(/⚠/.test(await page.getByRole('button', { name: /^Measurements/ }).innerText()), 'the Measurements button carries the warning')
+check(/⚠/.test(await action('Analyze').innerText()), 'the Explore button (Measurements & theory) carries the warning')
 await page.screenshot({ path: OUT + '07-flag.png' })
 await page.getByRole('radio', { name: /Auto/ }).click()
 await page.waitForTimeout(200)
@@ -170,16 +209,16 @@ const fInput = page.getByLabel(/^Frequency/).last()
 await fInput.fill('60')
 await fInput.press('Enter')
 await page.waitForTimeout(200)
-const ripple = await measureRow('Output', 'Ripple frequency')
+const ripple = await measureRow('Ripple', 'Ripple frequency')
 check(/^60\.000 Hz/.test(ripple), `ripple frequency follows the source (${ripple})`)
 
 // Ideal diode — the conduction angle is in Measurements → Timing (Engineer level)
 await page.getByRole('radio', { name: 'Ideal' }).click()
-await page.getByRole('radio', { name: 'Engineer', exact: true }).click()
+await page.locator('.ws-level select').selectOption('engineer')
 await page.waitForTimeout(200)
 const gamma = await measureRow('Timing', 'Conduction angle')
 check(/^180\.00°/.test(gamma), `ideal diode conduction angle = 180° (${gamma})`)
-await page.getByRole('radio', { name: 'Standard', exact: true }).click()
+await page.locator('.ws-level select').selectOption('standard')
 
 const body = await page.locator('body').innerText()
 check(!/NaN|Infinity|undefined/.test(body), 'no NaN / Infinity / undefined anywhere on the page')
@@ -188,20 +227,27 @@ await page.screenshot({ path: OUT + '08-final.png', fullPage: true })
 
 // ── Phase 2–7: every circuit, graph layouts, inductor hold-on, energy view ─────────────
 await page.evaluate(() => window.scrollTo(0, 0))
+// the circuit is chosen in the header's "Change circuit" menu (its own address); the load in Basic
 const pick = async (topo, load) => {
-  await page.getByRole('radio', { name: topo, exact: true }).click()
-  await page.getByRole('radio', { name: load, exact: true }).click()
+  const title = (await page.locator('.ws-head h1').innerText()).trim()
+  const want = { 'Half-wave': 'Single-phase half-wave', 'Center-tapped': 'Single-phase center-tapped', Bridge: 'Single-phase bridge' }[topo]
+  if (title !== want) {
+    await page.getByLabel('Change circuit').click()
+    await page.locator('.ws-switch-menu').getByRole('link', { name: topo, exact: true }).click()
+    await page.waitForSelector(`.ws-head h1:text-is("${want}")`)
+  }
+  await page.locator('.rx-load').getByRole('radio', { name: load, exact: true }).click()
   await page.waitForTimeout(250)
 }
 await page.getByRole('button', { name: 'Defaults' }).click()
-for (const topo of ['Half-wave', 'Center-tap', 'Bridge']) {
+for (const topo of ['Half-wave', 'Center-tapped', 'Bridge']) {
   for (const load of ['R', 'RL', 'RC', 'RLC']) {
     await pick(topo, load)
-    const text = await page.locator('main').innerText()
+    const text = await page.locator('main.ws').innerText()
     const flagged = await page.locator('.flag[role="alert"]').count()
     const diodes = await page.locator('.circuit .diode').count()
-    check(!/NaN|Infinity|undefined/.test(text) && flagged === 0 && diodes === (topo === 'Half-wave' ? 1 : topo === 'Center-tap' ? 2 : 4), `${topo} ${load}: renders, ${diodes} diode(s), theory within tolerance, no NaN`)
-    if ((topo === 'Bridge' && load === 'RC') || (topo === 'Center-tap' && load === 'RLC') || (topo === 'Half-wave' && load === 'RL')) {
+    check(!/NaN|Infinity|undefined/.test(text) && flagged === 0 && diodes === (topo === 'Half-wave' ? 1 : topo === 'Center-tapped' ? 2 : 4), `${topo} ${load}: renders, ${diodes} diode(s), theory within tolerance, no NaN`)
+    if ((topo === 'Bridge' && load === 'RC') || (topo === 'Center-tapped' && load === 'RLC') || (topo === 'Half-wave' && load === 'RL')) {
       await page.screenshot({ path: OUT + `10-${topo}-${load}.png`.toLowerCase() })
     }
   }
@@ -240,8 +286,8 @@ if (!held) {
 check(held, 'half-wave RL: WHY engine reports D1 held ON by the inductor after vin < 0')
 await page.screenshot({ path: OUT + '12-rl-held.png' })
 
-// Energy (Phase 6): the ⚡ Energy button opens the ENERGY tab; the power ledger balances
-await page.getByRole('button', { name: /⚡ Energy/ }).click()
+// Energy (Phase 6): the Energy action opens the ENERGY tab; the power ledger balances
+await action('Energy').click()
 await page.waitForTimeout(200)
 const bal = await page.locator('.balance').innerText()
 check(/conserved/.test(bal), `energy ledger balances at the cursor (${bal.trim()})`)
@@ -291,7 +337,7 @@ await mode('Predict').click()
 await page.getByRole('tab', { name: 'Sketch the output' }).click()
 await page.waitForTimeout(400)
 check((await page.locator('.instrument--hidden').count()) === 1, 'prediction hides the scope until the reveal')
-check((await page.getByRole('button', { name: /^Measurements/ }).count()) === 0, 'prediction hides the measurements until the reveal')
+check((await action('Analyze').count()) === 0, 'prediction hides the measurements (Analyze) until the reveal')
 const sk = await page.locator('canvas.sketch').boundingBox()
 await page.mouse.move(sk.x + 2, sk.y + sk.height * 0.3)
 await page.mouse.down()
@@ -302,7 +348,7 @@ await guessInputs.nth(0).fill('8')
 await page.getByRole('button', { name: /Reveal the simulation/ }).click()
 await page.waitForTimeout(300)
 check(/Shape match/.test(await page.locator('.score').innerText()), 'reveal scores the sketch against the simulated Vout')
-check((await page.locator('.instrument--hidden').count()) === 0 && (await page.getByRole('button', { name: /^Measurements/ }).count()) === 1, 'after the reveal the scope and measurements appear')
+check((await page.locator('.instrument--hidden').count()) === 0 && (await action('Analyze').count()) === 1, 'after the reveal the scope and measurements (Analyze) appear')
 await page.screenshot({ path: OUT + '16-predict.png' })
 await mode('Explore').click()
 

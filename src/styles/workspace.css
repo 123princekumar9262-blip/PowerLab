@@ -1,0 +1,1068 @@
+/* ============================================================================
+   Universal workspace shell (Phase 2). Circuit first: the bench is the widest,
+   brightest region; parameters and context sit quietly beside it; waveforms
+   span the page below. Same tokens as the rest of the platform.
+   ========================================================================== */
+
+.ws {
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 0 20px 28px;
+}
+
+/* ── Header: where am I, what mode ───────────────────────────────────────── */
+.ws-head {
+  padding: 12px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.ws-head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.ws--desktop .ws-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 20px;
+}
+.ws--desktop .ws-head-row {
+  display: contents;
+}
+.ws--desktop .ws-modes {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: center;
+}
+.ws--desktop .ws-head-tools {
+  grid-column: 4;
+  grid-row: 1;
+}
+.ws-back-link {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 13px;
+  white-space: nowrap;
+  padding: 8px 4px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ws-back-link:hover {
+  color: var(--text-1);
+}
+.ws-title {
+  min-width: 0;
+}
+.ws-lab {
+  margin: 0;
+  font-size: 11px;
+}
+.ws-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ws-title h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-title h1:focus {
+  outline: none;
+}
+.ws-switch,
+.ws-level select {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 8px;
+  min-height: 32px;
+}
+.ws-head-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ws-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ws-tool:hover,
+.ws-tool.on {
+  color: var(--text-1);
+  border-color: var(--accent);
+}
+.ws-modes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.ws-modes-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-1);
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.ws-modes-tabs button {
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 32px;
+}
+.ws-modes-tabs button.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+/* ── Regions ─────────────────────────────────────────────────────────────── */
+.ws-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+.ws--desktop .ws-grid {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+/* a third column only while a panel (or the current mode's activity) is open */
+.ws--desktop.ws--side .ws-grid {
+  grid-template-columns: 260px minmax(0, 1fr) 360px;
+}
+.ws--desktop.ws--focus .ws-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ws--desktop.ws--focus.ws--side .ws-grid {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+@media (max-width: 1279px) {
+  .ws--desktop .ws-grid {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .ws--desktop.ws--side .ws-grid {
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+  }
+  .ws--desktop.ws--focus.ws--side .ws-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  /* a narrower circuit is shorter: let the bench size itself; the side columns scroll within it */
+  .ws--desktop .ws-bench {
+    min-height: 0;
+  }
+}
+.ws-params,
+.ws-side {
+  /* the side columns take the bench's height and scroll inside it: opening a long answer never moves the page */
+  align-self: stretch;
+  height: 0;
+  min-height: 100%;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ws-params {
+  padding: 12px 14px;
+  /* parameters stay quiet: the circuit is the hero */
+  background: color-mix(in srgb, var(--surface-1) 70%, var(--bg));
+}
+.ws-side {
+  padding: 0;
+}
+.ws-bench {
+  min-width: 0;
+  min-height: 470px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 12px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ws-wave {
+  margin-top: 16px;
+  min-width: 0;
+}
+
+/* ── Parameters ──────────────────────────────────────────────────────────── */
+.wp-params {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wp-params-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wp-params-head .eyebrow {
+  margin: 0;
+}
+.wp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wp-note {
+  margin: 0;
+}
+.wp-advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* ── Circuit, status line, actions ───────────────────────────────────────── */
+.wp-circuit {
+  width: 100%;
+}
+.wp-circuit svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 440px;
+}
+.wp-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  border: 0;
+  width: 100%;
+}
+.wp-headline {
+  color: var(--text-1);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+.wp-fact::before {
+  content: '·';
+  margin-right: 12px;
+  color: var(--text-3);
+}
+.wp-time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wp-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.wp-dot--on {
+  background: #3987e5;
+}
+.wp-dot--off {
+  background: var(--good);
+}
+.wp-dot--idle {
+  background: var(--text-3);
+}
+.wp-path {
+  margin: 6px 2px 0;
+  color: var(--text-2);
+}
+.ws-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ws-act {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ws-act:hover {
+  color: var(--text-1);
+}
+.ws-act.on {
+  color: var(--text-1);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+.ws-act-icon {
+  color: var(--accent);
+  font-size: 13px;
+}
+.ws-act-badge {
+  font-size: 10px;
+  color: var(--warning);
+}
+
+/* ── Context ─────────────────────────────────────────────────────────────── */
+.ws-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+  z-index: 2;
+}
+.ws-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-height: 38px;
+}
+.ws-tabs button.on {
+  color: var(--text-1);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.ws-tabs--scroll {
+  overflow-x: auto;
+  padding: 0;
+  margin-bottom: 12px;
+}
+.ws-tabs--scroll button {
+  white-space: nowrap;
+}
+.ov-body .dc-state,
+.ov-body .dc-mode-panel,
+.ws-activity-body .dc-mode-panel {
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.why-next h3 {
+  color: var(--accent);
+}
+
+/* ── Waveforms ───────────────────────────────────────────────────────────── */
+.wp-add-menu {
+  min-width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.wp-add-group {
+  border: 0;
+  margin: 0 0 6px;
+  padding: 0;
+}
+.wp-add-group legend {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+.wp-shade {
+  display: inline-flex;
+  margin-top: 6px;
+}
+
+/* ── Panels: Inspect, Events, Analyze ────────────────────────────────────── */
+.wp-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.wp-parts .chip-btn.on {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.wp-more {
+  margin-top: 12px;
+}
+.wp-more summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* ── Overlays ────────────────────────────────────────────────────────────── */
+.ov {
+  background: var(--surface-1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.ov-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.ov-head .eyebrow {
+  margin: 0 0 2px;
+}
+.ov-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text-1);
+}
+.ov-title:focus {
+  outline: none;
+}
+.ov-close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 14px;
+}
+.ov-close:hover {
+  color: var(--text-1);
+}
+.ov-body {
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
+/* desktop: docked inside the page (never over the circuit) */
+.ov--dock {
+  border-radius: var(--radius);
+}
+.ws-bench .ov--dock {
+  border: 1px solid var(--border-strong);
+  margin-top: 4px;
+}
+/* tablet: a non-blocking side drawer below the top bar */
+.ov--drawer {
+  position: fixed;
+  top: 52px;
+  bottom: 0;
+  right: 0;
+  width: min(380px, 92vw);
+  z-index: 60;
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+}
+.ov--drawer.ov--left {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--border-strong);
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.35);
+}
+.ov--drawer.ov--wide {
+  width: min(640px, 96vw);
+}
+.ov--drawer .ov-body {
+  flex: 1;
+}
+/* phone: a modal bottom sheet */
+.ov-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(4, 6, 9, 0.6);
+  display: flex;
+  align-items: flex-end;
+}
+.ov--sheet {
+  width: 100%;
+  max-height: 86vh;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--border-strong);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+}
+.ov--sheet .ov-body {
+  flex: 1;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+.ov-grip {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  margin: 8px 0 0;
+}
+
+/* ── Tablet ──────────────────────────────────────────────────────────────── */
+.ws--tablet .ws-head-row {
+  margin-bottom: 10px;
+}
+.ws--tablet .ws-grid,
+.ws--phone .ws-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ws--tablet .ws-bench,
+.ws--phone .ws-bench {
+  min-height: 0;
+}
+
+/* ── Phone: circuit → status → waveform; a sticky action bar ─────────────── */
+.ws--phone {
+  padding: 0 10px 84px;
+}
+.ws--phone .ws-head {
+  padding: 8px 0 8px;
+  margin-bottom: 10px;
+}
+.ws--phone .ws-head-row {
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ws--phone .ws-back-text,
+.ws--phone .ws-tool-text,
+.ws--phone .ws-level {
+  display: none;
+}
+.ws--phone .ws-title h1 {
+  font-size: 16px;
+}
+.ws--phone .ws-switch {
+  max-width: 120px;
+}
+.ws--phone .ws-modes {
+  width: 100%;
+}
+.ws--phone .ws-modes-tabs {
+  flex: 1;
+}
+.ws--phone .ws-modes-tabs button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  min-height: 36px;
+}
+.ws--phone .ws-bench {
+  padding: 8px;
+  gap: 8px;
+}
+.ws--phone .wp-status-line {
+  font-size: 12.5px;
+  padding: 7px 10px;
+}
+.ws--phone .wp-time {
+  margin-left: 0;
+}
+.ws--phone .ws-wave {
+  margin-top: 10px;
+}
+.ws-actions--sticky {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  border-top: 1px solid var(--border-strong);
+  backdrop-filter: blur(6px);
+}
+.ws-actions--sticky .ws-act {
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 10.5px;
+}
+.ws-actions--sticky .ws-act.on {
+  background: var(--surface-3);
+}
+.ws-actions--sticky .ws-act-icon {
+  font-size: 16px;
+}
+.ws-actions--sticky .ws-act-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ── Change circuit menu ─────────────────────────────────────────────────── */
+.ws-switch-menu {
+  position: relative;
+}
+.ws-switch-menu summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ws-switch-menu summary::-webkit-details-marker {
+  display: none;
+}
+.ws-switch-menu[open] summary {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ws-switch-menu ul {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 190px;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.ws-switch-menu a {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 6px;
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 13.5px;
+}
+.ws-switch-menu a:hover,
+.ws-switch-menu a.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.ws-switch-menu ul {
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+.ws-switch-group {
+  display: block;
+  padding: 10px 10px 4px;
+  font-size: 10.5px;
+}
+.ws-switch-menu li:first-child .ws-switch-group {
+  padding-top: 4px;
+}
+
+/* ── Full-width body (e.g. side-by-side comparison) ──────────────────────── */
+.ws-full {
+  min-width: 0;
+  margin-top: 12px;
+}
+.ws-sheet-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.ws--phone .ws-sheet-foot .ws-level {
+  display: inline-block;
+}
+.ov .ws-level {
+  display: inline-block;
+}
+
+/* phone: the circuit keeps a readable size and scrolls sideways inside its card (never the page) */
+.ws--phone .wp-circuit {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.ws--phone .wp-circuit svg {
+  min-width: 560px;
+  max-height: none;
+}
+
+/* ── Simplified workspace (Phase 4): WHY + Explore, "More" modes, activity, generic views ─────────── */
+.ws-act--why {
+  color: var(--text-1);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong));
+  font-weight: 600;
+}
+.ws-act--why .ws-act-icon {
+  font-weight: 700;
+}
+.ws-explore {
+  position: relative;
+}
+.ws-explore-menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 250px;
+  display: grid;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+.ws-explore-menu button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-explore-menu button:hover,
+.ws-explore-menu button:focus-visible,
+.ws-explore-menu button.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.ws-check {
+  color: var(--accent);
+}
+/* phone: the menu opens upwards from the sticky bar, full width */
+.ws-actions--sticky .ws-explore {
+  position: static;
+  display: grid;
+}
+.ws-actions--sticky .ws-explore-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 6px;
+  right: 6px;
+  min-width: 0;
+}
+
+/* "More" practice modes */
+.ws-more-modes {
+  position: relative;
+}
+.ws-more-modes summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 13.5px;
+  white-space: nowrap;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+.ws-more-modes summary::-webkit-details-marker {
+  display: none;
+}
+.ws-more-modes summary.on {
+  color: var(--text-1);
+  font-weight: 600;
+  background: var(--surface-3);
+}
+.ws-more-modes ul {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.ws-more-modes ul button {
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.ws-more-modes ul button:hover,
+.ws-more-modes ul button.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+/* the current mode's own panel (lesson, experiment…) */
+.ws-activity {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px 14px;
+}
+.ws-side .ws-activity {
+  border: 0;
+  min-height: 100%;
+}
+.ws-activity--inline {
+  margin-top: 12px;
+}
+.ws-activity-head h2 {
+  font-size: 15px;
+  margin: 2px 0 10px;
+}
+
+/* status: the current path under the line */
+.wp-path-why {
+  margin-top: 4px;
+}
+.wp-path-why summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.wp-path-why ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* WHY: What → Why → Physical principle → What happens next */
+.wv-why {
+  display: grid;
+  gap: 10px;
+}
+.wv-question {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.wv-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wv-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.wv-steps dt {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.wv-steps dd {
+  margin: 0;
+  color: var(--text-1);
+  line-height: 1.5;
+}
+.wv-steps .why-next dt {
+  color: var(--accent);
+}
+.wv-eq {
+  display: block;
+  margin-top: 6px;
+}
+.wv-goto {
+  display: block;
+  margin-top: 6px;
+}
+.wv-more {
+  display: grid;
+  gap: 8px;
+  color: var(--text-2);
+}
+.wv-more-btn {
+  justify-self: start;
+}
+
+/* inspect · events · analyze */
+.wv-inspect h3 {
+  margin: 4px 0 0;
+}
+.wv-state {
+  display: inline-block;
+  margin: 8px 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-1);
+  font-weight: 650;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+.wv-events {
+  display: grid;
+  gap: 10px;
+}
+.wv-event-detail {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.wv-event-detail h3 {
+  margin: 4px 0 6px;
+  font-size: 14px;
+}
+.wv-event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.wv-event {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.wv-event:hover,
+.wv-event.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.wv-event-t {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wv-analyze-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+}
+.wv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wv-table th,
+.wv-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.wv-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wv-table thead th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+.wv-assumptions summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+}
+.wv-assumptions ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.store-detail {
+  grid-column: 1 / -1;
+}
+.wv-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: -4px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-2);
+}
+.wv-notice .text-btn {
+  margin-left: auto;
+}

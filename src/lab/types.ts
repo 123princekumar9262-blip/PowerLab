@@ -3,10 +3,10 @@ import type { Run, RunEvent } from '../converters/types.ts'
 
 /**
  * A TOPIC is one simulated subject of the platform (buck, boost, PWM lab, single-phase inverter…).
- * The lab shell (components/lab/LabShell.tsx) renders any topic with the same layout and the same
- * five modes — Explore, Learn, Experiment, Predict, Analyze — and progressive disclosure
- * (Beginner / Standard / Engineer). A topic supplies the physics and the words; the shell never
- * computes a physical value itself.
+ * The universal workspace shell (workspace/TopicShell.tsx) renders every topic with the same layout —
+ * parameters, circuit, one status line, WHY + Explore, waveforms — the modes Explore · Learn · Experiment
+ * (+ Predict), and progressive disclosure (Beginner / Standard / Engineer). A topic supplies the physics
+ * and the words; the shell never computes a physical value itself.
  */
 export type Density = 'beginner' | 'standard' | 'engineer'
 
@@ -171,6 +171,23 @@ export interface MeasureLabel {
   fmt: (v: number) => string
 }
 
+/**
+ * A category of the Analyze panel (workspace shell). `rows` name measurement keys (dotted paths allowed,
+ * e.g. "losses.q"); they are shown with their SIMULATION value and, when a compare row with the same key
+ * exists, its THEORY value. `tab` reuses one of `analyze.tabs`. Categories with nothing to show are hidden.
+ */
+export interface AnalysisCategory<R, M> {
+  id: string
+  label: string
+  rows?: string[]
+  tab?: string
+  note?(m: M, r: R): string | undefined
+}
+
+/** One-line physical state for the status line (workspace shell) — defined by the workspace contract. */
+import type { CurrentPath, EnergyModel, NextConsequence, StatusInfo } from '../workspace/contract.ts'
+export type { StatusInfo }
+
 export interface AnalyzeTab<P, R, M> {
   id: string
   label: string
@@ -227,6 +244,23 @@ export interface Topic<P, R extends Run, M, S> {
   experiments: Array<Experiment<P, M>>
   predictions(seed: number): Array<PredictTask<P, M>>
   measureLabels: Record<string, MeasureLabel>
+  // ── Optional: used by the universal workspace shell ──
+  /** The status line under the circuit, read from the state at the cursor. */
+  status?(st: S, r: R): StatusInfo
+  /** "Next consequence": what the present state leads to, from the run's own next event (null if none). */
+  next?(r: R, st: S, m: M): string | null
+  /** Analyze categories (Overview, Output, Current, Ripple, Power, Efficiency, Device stress…). */
+  analysis?: Array<AnalysisCategory<R, M>>
+  /** Inspectable parts (keyboard / small-screen access to the same inspector as clicking the circuit). */
+  parts?: Array<{ id: string; label: string }>
+  /** The next consequence with the time of the event it quotes (WHY → "Go to that instant"). */
+  nextConsequence?(r: R, st: S, m: M): NextConsequence | null
+  /** The conducting loop at the cursor (the "Show current path" overlay). */
+  path?(st: S, r: R): CurrentPath
+  /** Energy at the cursor as signed powers and stored energies (the shell's Energy panel). */
+  energyModel?(st: S, m: M, r: R): EnergyModel
+  /** The channels Focus view keeps (default: the first default channel). */
+  primaryChannels?: string[]
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -18,15 +18,61 @@ const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msed
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
-await page.goto(process.env.LAB_URL ?? 'http://localhost:5199/')
-await page.evaluate(() => localStorage.clear())
+const BASE = process.env.LAB_URL ?? 'http://localhost:5199/'
+await page.goto(BASE + '#/home')
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pel.prefs', JSON.stringify({ level: 'standard' })) })
+await page.goto(BASE + '#/labs/rectifiers/1ph-half-wave?load=RL')
 await page.reload()
-const mode = (name) => page.locator('.modes').getByRole('tab', { name, exact: true })
-const panelTab = (name) => page.locator('.panel-tabs').getByRole('tab', { name, exact: true })
+// The simplified workspace (Phase 4): modes as tabs (+ "More"), WHY, and one Explore menu.
+const MENU = { 'Current path': 'Show current path', Inspect: 'Inspect a component', Analyze: 'Measurements & theory', Measurements: 'Measurements & theory', Energy: 'Energy', Events: 'Switching events', State: 'State details', Focus: 'Focus view' }
+const explore = async (name) => {
+  await page.locator('.ws-explore-btn').click()
+  await page.locator('.ws-explore-menu').getByRole(/Show current path|Focus/.test(name) ? 'menuitemcheckbox' : 'menuitem', { name }).click()
+  await page.waitForTimeout(150)
+}
+const menuItems = async () => {
+  await page.locator('.ws-explore-btn').click()
+  const items = await page.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  await page.keyboard.press('Escape')
+  return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
+}
+const mode = (name) => ({
+  click: async () => {
+    if (['Explore', 'Learn', 'Experiment'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+    else {
+      await page.locator('.ws-more-modes summary').click()
+      await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()
+    }
+    await page.waitForTimeout(150)
+  },
+})
+const why = () => page.locator('.ws-act--why')
+const openWhy = async () => {
+  if (!(await page.locator('.wv-why').count())) await why().click()
+  if (!(await page.locator('.wv-more').count())) await page.locator('.wv-more-btn').click()
+}
+const openState = async () => {
+  if (!(await page.locator('.ov .state-headline').count())) await explore('State details')
+}
+const action = (name) => ({
+  click: async () => (name === 'WHY' ? openWhy() : explore(MENU[name])),
+  count: async () => (name === 'WHY' ? why().count() : (await menuItems()).includes(MENU[name]) ? 1 : 0),
+  innerText: async () => page.locator('.ws-explore-btn').innerText(),
+})
+const panelTab = (name) => ({
+  click: async () => {
+    if (name === 'State') return openState()
+    if (name === 'Why') return openWhy()
+    // the mode's own panel (lesson, experiment…) is always on the page: close whatever covers it
+    if (await page.locator('.ws-side .ov').count()) await page.locator('.ws-side .ov-close').click()
+  },
+})
+const headline = async () => {
+  await openState()
+  return page.locator('.ov .state-headline').innerText()
+}
 
-await page.getByRole('radio', { name: 'Half-wave', exact: true }).click()
-await page.getByRole('radio', { name: 'RL', exact: true }).click()
-await page.getByRole('button', { name: /Run simulation/ }).click()
+await page.waitForSelector('.scope-canvas canvas')
 await page.waitForTimeout(400)
 check((await page.locator('.circuit .diode').count()) === 1, 'RL rectifier without Dfw: one diode')
 check(!(await page.locator('.fw-panel').count()), 'no freewheel panel while Dfw is OFF')
@@ -35,19 +81,20 @@ check(!(await page.locator('.fw-panel').count()), 'no freewheel panel while Dfw 
 await page.getByRole('button', { name: /Freewheeling diode: OFF/ }).click()
 await page.waitForTimeout(500)
 check((await page.locator('.circuit .diode').count()) === 2, 'Dfw ON: schematic shows D1 and Dfw')
-check(/freewheeling diode/.test(await page.locator('.bench-title').innerText()), 'bench title names the freewheeling diode')
+check(/freewheeling diode/.test(await page.locator('.ws-head h1').innerText()), 'the workspace title names the freewheeling diode')
 check(await page.locator('.legend').getByText('Ifw', { exact: true }).isVisible(), 'scope offers the Ifw channel')
-await page.getByRole('button', { name: '+ Add channel' }).click()
+await page.getByRole('button', { name: '+ Add waveform' }).click()
 check(await page.locator('.channel-pop').getByRole('checkbox', { name: /^WL/ }).isVisible(), 'the E_L (WL) channel can be added')
 await page.keyboard.press('Escape')
-await page.locator('.bench-title').click()
+await page.locator('.ws-head h1').click()
 check((await page.locator('.flag[role="alert"]').count()) === 0, 'simulation agrees with theory (no ⚠ flag)')
-await page.getByRole('button', { name: /^Measurements/ }).click()
-await page.locator('.drawer').getByRole('tab', { name: 'Diodes', exact: true }).click()
-check(await page.locator('.drawer').getByText('Dfw conduction per cycle').isVisible(), 'Measurements → Diodes has the Dfw rows')
+await action('Analyze').click()
+await page.locator('.wv-analyze').getByRole('tab', { name: 'Device stress' }).click()
+check(await page.locator('.wv-analyze').getByText('Dfw conduction per cycle').isVisible(), 'Analyze → Device stress has the Dfw rows')
 await page.keyboard.press('Escape')
 
-// Step through conduction: step 5 = freewheel current flows
+// Step through conduction (State details): step 5 = freewheel current flows
+await openState()
 await page.getByRole('button', { name: /Step through conduction/ }).click()
 for (let k = 0; k < 4; k++) await page.getByRole('button', { name: 'Next step →' }).click()
 await page.waitForTimeout(300)
@@ -59,14 +106,14 @@ const vout = await page.locator('.fw-instant').innerText()
 check(/−0\.700 V/.test(vout), 'paused instant: Vout clamped at −Vf')
 check((await page.locator('svg.circuit path.wire--active').count()) > 0, 'active wires highlighted')
 await page.screenshot({ path: OUT + 'fw-10-freewheeling.png' })
-await page.getByRole('button', { name: /Current path/ }).click()
-const path = await page.locator('.path-vertical').innerText()
+await action('Current path').click()
+const path = await page.locator('.wp-path').innerText()
 check(/L[\s\S]*R[\s\S]*Dfw/.test(path), 'current path L → R → Dfw')
-await page.keyboard.press('Escape')
-await page.getByRole('button', { name: 'WHY?' }).click()
+await action('Current path').click()
+await action('WHY').click()
 await page.getByRole('button', { name: 'Show detailed explanation' }).click()
-const why = await page.locator('#fw-why li').count()
-check(why === 7, `"Why is Dfw ON?" has 7 steps (${why})`)
+const whySteps = await page.locator('#fw-why li').count()
+check(whySteps === 7, `"Why is Dfw ON?" has 7 steps (${whySteps})`)
 check(/E_L = ½·L·i²/.test(await page.locator('#fw-why').innerText()), 'WHY quotes E_L = ½·L·i²')
 
 // Physics Lens: ten stages
@@ -112,8 +159,13 @@ check((await page.locator('.circuit .diode').count()) === 1, 'Dfw OFF: back to t
 const body = await page.locator('body').innerText()
 check(!/NaN|Infinity|undefined/.test(body), 'no NaN / Infinity / undefined on the page')
 await page.setViewportSize({ width: 390, height: 844 })
+await page.waitForTimeout(300)
+// phones: the parameters (and the Dfw choice in Basic) open as a sheet
+await page.getByRole('button', { name: /Parameters/ }).click()
 await page.getByRole('button', { name: /Freewheeling diode: OFF/ }).click()
 await page.waitForTimeout(400)
+check((await page.locator('.circuit .diode').count()) === 2, 'phone: the parameters sheet fits the freewheeling diode')
+await page.keyboard.press('Escape')
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
 check(overflow <= 0, `no horizontal page scroll at 390 px (overflow ${overflow}px)`)
 check(errors.length === 0, `no console errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`)

@@ -1,4 +1,4 @@
-import { formatA, formatSI, formatTime, formatV } from '../../utils/format.ts'
+import { formatA, formatSI, formatTime, formatV, formatW } from '../../utils/format.ts'
 import { converterSample, segmentAverage } from '../engine.ts'
 import type { BuckInterval, ConverterEvent, ConverterKind, ConverterResult } from '../types.ts'
 import { dcdcBoundary } from './theory.ts'
@@ -324,5 +324,74 @@ export function eventWhy(e: ConverterEvent): string {
       return 'All energy stored in L has been delivered. Until the next gate pulse, only C feeds the load (DCM).'
     default:
       return ''
+  }
+}
+
+// ── Workspace shell: status line and "next consequence" (wording only, read from the run) ──────────
+
+/** One line for the status bar: the switch, what the inductor is doing, the diode — from the simulated devices. */
+export function dcdcStatus(st: DcdcState): { headline: string; facts: string[]; tone: 'on' | 'off' | 'idle' } {
+  if (st.interval === 'on')
+    return { headline: 'Switch ON', facts: [st.dildt >= 0 ? 'inductor charging (iL rising)' : 'iL falling', st.dOn ? 'diode ON' : 'diode OFF'], tone: 'on' }
+  // OFF: the buck's diode freewheels the load current; the boost's and buck-boost's diode delivers the inductor's energy to the output
+  if (st.interval === 'off') return { headline: 'Switch OFF', facts: [st.kind === 'buck' ? 'diode freewheeling' : 'diode feeds the output', st.dildt <= 0 ? 'inductor discharging (iL falling)' : 'iL rising'], tone: 'off' }
+  return { headline: 'Switch OFF', facts: ['diode OFF', 'iL = 0 (idle, discontinuous conduction)'], tone: 'idle' }
+}
+
+/**
+ * NEXT CONSEQUENCE: where the present interval ends, quoting the run's own next event (gate edge, diode
+ * turn-off, iL reaching zero). Null when the shown run has no such event ahead — nothing is invented.
+ */
+export function dcdcNextConsequence(r: ConverterResult, st: DcdcState): { text: string; time: number } | null {
+  const after = st.t + 0.5 * r.params.dt
+  const next = (kinds: string[]) => r.events.filter((e) => e.time > after && kinds.includes(e.kind)).sort((a, b) => a.time - b.time)[0]
+  const at = (t: number) => `t = ${formatTime(t)}`
+  const say = (text: string, e: { time: number }) => ({ text, time: e.time })
+  if (st.interval === 'on') {
+    const e = next(['gate-off'])
+    if (!e) return null
+    return say(`iL keeps ${st.dildt >= 0 ? 'rising' : 'falling'} at ${formatSlopeA(st.dildt)} (vL = ${formatV(st.vl)}) until the gate goes LOW at ${at(e.time)} — then Q1 turns OFF and the inductor forces its current through D1.`, e)
+  }
+  if (st.interval === 'off') {
+    const e = next(['gate-on', 'il-zero', 'diode-off'])
+    if (!e) return null
+    if (e.kind === 'gate-on') return say(`iL keeps falling at ${formatSlopeA(st.dildt)} through D1 until Q1 turns ON again at ${at(e.time)} — then the source drives iL up once more.`, e)
+    return say(`iL falls to zero at ${at(e.time)}: D1 turns OFF and nothing conducts until the next gate pulse (discontinuous conduction).`, e)
+  }
+  const e = next(['gate-on'])
+  if (!e) return null
+  return say(`Nothing conducts until Q1 turns ON at ${at(e.time)}; then iL starts rising from zero.`, e)
+}
+
+/** The next consequence in words (see dcdcNextConsequence for the event time it quotes). */
+export function dcdcNext(r: ConverterResult, st: DcdcState): string | null {
+  return dcdcNextConsequence(r, st)?.text ?? null
+}
+
+/**
+ * ENERGY at the cursor, from the simulated sample: every element's instantaneous power (+ absorbing,
+ * − supplying) — source, switch (vQ·iQ), diode (vD·iD), winding resistance (rL·iL²), ESR (esr·iC²),
+ * inductor (vL·iL), capacitor (vC·iC), load (vout²/R) — and the stored energies. Σp ≈ 0 is a check on
+ * the simulation (energy conservation), not an assumption: no element is computed as a remainder.
+ */
+export function dcdcEnergy(st: DcdcState, m: { elMax: number; voutMax: number; voutMin: number }, p: { c: number; rl: number; esr: number }) {
+  const ledger = [
+    { id: 'src', label: 'Source Vin', watts: -st.pin, note: 'supplies energy while Q1 (buck) draws from it' },
+    { id: 'q', label: 'Switch Q1', watts: st.vq * st.iq, note: 'conduction loss vQ·iQ' },
+    { id: 'd', label: 'Diode D1', watts: st.vd * st.id, note: 'conduction loss vD·iD while freewheeling' },
+    { id: 'l', label: 'Inductor L', watts: st.pL, note: 'stores ½·L·iL² (vL·iL: + storing, − releasing)' },
+    { id: 'c', label: 'Capacitor C', watts: st.pC, note: 'stores ½·C·vC² (vC·iC: + charging, − discharging)' },
+    { id: 'rl', label: 'Winding + ESR', watts: p.rl * st.il * st.il + p.esr * st.ic * st.ic, note: 'rL·iL² + ESR·iC² as heat' },
+    { id: 'r', label: 'Load R', watts: st.pout, note: 'turns energy into heat (always absorbing)' },
+  ]
+  const ecMax = 0.5 * p.c * Math.max(m.voutMax ** 2, m.voutMin ** 2)
+  return {
+    ledger,
+    stores: [
+      { id: 'l', label: 'Inductor EL = ½·L·iL²', joules: st.el, fraction: st.el / Math.max(m.elMax, 1e-15), detail: `${st.pL >= 0 ? 'storing' : 'releasing'} ${formatW(Math.abs(st.pL))}` },
+      { id: 'c', label: 'Capacitor EC = ½·C·vC²', joules: st.ec, fraction: st.ec / Math.max(ecMax, 1e-15), detail: `${st.pC >= 0 ? 'charging' : 'discharging'} ${formatW(Math.abs(st.pC))}` },
+    ],
+    balance: ledger.reduce((a, r) => a + r.watts, 0),
+    tolerance: 1e-6 * Math.max(1e-12, ...ledger.map((r) => Math.abs(r.watts))) + 1e-9,
   }
 }

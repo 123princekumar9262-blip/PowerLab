@@ -2,21 +2,26 @@
 
 **Understand the circuit by watching it work.**
 
-An interactive power-electronics laboratory. The top bar holds the modules:
-- **Rectifiers**
-- **DC-DC:** buck, boost, buck-boost
-- **PWM:** the PWM lab
-- **Inverters:** single-phase, three-phase, SPWM, SVPWM
-- **Devices:** MOSFET double-pulse test
-- **Drives:** DC motor on a 1Q/2Q chopper
-- **Magnetics:** gapped inductor, saturation
-- **Control:** closed-loop buck and boost
-- **EV:** drivetrain on a drive cycle, 0–100 km/h
-- **Engineering:** switch losses and thermal path
+An interactive power-electronics laboratory.
 
-Every module is built. See [DC-DC converters](#dc-dc-converters-buck),
-[PWM and inverters](#pwm-lab-and-inverters) and [the other modules](#control-devices-drives-magnetics-ev-engineering).
-The design documents are `docs/converters.md`, `docs/pwm-inverters.md` and `docs/modules.md`.
+**Navigation.**
+- **Home** (`#/home`) answers *what can I do here?*: continue learning, the labs, a recommended learning path, and recent items.
+- **Labs** (`#/labs`) lists the full catalogue, in three groups:
+  - **Conversion:** Rectifiers, DC-DC Converters (buck, boost, buck-boost), PWM, Inverters (single-phase, three-phase, SPWM, SVPWM).
+  - **Foundations:** Switching Devices (MOSFET double-pulse test), Magnetics (gapped inductor, saturation), Control (closed-loop buck and boost).
+  - **Systems:** Drives & Motors (DC motor on a 1Q/2Q chopper), Losses & Thermal (switch losses and the thermal path), EV Power Electronics (drivetrain on a drive cycle, 0–100 km/h).
+- **Lab landing pages** (`#/labs/:lab`) let you pick a circuit. **Workspaces** (`#/labs/:lab/:topic[/:mode]`) open it already running.
+- **Engineering** (`#/engineering`) is the practice area: Challenge and Reverse Engineering are ready; Design, Fault Diagnosis and Interview are coming soon.
+- **Progress** (`#/progress`) and **Settings** (`#/settings`, information level).
+- **Search:** Ctrl/⌘ K.
+- **Old links redirect:** `#dcdc` → `#/labs/dc-dc`, and `#engineering` → `#/labs/thermal`.
+
+Every lab and topic carries an honest READY / COMING SOON status from one catalogue file
+(`src/catalogue/catalogue.ts`); a unit test fails if READY ever points at something that does not work.
+See [DC-DC converters](#dc-dc-converters-buck), [PWM and inverters](#pwm-lab-and-inverters) and
+[the other modules](#control-devices-drives-magnetics-ev-engineering). The design documents are
+`docs/converters.md`, `docs/pwm-inverters.md`, `docs/modules.md` and the navigation redesign plan
+`docs/UI-ARCHITECTURE-REDESIGN.md`.
 
 The Rectifiers module is an interactive laboratory for rectifiers. Move a time cursor
 across the waveforms and the circuit diagram, the diode states, the current paths
@@ -39,11 +44,11 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
-**Tests.** 757 unit tests pass:
+**Tests.** 910 unit tests pass:
 
 | Area | Tests |
 |---|---|
-| Rectifier | 426 |
+| Rectifier | 467 |
 | Buck | 55 |
 | Boost / buck-boost | 78 |
 | PWM | 48 |
@@ -53,19 +58,27 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Drives | 22 |
 | Magnetics | 17 |
 | EV | 18 |
-| Engineering | 19 |
+| Losses & Thermal | 19 |
+| Shell (router, catalogue honesty, search, progress) | 14 |
+| Workspace shell (Buck: one timestep in every panel, Analyze) | 9 |
+| Rectifier in the workspace shell (golden numbers, status / next consequence, one sample in every region, Analyze, routing) | 37 |
+| Workspace contract on real runs (cursor never re-simulates, events, path, inspector, WHY, energy, Change circuit) | 17 |
+| Exact DC-DC solution bit-identical to its snapshot; `expm` bit-identical to the original | 35 |
 
-**Browser smoke suites.** Seven suites pass (336 checks):
+**Browser smoke suites.** Ten suites pass (623 checks):
 
 | Suite | Checks |
 |---|---|
-| Single-phase | 56 |
-| Three-phase | 40 |
-| Freewheeling diode | 29 |
+| Single-phase | 57 |
+| Three-phase | 41 |
+| Freewheeling diode | 30 |
 | Controlled / compare | 36 |
-| DC-DC | 55 |
+| DC-DC | 70 |
 | PWM / inverters | 33 |
-| Control, Devices, Drives, Magnetics, EV, Engineering | 87 |
+| Control, Devices, Drives, Magnetics, EV, Losses & Thermal | 93 |
+| Shell (Home, Labs, routes, redirects, Continue, level, search, Back, 390 px) | 70 |
+| Workspace shell (Buck at 1440/1024/820/768/390/375: regions, WHY + Explore, drawers, sheets, sync, Focus, levels) | 109 |
+| Rectifier workspace (six widths, entry points, WHY, Explore, Change circuit, levels, Focus, sheets, Compare) | 84 |
 
 ## Run it
 
@@ -80,9 +93,12 @@ npm run smoke        # browser smoke tests — need the dev server on port 5199:
 npm run smoke3       #   npm run dev -- --port 5199     (then, in another terminal)
 npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw && npm run smoke-ctl
 npm run smoke-ctl
-npm run smoke-dcdc   # DC-DC converters (http://localhost:5199/#dcdc)
-npm run smoke-inv    # PWM lab and inverters (#pwm, #inverters)
-npm run smoke-modules # Control, Devices, Drives, Magnetics, EV, Engineering
+npm run smoke-dcdc   # DC-DC converters (http://localhost:5199/#/labs/dc-dc)
+npm run smoke-inv    # PWM lab and inverters (#/labs/pwm, #/labs/inverters)
+npm run smoke-modules # Control, Devices, Drives, Magnetics, EV, Losses & Thermal
+npm run smoke-shell  # Home, Labs, landing pages, routing, Continue, search, phone width
+npm run smoke-workspace # the universal workspace shell (Buck) at six widths
+npm run smoke-rectifier-shell # the Rectifier Lab in the workspace shell at six widths
 ```
 
 The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
@@ -371,14 +387,29 @@ src/
   challenges/                design challenges and evaluation (Phase 10)
   visualization/             scope renderer (overlay/grouped/separate), signals, channel presets, scales, events
   state/                     reducer, playback, stepping, mode logic (useModes)
-  components/                Header, CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
-                             ChannelBar, FreewheelPanel, CompareView, StepThrough, ui/Drawer,
+  components/                CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
+                             ChannelBar, FreewheelPanel, CompareView, StepThrough,
                              panels/* (State, Why, Learn, Path, Inspect, Measurements, Theory, Events,
                              Firing, Overlap), compare/CompareLab, PhysicsLens, Scope, Transport,
                              EnergyPanel, ParameterPanel, MeasurementTable, EventPanels, modes/*
+  rectifier/                 RectifierShell (the Rectifier Lab's adapter into the workspace shell), analyze (its
+                             measurement rows as Analyze categories), carry (Change circuit keeps compatible values)
   styles/index.css           design tokens + layout
   styles/dcdc.css            platform bar + DC-DC module
-  Platform.tsx               module bar (all ten modules); #module deep links
+  Platform.tsx               the platform shell entry
+  catalogue/                 catalogue.ts — THE single source: labs, topics, status, routes, modes, path, keywords;
+                             search.ts — search index built from the catalogue
+  shell/                     AppShell (top bar, menu, search palette), router (hash routes + legacy redirects),
+                             pages (Home, Labs, landing pages, Engineering, Progress, Settings), WorkspacePage,
+                             prefs (information level), progress (Continue, Recent, learning path)
+  workspaces/                one lazily loaded workspace per lab, all in the universal workspace shell (the rectifier
+                             App via RectifierShell; every other lab's topics via TopicShell)
+  workspace/                 THE UNIVERSAL WORKSPACE SHELL (every lab): WorkspaceShell (header,
+                             parameters, circuit, one status line, WHY + Explore, waveforms; side panel on
+                             demand; dock/drawer/sheet overlays; Focus view), contract.ts (the shapes an adapter
+                             gives the shell), views.tsx (status, WHY, inspector, events, analysis, energy),
+                             carry.ts (Change circuit), useTopicWorkspace (one run, one master cursor), panels
+                             (a Topic's parameters, circuit, waveforms), TopicShell (adapter: any Topic → the shell)
   converters/                generic switched-circuit engine (gate schedules, exact switching, trapezoidal +
                              backward-Euler restarts, shooting steady state), schedule, fourier (+ Bessel), expm;
                              dcdc/ (buck, boost, buck-boost: model, exact + textbook theory, measure, compare,
@@ -389,8 +420,8 @@ src/
   converters/control|devices|drives|magnetics|ev|engineering/  model + simulation, independent theory, content
                              (state, WHY, compare, lessons, experiments, predictions)
   topics/                    dcdc, pwm, inverters, control, devices, drives, magnetics, ev, engineering — topic definitions
-  components/lab/            LabShell (five modes, progressive disclosure), LabScope, ParamsPanel, Panels,
-                             Analyze, Modes, SpectrumChart
+  components/lab/            the Topic labs' renderers used by the shell: LabScope, ParamsPanel, Panels (state
+                             card), Analyze (measurement table, numerical checks), Modes, SpectrumChart
   components/dcdc|pwm|inverter/  schematics (DC-DC, PWM block diagram, bridges + space-vector hexagon), DC-DC views
 tests/                       Vitest suites (physics, theory, limits, three-phase, controlled, freewheel, compare, UI, modes)
 scripts/smoke.mjs            Playwright end-to-end check (single-phase)
@@ -399,11 +430,16 @@ scripts/smoke-fw.mjs         Playwright end-to-end check (freewheeling diode)
 scripts/smoke-ctl.mjs        Playwright end-to-end check (controlled rectifiers, μ, Compare)
 scripts/smoke-dcdc.mjs       Playwright end-to-end check (platform + DC-DC converters)
 scripts/smoke-inv.mjs        Playwright end-to-end check (PWM lab + inverters)
-scripts/smoke-modules.mjs    Playwright end-to-end check (Control, Devices, Drives, Magnetics, EV, Engineering)
+scripts/smoke-modules.mjs    Playwright end-to-end check (Control, Devices, Drives, Magnetics, EV, Losses & Thermal)
+scripts/smoke-shell.mjs      Playwright end-to-end check (platform shell: navigation, routes, Continue, search, mobile)
+scripts/smoke-workspace.mjs  Playwright end-to-end check (universal workspace shell, Buck, six widths)
+scripts/smoke-rectifier-shell.mjs  Playwright end-to-end check (Rectifier Lab in the workspace shell, six widths)
 docs/simulation.md           the mathematical model (rectifiers)
 docs/converters.md           switched-circuit engine + DC-DC: equations, steady state, theory, validation, limitations
 docs/pwm-inverters.md        PWM lab and inverters: modulators, theory, validation, limitations
-docs/modules.md              Control, Devices, Drives, Magnetics, EV, Engineering: models, theory, validation, limitations
+docs/modules.md              Control, Devices, Drives, Magnetics, EV, Losses & Thermal: models, theory, validation, limitations
+docs/UI-ARCHITECTURE-REDESIGN.md  information-architecture redesign: audit, plan, phases (Phases 1–5 done)
+docs/WORKSPACE-SHELL-PLAN.md universal workspace shell: plan and Phase 2 implementation notes (Buck)
 ```
 
 ## Architecture

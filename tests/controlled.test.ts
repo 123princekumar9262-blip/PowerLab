@@ -75,16 +75,16 @@ describe('single-phase semi-controlled and fully controlled bridges', () => {
       expect(c.measurements.voutAvg).toBeCloseTo(((2 * Vm) / Math.PI) * Math.cos((a * Math.PI) / 180) - 1.4, 1)
     }
   })
-  it('theory agrees with simulation for every single-phase controlled circuit (R and RL, α = 0…90°)', () => {
-    const ids: CircuitId[] = ['half-wave:R', 'half-wave:RL', 'center-tap:RL', 'bridge:R', 'bridge:RL', 'semi-bridge:R', 'semi-bridge:RL']
-    for (const id of ids)
-      for (const a of [0, 45, 90])
-        for (const fw of [false, true]) {
-          const c = compareWithTheory(runSimulation(scr(a, { fw, cycles: 16 }), id))
-          const bad = c.rows.filter((x) => !x.withinTolerance).map((x) => `${x.key}: ${x.simulated} vs ${x.theory}`)
-          expect(bad, `${id} α=${a} fw=${fw}`).toEqual([])
-          expect(c.rows.filter((x) => x.kind === 'exact' && x.error !== null).length, `${id} α=${a}`).toBeGreaterThan(10)
-        }
+  // One case per configuration (42): each has its own time budget, and a failure names the circuit.
+  // (Was one 42-run test: under heavy host load its ~22–30 s total once crossed the shared timeout.)
+  const theoryCases = (['half-wave:R', 'half-wave:RL', 'center-tap:RL', 'bridge:R', 'bridge:RL', 'semi-bridge:R', 'semi-bridge:RL'] as CircuitId[]).flatMap((id) =>
+    [0, 45, 90].flatMap((a) => [false, true].map((fw) => [id, a, fw] as const)),
+  )
+  it.each(theoryCases)('theory agrees with simulation: %s, α = %i°, Dfw %s', (id, a, fw) => {
+    const c = compareWithTheory(runSimulation(scr(a, { fw, cycles: 16 }), id))
+    const bad = c.rows.filter((x) => !x.withinTolerance).map((x) => `${x.key}: ${x.simulated} vs ${x.theory}`)
+    expect(bad, `${id} α=${a} fw=${fw}`).toEqual([])
+    expect(c.rows.filter((x) => x.kind === 'exact' && x.error !== null).length, `${id} α=${a}`).toBeGreaterThan(10)
   })
   it('the theory says when no closed form applies (capacitor filter fed by SCRs)', () => {
     const c = compareWithTheory(runSimulation(scr(30), 'bridge:RC'))

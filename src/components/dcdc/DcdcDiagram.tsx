@@ -9,6 +9,8 @@ interface Props {
   selected: string | null
   onSelect: (part: DcdcPart) => void
   values: boolean
+  /** Workspace shell: no caption (the status line says it) and no live numbers unless `values`. */
+  minimal?: boolean
 }
 
 const TOP = 62
@@ -20,7 +22,7 @@ const MID = (TOP + GND) / 2
  * current and in which direction, the capacitor charging or discharging) is read from the simulated
  * sample at the cursor. Wires are drawn in the direction conventional current flows when active.
  */
-export function DcdcDiagram({ st, params, showPath, selected, onSelect, values }: Props) {
+export function DcdcDiagram({ st, params, showPath, selected, onSelect, values, minimal = false }: Props) {
   const kind = st.kind
   const on = st.interval === 'on'
   const off = st.interval === 'off'
@@ -186,9 +188,11 @@ export function DcdcDiagram({ st, params, showPath, selected, onSelect, values }
       <g {...part('out', `Output, Vout = ${formatV(st.vout)}`)}>
         <circle cx={X.out} cy={TOP} r={9} className="cpart-hit" />
         <circle cx={X.out} cy={TOP} r={4} className="node-dot" />
-        <text x={(X.out + X.r) / 2} y={TOP - 14} textAnchor="middle" className="cvalue cvalue--out">
-          Vout {formatV(st.vout)}
-        </text>
+        {(!minimal || values) && (
+          <text x={(X.out + X.r) / 2} y={TOP - 14} textAnchor="middle" className="cvalue cvalue--out">
+            Vout {formatV(st.vout)}
+          </text>
+        )}
       </g>
       <circle cx={X.out} cy={GND} r={3} className="node-dot" />
     </>
@@ -204,7 +208,7 @@ export function DcdcDiagram({ st, params, showPath, selected, onSelect, values }
       )}
     </g>
   )
-  const caption = (
+  const caption = minimal ? null : (
     <text x={345} y={GND + 44} className="path-caption" textAnchor="middle">
       {on ? 'Switch ON' : off ? 'Freewheeling' : 'Idle (DCM)'} · {st.pathText}
     </text>

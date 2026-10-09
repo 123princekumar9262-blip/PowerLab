@@ -96,6 +96,25 @@ export function dcdcExact(p: ResolvedConverter): DcdcExact {
   const flowOffFull = affineFlow(off.A, off.b, Ts - tOn)
   const offAt = (x1: number[], t: number) => affineFlow(off.A, off.b, t)(x1)
   const idleAt = (v: number, t: number) => affineFlow(idle.A, idle.b, t)([0, v])
+  // The DCM search below evaluates the same flows over and over (the scan grid and the bisection midpoints
+  // recur on every outer iteration: ~75 % of its matrix exponentials). Reuse each flow for an identical
+  // step length — the very same function of the very same input, so every result is bit-identical. The
+  // cache lives only for this call; at() below keeps the uncached flows.
+  const memo = (A: number[][], b: number[]) => {
+    const flows = new Map<number, (x: number[]) => number[]>()
+    return (t: number) => {
+      let f = flows.get(t)
+      if (!f) {
+        f = affineFlow(A, b, t)
+        flows.set(t, f)
+      }
+      return f
+    }
+  }
+  const offFlow = memo(off.A, off.b)
+  const idleFlow = memo(idle.A, idle.b)
+  const offAtCached = (x1: number[], t: number) => offFlow(t)(x1)
+  const idleAtCached = (v: number, t: number) => idleFlow(t)([0, v])
 
   // CCM: x0 = Φoff(Φon(x0)) — affine: solve (I − M)·x0 = c.
   const map = (x: number[]) => flowOffFull(flowOn(x))
@@ -123,7 +142,7 @@ export function dcdcExact(p: ResolvedConverter): DcdcExact {
       const N = 64
       for (let j = 1; j <= N; j++) {
         const t = (span * j) / N
-        if (offAt(x1, t)[0] <= 0) {
+        if (offAtCached(x1, t)[0] <= 0) {
           hi = t
           lo = (span * (j - 1)) / N
           break
@@ -131,7 +150,7 @@ export function dcdcExact(p: ResolvedConverter): DcdcExact {
       }
       for (let it = 0; it < 80; it++) {
         const mid = (lo + hi) / 2
-        if (offAt(x1, mid)[0] > 0) lo = mid
+        if (offAtCached(x1, mid)[0] > 0) lo = mid
         else hi = mid
       }
       return hi
@@ -139,8 +158,8 @@ export function dcdcExact(p: ResolvedConverter): DcdcExact {
     const cycle = (v0: number) => {
       const x1 = flowOn([0, v0])
       const t2 = Math.min(diodeOff(x1), span)
-      const x2 = offAt(x1, t2)
-      return { t2, vEnd: idleAt(x2[1], span - t2)[1] }
+      const x2 = offAtCached(x1, t2)
+      return { t2, vEnd: idleAtCached(x2[1], span - t2)[1] }
     }
     // g(v0) = vC(Ts) − v0 changes sign at the periodic start voltage: bracket around the ideal DCM
     // estimate (expanding as needed), then bisect.

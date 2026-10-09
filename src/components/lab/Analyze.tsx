@@ -1,34 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { Run } from '../../converters/types.ts'
-import type { AnyTopic, CompareResult, CompareRow, Density } from '../../lab/types.ts'
+import type { AnyTopic, CompareResult, CompareRow } from '../../lab/types.ts'
 import { formatSI } from '../../utils/format.ts'
 
 const fmt = (row: CompareRow, v: number) => (row.unit === '%' ? `${(v * 100).toFixed(2)} %` : row.unit === '°' ? `${v.toFixed(2)}°` : formatSI(v, row.unit))
 const fmtErr = (row: CompareRow) => (row.absolute ? `${(row.error * 100).toFixed(3)} pt` : `${(row.error * 100).toFixed(3)} %`)
 
-/** ANALYZE: measurements with their theory, the derivation, topic tabs and the numerical checks. */
-export function AnalyzePanel({ topic, r, m, p, density }: { topic: AnyTopic; r: Run; m: unknown; p: unknown; density: Density }) {
-  const [tab, setTab] = useState('measure')
-  const cmp = useMemo(() => topic.analyze.compare(r, m), [topic, r, m])
-  const tabs: Array<[string, string]> = [['measure', 'Measurements'], ['theory', 'Theory'], ...(topic.analyze.tabs ?? []).map((t) => [t.id, t.label] as [string, string]), ['numerics', 'Numerical checks']]
-  const extra = topic.analyze.tabs?.find((t) => t.id === tab)
-  return (
-    <section className="dc-analyze" aria-label="Analyze">
-      <div className="seg tabs-seg" role="tablist" aria-label="Analysis">
-        {tabs.map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-      {tab === 'measure' && <MeasureTable cmp={cmp} />}
-      {tab === 'theory' && <div className="dc-theory">{topic.analyze.theory(r, m)}</div>}
-      {extra && extra.render({ r, m, p, density })}
-      {tab === 'numerics' && <Numerics topic={topic} r={r} p={p} cmp={cmp} />}
-    </section>
-  )
-}
-
+/** Measurements with their theory: the exact solution or the textbook formula, side by side with the simulation. */
 export function MeasureTable({ cmp }: { cmp: CompareResult }) {
   const [theory, setTheory] = useState<'textbook' | 'exact'>('textbook')
   return (
@@ -116,7 +94,7 @@ export function MeasureTable({ cmp }: { cmp: CompareResult }) {
   )
 }
 
-function Numerics({ topic, r, p, cmp }: { topic: AnyTopic; r: Run; p: unknown; cmp: CompareResult }) {
+export function Numerics({ topic, r, p, cmp }: { topic: AnyTopic; r: Run; p: unknown; cmp: CompareResult }) {
   const d = r.diagnostics
   const keys = topic.analyze.convergence ?? cmp.rows.slice(0, 2).map((x) => x.key)
   const [conv, setConv] = useState<null | Array<{ spp: number; errs: number[] }>>(null)

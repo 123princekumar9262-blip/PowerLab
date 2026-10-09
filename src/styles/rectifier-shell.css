@@ -1,0 +1,58 @@
+/* The Rectifier Lab's own styles inside the universal workspace shell (imported by RectifierShell). */
+
+/* the parameter column is narrow at every width: one column (its old full-width grid does not apply) */
+.ws .ws-params .params {
+  display: block;
+}
+/* the lab's existing panels sit inside the shell's cards, panels and sheets: no second frame */
+.ws .ws-params .params,
+.ws .ov-body .state,
+.ws .ov-body .why-panel,
+.ws .ov-body .learn-tab,
+.ws .ov-body .energy,
+.ws .ov-body .mode-panel,
+.ws .ov-body .measure,
+.ws .ws-activity-body .mode-panel,
+.ws .ws-activity-body .energy {
+  border: 0;
+  background: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+.rx-circuit-choice {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.rx-load {
+  flex-wrap: wrap;
+}
+.rx-load .pick {
+  padding: 5px 11px;
+}
+.rx-circuit-choice .fw-toggle {
+  justify-self: start;
+}
+/* live numbers on the circuit only at Engineer (the status line, State and Inspect carry them) */
+.rx-circuit--quiet text.value {
+  display: none;
+}
+.rx-equations {
+  margin-top: 14px;
+}
+.rx-equations > summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+/* phones: the schematic keeps a legible size and scrolls sideways inside its card (as Buck) */
+.ws--phone .rx-circuit {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.ws--phone .rx-circuit .circuit-wrap {
+  min-width: 560px;
+}

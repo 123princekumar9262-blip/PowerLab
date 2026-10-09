@@ -17,7 +17,10 @@
     "smoke-ctl": "node scripts/smoke-ctl.mjs",
     "smoke-dcdc": "node scripts/smoke-dcdc.mjs",
     "smoke-inv": "node scripts/smoke-inv.mjs",
-    "smoke-modules": "node scripts/smoke-modules.mjs"
+    "smoke-modules": "node scripts/smoke-modules.mjs",
+    "smoke-shell": "node scripts/smoke-shell.mjs",
+    "smoke-workspace": "node scripts/smoke-workspace.mjs",
+    "smoke-rectifier-shell": "node scripts/smoke-rectifier-shell.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

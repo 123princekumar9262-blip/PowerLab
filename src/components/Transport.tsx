@@ -15,6 +15,8 @@ interface Props {
   onStep: (dir: 1 | -1) => void
   onSpeed: (s: number) => void
   onStepMode: (m: StepMode) => void
+  /** Play, reset and step only (step size and speed are shown from the Standard level). */
+  simple?: boolean
 }
 
 const STEP_MODES: Array<{ id: StepMode; label: string; title: string }> = [
@@ -44,6 +46,7 @@ export function Transport(p: Props) {
         <button className="t-btn" onClick={() => p.onStep(1)} aria-label="Step forward" title="Step forward (→)">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10l7-5z" /><rect x="11.2" y="3" width="1.8" height="10" rx=".6" /></svg>
         </button>
+        {!p.simple && (
         <div className="seg" role="radiogroup" aria-label="Step size">
           {STEP_MODES.map((m) => (
             <button key={m.id} role="radio" aria-checked={p.stepMode === m.id} className={p.stepMode === m.id ? 'on' : ''} onClick={() => p.onStepMode(m.id)} title={m.title}>
@@ -51,8 +54,10 @@ export function Transport(p: Props) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
+      {!p.simple && (
       <div className="seg" role="radiogroup" aria-label="Playback speed" title="1× = one source cycle every 4 s (slow motion)">
         {SPEEDS.map((s) => (
           <button key={s} role="radio" aria-checked={p.speed === s} className={p.speed === s ? 'on' : ''} onClick={() => p.onSpeed(s)}>
@@ -60,6 +65,7 @@ export function Transport(p: Props) {
           </button>
         ))}
       </div>
+      )}
       <div className="transport-readout" aria-live="off">
         <span>
           <em>t</em> {formatTime(p.time)}

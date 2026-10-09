@@ -1,0 +1,843 @@
+/* ============================================================================
+   Platform shell: top bar, Home, Labs, landing pages, Engineering, Progress,
+   Settings, search. Same tokens as the labs (index.css). Calm by design:
+   restrained borders, no glow, one accent, generous whitespace.
+   ========================================================================== */
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.shell-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 52px;
+  padding: 0 20px;
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-1);
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.shell-mark svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+.shell-mark .brand-tri {
+  fill: var(--accent);
+}
+.shell-nav {
+  display: flex;
+  gap: 4px;
+}
+.shell-nav a,
+.menu-sheet a {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 7px;
+}
+.shell-nav a:hover,
+.menu-sheet a:hover {
+  color: var(--text-1);
+  background: var(--surface-3);
+}
+.shell-nav a.on {
+  color: var(--text-1);
+  background: var(--surface-3);
+}
+.shell-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shell-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.shell-search:hover {
+  color: var(--text-2);
+  border-color: var(--text-3);
+}
+.shell-search-text {
+  flex: 1;
+  text-align: left;
+}
+.shell-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.shell-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-2);
+  font-size: 17px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.shell-icon:hover,
+.shell-icon.on {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.shell-menu-btn {
+  display: none;
+}
+.menu-sheet {
+  display: none;
+}
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 12px;
+  padding: 8px 12px;
+  background: var(--surface-3);
+  color: var(--text-1);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+.shell-main:focus {
+  outline: none;
+}
+
+/* ── Pages ───────────────────────────────────────────────────────────────── */
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 36px 24px 72px;
+}
+.page--narrow {
+  max-width: 760px;
+}
+.page h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+.page h1:focus {
+  outline: none;
+}
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.page-lead {
+  margin: 8px 0 0;
+  color: var(--text-2);
+  font-size: 15px;
+  max-width: 62ch;
+  line-height: 1.5;
+}
+.section-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.section-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.group-title {
+  margin: 26px 0 10px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.muted {
+  color: var(--text-3);
+}
+.small {
+  font-size: 13px;
+}
+.page :is(p, .recent) a:not(.btn) {
+  color: var(--accent);
+}
+
+/* ── Status (always text) ────────────────────────────────────────────────── */
+.status {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.status--ready {
+  border-color: color-mix(in srgb, var(--good) 45%, transparent);
+  color: #7ad69a;
+}
+.status--coming-soon {
+  color: var(--text-3);
+}
+.status--in-development {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--text-3);
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #08111f;
+}
+.btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+/* ── Home ────────────────────────────────────────────────────────────────── */
+.home-head {
+  margin-bottom: 26px;
+}
+.hero {
+  padding: 22px 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-1);
+  max-width: 640px;
+  margin-bottom: 40px;
+}
+.hero .eyebrow {
+  margin: 0 0 6px;
+}
+.hero-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--text-1);
+}
+.hero-meta {
+  margin: 6px 0 16px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.home-section {
+  margin-bottom: 40px;
+}
+.lab-group .group-title {
+  margin-top: 18px;
+}
+
+/* ── Lab cards ───────────────────────────────────────────────────────────── */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.lab-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.lab-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: inherit;
+  text-decoration: none;
+  min-height: 44px;
+}
+.lab-card:hover,
+.lab-card:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.lab-card--compact {
+  padding: 11px 14px;
+}
+.lab-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--accent);
+  font-size: 15px;
+}
+.lab-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lab-card-title {
+  color: var(--text-1);
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.lab-card-line {
+  color: var(--text-2);
+  font-size: 13px;
+}
+.lab-card-detail {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* ── Learning path ───────────────────────────────────────────────────────── */
+.lpath {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lpath--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.lpath--compact .lpath-step a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+.lpath-mark {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.lpath-step--done a {
+  color: var(--text-2);
+}
+.lpath-step--done .lpath-mark {
+  color: var(--good);
+}
+.lpath-step--recommended a {
+  border-color: var(--accent) !important;
+  color: var(--text-1) !important;
+}
+.lpath-step--recommended .lpath-mark {
+  color: var(--accent);
+}
+.lpath-step--started .lpath-mark {
+  color: var(--text-2);
+}
+.lpath--full .lpath-step a {
+  display: grid;
+  grid-template-columns: 18px 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-1);
+  text-decoration: none;
+}
+.lpath--full .lpath-step a:hover {
+  background: var(--surface-1);
+}
+.lpath-n {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.lpath-meta {
+  color: var(--text-3);
+  font-size: 12.5px;
+  text-align: right;
+}
+.recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recent a {
+  font-size: 14px;
+  text-decoration: none;
+}
+.recent a:hover {
+  text-decoration: underline;
+}
+
+/* ── Landing pages ───────────────────────────────────────────────────────── */
+.crumbs ol {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.crumbs li + li::before {
+  content: '›';
+  margin-right: 6px;
+  color: var(--text-3);
+}
+.crumbs a {
+  color: var(--text-2) !important;
+  text-decoration: none;
+}
+.crumbs a:hover {
+  color: var(--text-1) !important;
+}
+.topic-section .group-title {
+  margin-top: 22px;
+}
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.topic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: inherit;
+  text-decoration: none;
+  min-height: 44px;
+}
+a.topic-card:hover,
+a.topic-card:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.topic-card--soon {
+  background: none;
+  border-style: dashed;
+}
+.topic-title {
+  color: var(--text-1);
+  font-weight: 600;
+  font-size: 14px;
+}
+.topic-card--soon .topic-title {
+  color: var(--text-2);
+}
+.topic-line {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.lab-foot {
+  margin-top: 36px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.lab-foot p {
+  margin: 4px 0;
+}
+.notice {
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-2);
+  font-size: 14px;
+}
+.chain {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.chain-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chain-arrow {
+  color: var(--text-3);
+}
+.chain-box {
+  padding: 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 13.5px;
+}
+
+/* ── Engineering ─────────────────────────────────────────────────────────── */
+.area-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+.area-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+.area-row:hover {
+  background: var(--surface-1);
+}
+.area-title {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.area-line {
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+.soon-box {
+  padding: 14px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-2);
+}
+.soon-box p {
+  margin: 4px 0;
+}
+
+/* ── Settings ────────────────────────────────────────────────────────────── */
+.level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.level-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.level-option.on {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.level-name {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.level-detail {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* ── Workspace bar ───────────────────────────────────────────────────────── */
+.workspace-page {
+  min-width: 0;
+}
+.ws-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px 0;
+  min-width: 0;
+}
+.ws-back {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 13px;
+  white-space: nowrap;
+  padding: 6px 0;
+}
+.ws-back:hover {
+  color: var(--text-1);
+}
+.ws-bar .crumbs ol {
+  margin: 0;
+}
+.ws-loading {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text-3);
+}
+
+/* the rectifier lab's one-time hint (replaces the permanent guide) */
+.first-hint button {
+  white-space: nowrap;
+}
+.first-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  color: var(--text-2);
+}
+
+/* ── Search palette ──────────────────────────────────────────────────────── */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(4, 6, 9, 0.62);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10vh 16px 16px;
+}
+.palette {
+  width: min(620px, 100%);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.palette-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 16px;
+  padding: 15px 18px;
+  outline: none;
+}
+.palette-empty {
+  padding: 12px 18px;
+}
+.palette-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip-btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip-btn:hover {
+  color: var(--text-1);
+}
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.palette-list li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.palette-list li.on {
+  background: var(--surface-3);
+}
+.pr-kind {
+  flex: none;
+  width: 64px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.pr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pr-title {
+  color: var(--text-1);
+  font-size: 14px;
+}
+.pr-detail {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.palette-foot {
+  margin: 0;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .shell-bar {
+    gap: 10px;
+    padding: 0 12px;
+  }
+  .shell-nav {
+    display: none;
+  }
+  .shell-search {
+    min-width: 0;
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+  .shell-search-text,
+  .shell-kbd {
+    display: none;
+  }
+  .shell-actions > a.shell-icon {
+    display: none;
+  }
+  .shell-menu-btn {
+    display: inline-grid;
+  }
+  .menu-sheet {
+    display: block;
+    position: sticky;
+    top: 52px;
+    z-index: 49;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px 12px;
+  }
+  .menu-sheet nav {
+    display: flex;
+    flex-direction: column;
+  }
+  .menu-sheet a {
+    padding: 12px;
+    font-size: 15px;
+  }
+  .menu-sheet a.on {
+    color: var(--text-1);
+    background: var(--surface-3);
+  }
+  .page {
+    padding: 22px 16px 56px;
+  }
+  .page h1 {
+    font-size: 23px;
+  }
+  .page-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .hero {
+    padding: 18px;
+  }
+  .ws-bar {
+    padding: 8px 12px 0;
+  }
+  .ws-bar .crumbs {
+    display: none;
+  }
+  /* the lab shell's mode tabs scroll inside their bar instead of widening the page */
+  .palette-backdrop {
+    padding-top: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .shell-name {
+    font-size: 13px;
+  }
+  .lab-grid,
+  .lab-grid--compact,
+  .topic-grid {
+    grid-template-columns: 1fr;
+  }
+}

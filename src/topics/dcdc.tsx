@@ -2,7 +2,7 @@ import { DcdcDiagram } from '../components/dcdc/DcdcDiagram.tsx'
 import { DcdcBadge, DcdcEnergy, DcdcStress, DcdcSweep, DcdcTheory, dcdcInspect } from '../components/dcdc/DcdcViews.tsx'
 import { BUCK_EXPERIMENTS, BUCK_LESSONS, buckPredictTasks } from '../converters/buck/learn.ts'
 import { compareDcdc } from '../converters/dcdc/compare.ts'
-import { dcdcStateAt, dcdcWhy, eventLabel, eventWhy, formatSlopeA, formatSlopeV, INTERVAL_NAME, type DcdcState } from '../converters/dcdc/explain.ts'
+import { dcdcEnergy, dcdcNext, dcdcNextConsequence, dcdcStateAt, dcdcStatus, dcdcWhy, eventLabel, eventWhy, formatSlopeA, formatSlopeV, INTERVAL_NAME, type DcdcState } from '../converters/dcdc/explain.ts'
 import { BOOST_LESSONS, BUCK_BOOST_LESSONS, dcdcExperiments, dcdcLessonTime, dcdcPredictTasks, type DcdcLesson } from '../converters/dcdc/learn.ts'
 import { measureDcdc, type DcdcMeasurements } from '../converters/dcdc/measure.ts'
 import { dcdcModel } from '../converters/dcdc/model.ts'
@@ -10,8 +10,8 @@ import { dcdcBoundary, dcdcTextbook } from '../converters/dcdc/theory.ts'
 import { simulateCircuit } from '../converters/engine.ts'
 import { BUCK_LIMITS, DCDC_DEFAULTS, resolveConverter } from '../converters/params.ts'
 import type { ConverterKind, ConverterParams, ConverterResult } from '../converters/types.ts'
-import type { ChannelMeta, Experiment, Lesson, MeasureLabel, ParamSpec, PredictTask, StateRow, Topic } from '../lab/types.ts'
-import { formatA, formatSI, formatTime, formatV } from '../utils/format.ts'
+import type { AnalysisCategory, ChannelMeta, Experiment, InspectInfo, Lesson, MeasureLabel, ParamSpec, PredictTask, StateRow, Topic } from '../lab/types.ts'
+import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
 
 /**
  * Converter channels. Colour follows the ENTITY: switch Q1 blue, diode D1 green, inductor red,
@@ -187,3 +187,91 @@ export function dcdcTopic(kind: ConverterKind): Topic<ConverterParams, Converter
   }
 }
 
+
+// ── Buck in the universal workspace shell (Phase 2 reference) ─────────────────────────────────────────
+
+const byKey = (k: string) => DCDC_BASIC.find((x) => x.key === k)!
+/** Basic: what operates the circuit. L and C stay one click away under Advanced (same values, same lessons). */
+const BUCK_BASIC: Array<ParamSpec<ConverterParams>> = [byKey('vin'), byKey('fs'), byKey('duty'), byKey('r')]
+const BUCK_ADVANCED: Array<ParamSpec<ConverterParams>> = [byKey('l'), byKey('c'), ...DCDC_ADVANCED]
+
+const BUCK_LABELS: Record<string, MeasureLabel> = {
+  ...DCDC_MEASURE_LABELS,
+  ioAvg: { label: 'Iout (average)', fmt: (v) => formatA(v) },
+  pinAvg: { label: 'Pin (average)', fmt: (v) => formatW(v) },
+  poutAvg: { label: 'Pout (average)', fmt: (v) => formatW(v) },
+  'losses.q': { label: 'Switch Q1 loss', fmt: (v) => formatW(v) },
+  'losses.d': { label: 'Diode D1 loss', fmt: (v) => formatW(v) },
+  'losses.dcr': { label: 'Inductor DCR loss', fmt: (v) => formatW(v) },
+  'losses.esr': { label: 'Capacitor ESR loss', fmt: (v) => formatW(v) },
+  'losses.total': { label: 'Total loss', fmt: (v) => formatW(v) },
+  iqPeak: { label: 'Switch peak current', fmt: (v) => formatA(v) },
+  iqRms: { label: 'Switch RMS current', fmt: (v) => formatA(v) },
+  idRms: { label: 'Diode RMS current', fmt: (v) => formatA(v) },
+  vqMax: { label: 'Switch blocking voltage', fmt: (v) => formatV(v, false) },
+  vdReverseMax: { label: 'Diode reverse voltage', fmt: (v) => formatV(v, false) },
+  d2: { label: 'Diode conduction D2', fmt: (v) => `${(v * 100).toFixed(1)} %` },
+}
+
+/** Analyze categories: existing measurements only (SIMULATION, with THEORY where a compare row exists). */
+const BUCK_ANALYSIS: Array<AnalysisCategory<ConverterResult, DcdcMeasurements>> = [
+  { id: 'overview', label: 'Overview', rows: ['voutAvg', 'ilAvg', 'mode', 'efficiency'] },
+  { id: 'output', label: 'Output', rows: ['voutAvg', 'voutPP', 'ioAvg'] },
+  { id: 'current', label: 'Current', rows: ['ilAvg', 'ilMax', 'ilMin', 'ilPP', 'icRms'] },
+  {
+    id: 'ripple',
+    label: 'Ripple',
+    rows: ['ilPP', 'voutPP', 'd2', 'd3'],
+    note: (m, r) => {
+      const b = dcdcBoundary(r.params)
+      return `${m.mode} (SIMULATION). The CCM/DCM boundary (theory): Lcrit = ${formatSI(b.lCrit, 'H')}, Rcrit = ${formatSI(b.rCrit, 'Ω')}.`
+    },
+  },
+  { id: 'power', label: 'Power', rows: ['pinAvg', 'poutAvg', 'losses.total'] },
+  { id: 'efficiency', label: 'Efficiency', rows: ['efficiency', 'losses.q', 'losses.d', 'losses.dcr', 'losses.esr'] },
+  { id: 'stress', label: 'Device stress', tab: 'stress' },
+]
+
+const BUCK_PARTS = [
+  { id: 'vin', label: 'Source Vin' },
+  { id: 'q1', label: 'Switch Q1' },
+  { id: 'd1', label: 'Diode D1' },
+  { id: 'l', label: 'Inductor L' },
+  { id: 'c', label: 'Capacitor C' },
+  { id: 'r', label: 'Load R' },
+]
+
+/** The inspector of the shell adds what a storage element is doing right now (from the simulated power into it). */
+function buckInspect(part: string, st: DcdcState, m: DcdcMeasurements, r: ConverterResult): InspectInfo {
+  const info = dcdcInspect(part, st, m, r)
+  const eps = 1e-9 * Math.max(1, Math.abs(m.pinAvg))
+  if (part === 'l') return { ...info, rows: [['State now', st.pL > eps ? 'STORING ENERGY' : st.pL < -eps ? 'RELEASING ENERGY' : st.il === 0 ? 'NO CURRENT' : 'STEADY'], ...info.rows] }
+  if (part === 'c') return { ...info, rows: [['State now', st.pC > eps ? 'CHARGING' : st.pC < -eps ? 'DISCHARGING' : 'STEADY'], ...info.rows] }
+  return info
+}
+
+/** A DC-DC converter as the universal workspace shell shows it: the same simulator, configured for progressive disclosure. */
+export function dcdcShellTopic(kind: ConverterKind): Topic<ConverterParams, ConverterResult, DcdcMeasurements, DcdcState> {
+  const t = dcdcTopic(kind)
+  return {
+    ...t,
+    title: TITLES[kind],
+    basic: BUCK_BASIC,
+    advanced: BUCK_ADVANCED,
+    defaultChannels: ['gate', 'vout', 'il'],
+    measureLabels: BUCK_LABELS,
+    inspect: buckInspect,
+    status: (st) => dcdcStatus(st),
+    next: (r, st) => dcdcNext(r, st),
+    nextConsequence: (r, st) => dcdcNextConsequence(r, st),
+    path: (st) => ({ elements: st.path, text: st.pathText, reasons: [] }),
+    energyModel: (st, m, r) => dcdcEnergy(st, m, r.params),
+    primaryChannels: ['gate', 'vout'],
+    analysis: BUCK_ANALYSIS,
+    parts: BUCK_PARTS,
+    Diagram: ({ r, st, selected, onSelect, values, showPath }) => <DcdcDiagram st={st} params={r.params} selected={selected} onSelect={onSelect} values={values} showPath={showPath} minimal />,
+  }
+}
+
+/** Buck in the shell (the Phase 2 reference). */
+export const buckShellTopic = () => dcdcShellTopic('buck')
