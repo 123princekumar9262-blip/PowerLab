@@ -14,7 +14,7 @@ const sectionOf = (r: Route): Section =>
 const NAV: Array<{ id: Exclude<Section, null | 'settings'>; label: string; href: string }> = [
   { id: 'home', label: 'Home', href: href.home() },
   { id: 'labs', label: 'Labs', href: href.labs() },
-  { id: 'engineering', label: 'Engineering', href: href.engineering() },
+  { id: 'engineering', label: 'Practice', href: href.engineering() },
   { id: 'progress', label: 'Progress', href: href.progress() },
 ]
 
@@ -33,7 +33,7 @@ function titleOf(r: Route): string {
       return `${t ? fullName(t) : 'Workspace'} — ${lab?.title ?? ''} · ${app}`
     }
     case 'engineering':
-      return `Engineering · ${app}`
+      return `Practice · ${app}`
     case 'progress':
       return `Progress · ${app}`
     case 'settings':
@@ -44,7 +44,7 @@ function titleOf(r: Route): string {
 }
 
 /**
- * The platform shell: one top bar (Home · Labs · Engineering · Progress · Search · Settings) and the
+ * The platform shell: one top bar (Home · Labs · Practice · Progress · Search · Settings) and the
  * page for the current route. Pages render from the catalogue; workspaces load lazily.
  */
 export function AppShell() {

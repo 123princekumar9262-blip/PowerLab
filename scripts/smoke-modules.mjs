@@ -37,7 +37,7 @@ const mode = (name) => ({
   click: async () => {
     if (name === 'Analyze') return openAnalyze()
     await closePanels()
-    if (['Explore', 'Learn', 'Experiment'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+    if (['Explore', 'Learn', 'Experiment', 'Predict'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
     else {
       await page.locator('.ws-more-modes summary').click()
       await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()
@@ -120,7 +120,10 @@ for (const M of MODULES) {
   check(/WHAT IS HAPPENING/i.test(await page.locator('.wv-why').innerText()) && /PHYSICAL PRINCIPLE/i.test(await page.locator('.wv-why').innerText()), `${M.tab}: WHY answers what · why · principle`)
   await closePanels()
   check((await page.locator('.cscope canvas').count()) > 0, `${M.tab}: scope drawn`)
+  // Beginner: the diagram keeps names, set values and words; live numbers come back from Standard
+  check(!/\d/.test(await page.locator('.ws-bench svg .path-caption').first().textContent()), `${M.tab}: Beginner diagram caption has no live numbers`)
   await density('Standard')
+  check(/\d/.test(await page.locator('.ws-bench svg .path-caption').first().textContent()), `${M.tab}: Standard diagram caption shows the live numbers`)
   if (M.side) {
     await explore(M.side)
     check(await page.locator('.ws .ov .dc-energy, .ws .ov .bode').first().isVisible(), `${M.tab}: Explore → "${M.side}" shows`)
@@ -170,6 +173,17 @@ check(await exactAllPass(), 'Drives: two-quadrant braking also agrees with the e
 await mode('Explore').click()
 await page.getByRole('button', { name: 'Reset' }).click()
 await page.waitForTimeout(500)
+// past the start-up's last event, WHY still says what happens next: how the motor settles until the run ends
+{
+  const sc = page.locator('.cscope canvas.scope-layer--overlay')
+  await sc.scrollIntoViewIfNeeded()
+  const b = await sc.boundingBox()
+  await page.mouse.click(b.x + 64 + (b.width - 64 - 54) * 0.9, b.y + b.height / 2)
+  await openWhy()
+  const nx = await page.locator('.wv-why .why-next').innerText()
+  check(/No further event in this run/.test(nx) && /Speed .+ rpm/.test(nx), 'Drives: past the last event, "What happens next" describes the settling from the simulation')
+  await closePanels()
+}
 await go('#/labs/magnetics/inductor')
 await page.getByRole('radio', { name: 'Start-up', exact: true }).click()
 await page.waitForTimeout(800)

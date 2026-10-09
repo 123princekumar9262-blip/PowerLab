@@ -35,7 +35,7 @@ const mode = (name) => ({
   click: async () => {
     if (name === 'Analyze') return openAnalyze()
     await closePanels()
-    if (['Explore', 'Learn', 'Experiment'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+    if (['Explore', 'Learn', 'Experiment', 'Predict'].includes(name)) await page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
     else {
       await page.locator('.ws-more-modes summary').click()
       await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()

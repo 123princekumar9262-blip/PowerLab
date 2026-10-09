@@ -66,6 +66,57 @@ export function rectifierWhy(result: SimulationResult, ex: StateExplanation): Wh
   return { id: 'now', question: 'Why is the circuit doing this now?', what: ex.summary, why, principle: principle.principle, equation: principle.equation, more }
 }
 
+/** The load's own rule: how R, L and C shape the output (the circuit's parameters, not the instant). */
+function loadRule(load: SimulationResult['params']['load']): { principle: string; equation: string } {
+  switch (load) {
+    case 'RL':
+      return { principle: 'An inductor opposes every change of current: the current cannot jump, so it lags the voltage and is smoother than it. The larger L/R, the smoother the current.', equation: 'Vout = R·i + L·di/dt' }
+    case 'RC':
+      return { principle: 'A capacitor holds its voltage: it charges while the source is above it and feeds the load while the source is below it. The larger R·C, the smaller the droop between charging pulses.', equation: 'iC = C·dvC/dt' }
+    case 'RLC':
+      return { principle: 'The inductor smooths the current and the capacitor holds the voltage: together they filter the rectified voltage into a steadier DC output.', equation: 'vL = L·di/dt,   iC = C·dvC/dt' }
+    default:
+      return { principle: 'A resistor responds instantly: its current is its voltage divided by R at every moment, so the output has exactly the shape of the rectified voltage.', equation: 'io = Vout / R' }
+  }
+}
+
+/**
+ * Every WHY question the rectifier answers at the cursor, all from the explainer's chain at this sample:
+ *   now    — why the devices are in this state (rectifierWhy)
+ *   path   — why the current takes this path: the devices that are ON close the loop, the others block
+ *   output — why the output looks like this: the output and waveform steps, with the load's own rule
+ */
+export function rectifierWhyQuestions(result: SimulationResult, ex: StateExplanation): WhyQuestion[] {
+  const by = (stage: string) => ex.chain.find((c) => c.stage === stage)
+  const flowing = !!ex.path
+  const pathStep = by('path')
+  const devices = by('diode')
+  const path: WhyQuestion = {
+    id: 'path',
+    question: 'Why does the current take this path?',
+    what: pathStep?.text ?? ex.current.text,
+    why: flowing
+      ? `${devices ? firstSentence(devices.text) : ex.diode.text} Only the devices that are ON close the loop; every blocking device leaves its branch open.`
+      : `${devices ? firstSentence(devices.text) : ex.diode.text} With every branch open there is no closed loop, so no current can flow.`,
+    principle: 'Current flows only around a closed loop, and only through devices that are ON. At every junction the current flowing in equals the current flowing out (Kirchhoff’s current law).',
+    equation: pathStep?.equation ?? 'Σ i(in) = Σ i(out) at every node',
+    more: devices && firstSentence(devices.text) !== devices.text ? [devices.text] : undefined,
+  }
+  const out = by('output')
+  const wave = by('waveform')
+  const rule = loadRule(result.params.load)
+  const output: WhyQuestion = {
+    id: 'output',
+    question: 'Why does the output look like this?',
+    what: out?.text ?? ex.output.text,
+    why: wave?.text ?? ex.output.text,
+    principle: rule.principle,
+    equation: out?.equation ?? wave?.equation ?? rule.equation,
+    more: by('energy') ? [`${by('energy')!.title}: ${by('energy')!.text}`] : undefined,
+  }
+  return [rectifierWhy(result, ex), path, output]
+}
+
 /** Device events that change what conducts (source-only markers such as Vin peaks are skipped). */
 const DEVICE_KINDS: ReadonlySet<CircuitEvent['kind']> = new Set(['diode-on', 'diode-off', 'current-start', 'current-stop', 'current-transfer', 'commutation-start', 'commutation-end'])
 

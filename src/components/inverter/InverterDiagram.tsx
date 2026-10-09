@@ -10,6 +10,8 @@ interface Props {
   selected: string | null
   onSelect: (part: string) => void
   values: boolean
+  /** Live numbers (Standard and Engineer); Beginner keeps names, set values and words. */
+  live?: boolean
   showPath: boolean
 }
 
@@ -29,7 +31,7 @@ export function InverterDiagram(props: Props) {
       <svg className="buck-diagram inv-diagram" viewBox="0 0 690 270" role="group" aria-label={`${p.topology} inverter. ${st.legs.map((l) => `leg ${l.name}: ${l.conducting ?? 'none'}`).join('; ')}`}>
         {p.topology === 'three' ? <Three {...props} /> : <Single {...props} />}
       </svg>
-      {p.modulation === 'svpwm' && <SpaceVectors st={st} p={p} />}
+      {p.modulation === 'svpwm' && <SpaceVectors st={st} p={p} live={props.live ?? true} />}
     </>
   )
 }
@@ -163,7 +165,7 @@ function Load({ x0, x1, y, p, label, current, values, selected, onSelect, id, co
   )
 }
 
-function Single({ st, p, selected, onSelect, values }: Props) {
+function Single({ st, p, selected, onSelect, values, live = true }: Props) {
   const full = p.topology === 'full'
   const XA = 230
   const XB = 490
@@ -189,18 +191,21 @@ function Single({ st, p, selected, onSelect, values }: Props) {
           </text>
         </>
       )}
-      <text x={600} y={TOP + 4} textAnchor="end" className="cvalue cvalue--out">
-        vo {formatV(st.vo)}
-      </text>
+      {live && (
+        <text x={600} y={TOP + 4} textAnchor="end" className="cvalue cvalue--out">
+          vo {formatV(st.vo)}
+        </text>
+      )}
       <text x={345} y={258} className="path-caption" textAnchor="middle">
-        θ = {st.theta.toFixed(1)}° · {st.legs.map((l) => `${l.name}: ${l.conducting ?? '—'}`).join(' · ')} · P from DC {st.pdc >= 0 ? '+' : ''}
-        {formatSI(st.pdc, 'W')}
+        {live && `θ = ${st.theta.toFixed(1)}° · `}
+        {st.legs.map((l) => `${l.name}: ${l.conducting ?? '—'}`).join(' · ')}
+        {live && ` · P from DC ${st.pdc >= 0 ? '+' : ''}${formatSI(st.pdc, 'W')}`}
       </text>
     </>
   )
 }
 
-function Three({ st, p, selected, onSelect, values }: Props) {
+function Three({ st, p, selected, onSelect, values, live = true }: Props) {
   const xs = [200, 300, 400]
   const ys = [86, 135, 184]
   const xn = 640
@@ -234,14 +239,16 @@ function Three({ st, p, selected, onSelect, values }: Props) {
         </text>
       )}
       <text x={345} y={258} className="path-caption" textAnchor="middle">
-        θ = {st.theta.toFixed(1)}° · {st.legs.map((l) => `${l.name}: ${l.conducting ?? '—'}`).join(' · ')} · vab {formatV(st.vo)}
+        {live && `θ = ${st.theta.toFixed(1)}° · `}
+        {st.legs.map((l) => `${l.name}: ${l.conducting ?? '—'}`).join(' · ')}
+        {live && ` · vab ${formatV(st.vo)}`}
       </text>
     </>
   )
 }
 
 /** Space-vector hexagon: the six active vectors, the present sector, the reference and the dwell times. */
-function SpaceVectors({ st, p }: { st: InvState; p: ResolvedInverter }) {
+function SpaceVectors({ st, p, live }: { st: InvState; p: ResolvedInverter; live: boolean }) {
   const R = 100
   const cx = 160
   const cy = 125
@@ -278,7 +285,8 @@ function SpaceVectors({ st, p }: { st: InvState; p: ResolvedInverter }) {
       {sv && (
         <g transform="translate(330, 40)">
           <text className="clabel">
-            Sector {sv.sector + 1} · θ in sector {((sv.thetaK * 180) / Math.PI).toFixed(1)}°
+            Sector {sv.sector + 1}
+            {live && ` · θ in sector ${((sv.thetaK * 180) / Math.PI).toFixed(1)}°`}
           </text>
           {(
             [
@@ -291,14 +299,18 @@ function SpaceVectors({ st, p }: { st: InvState; p: ResolvedInverter }) {
               <text className="cvalue">{label}</text>
               <rect y={6} width={270} height={10} rx={3} className="sv-track" />
               <rect y={6} width={(270 * t) / Ts} height={10} rx={3} fill={col} />
-              <text x={276} y={15} className="cvalue">
-                {formatTime(t)}
-              </text>
+              {live && (
+                <text x={276} y={15} className="cvalue">
+                  {formatTime(t)}
+                </text>
+              )}
             </g>
           ))}
-          <text y={146} className="cvalue">
-            Ts = {formatTime(Ts)} · |Vref| = m·Vdc/2 = {formatV((p.m * p.vdc) / 2, false)}
-          </text>
+          {live && (
+            <text y={146} className="cvalue">
+              Ts = {formatTime(Ts)} · |Vref| = m·Vdc/2 = {formatV((p.m * p.vdc) / 2, false)}
+            </text>
+          )}
           <text y={164} className="cvalue">
             dashed circle: linear limit m = 2/√3
           </text>

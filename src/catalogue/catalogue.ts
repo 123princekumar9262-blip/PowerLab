@@ -17,10 +17,10 @@ export type ModeId = 'explore' | 'learn' | 'experiment' | 'predict' | 'challenge
 /** The global order of the learning modes (only the applicable ones are shown). */
 export const MODE_ORDER: ModeId[] = ['explore', 'learn', 'experiment', 'predict', 'challenge', 'reverse', 'compare']
 /** The everyday modes of a circuit workspace (tabs); the others are practice modes behind "More". */
-export const PRIMARY_MODES: ModeId[] = ['explore', 'learn', 'experiment']
-/** A lab's modes split into the workspace's tabs and its "More" menu, labelled. */
+export const PRIMARY_MODES: ModeId[] = ['explore', 'learn', 'experiment', 'predict']
+/** A lab's modes split into the workspace's tabs and its "More" menu, labelled and described. */
 export function workspaceModes(ids: ModeId[]) {
-  const label = (m: ModeId) => ({ id: m, label: MODE_LABEL[m] })
+  const label = (m: ModeId) => ({ id: m, label: MODE_LABEL[m], hint: MODE_HINT[m] })
   return { modes: ids.filter((m) => PRIMARY_MODES.includes(m)).map(label), moreModes: ids.filter((m) => !PRIMARY_MODES.includes(m)).map(label) }
 }
 export const MODE_LABEL: Record<ModeId, string> = {
@@ -32,8 +32,24 @@ export const MODE_LABEL: Record<ModeId, string> = {
   reverse: 'Reverse',
   compare: 'Compare',
 }
+/** What each mode is for, in plain words (Home, the workspace guide, the mode tabs' tooltips). */
+export const MODE_HINT: Record<ModeId, string> = {
+  explore: 'change any value and watch the circuit respond',
+  learn: 'short guided lessons, one step at a time',
+  experiment: 'change one thing and compare the results',
+  predict: 'guess the result first, then let the simulation check it',
+  challenge: 'design tasks scored by the simulation',
+  reverse: 'work out a hidden circuit from its waveforms',
+  compare: 'two circuits side by side',
+}
 
 export const CATEGORY_LABEL: Record<Category, string> = { conversion: 'Conversion', foundations: 'Foundations', systems: 'Systems' }
+/** Each group in one plain sentence (Home and the Labs page). */
+export const CATEGORY_LINE: Record<Category, string> = {
+  conversion: 'Circuits that turn one kind of electrical power into another: AC to DC, DC to DC, DC to AC.',
+  foundations: 'The parts inside every converter: the switch, the magnetic core and the feedback loop.',
+  systems: 'Converters at work: driving a motor, staying cool, moving an electric car.',
+}
 export const CATEGORY_ORDER: Category[] = ['conversion', 'foundations', 'systems']
 
 /** Rectifier circuit selection carried by a topic (the rectifier workspace's own vocabulary). */

@@ -51,9 +51,22 @@ export function periodicSchedule(id: string, period: number, edgesIn: Array<{ t:
       if (!clean.length) return out
       const m0 = Math.floor(a / period) - 1
       const m1 = Math.ceil(b / period) + 1
-      for (let m = m0; m <= m1; m++) for (const e of clean) {
-        const t = m * period + e.t
-        if (t > a && t <= b) out.push({ t, rising: e.rising })
+      for (let m = m0; m <= m1; m++) {
+        const base = m * period
+        // base + ts[i] is non-decreasing in i: binary-search the first edge after a, then walk to b
+        // (the same edges, times and order as testing every edge — only the ones in the window are visited)
+        let lo = 0
+        let hi = ts.length
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1
+          if (base + ts[mid] > a) hi = mid
+          else lo = mid + 1
+        }
+        for (let i = lo; i < ts.length; i++) {
+          const t = base + ts[i]
+          if (t > b) break
+          out.push({ t, rising: clean[i].rising })
+        }
       }
       return out
     },

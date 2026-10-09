@@ -27,7 +27,6 @@ import { LESSONS } from './learning/lessons.ts'
 import type { LabParams, LoadType, RectifierTopology } from './types/simulation.ts'
 import { rememberParams, type CarryReport } from './workspace/carry.ts'
 import { CarryNotice } from './workspace/views.tsx'
-import { loadJSON, saveJSON } from './utils/storage.ts'
 import { stepTarget } from './state/stepping.ts'
 import { usePlayback } from './state/usePlayback.ts'
 import { presetVisible, type ChannelPreset } from './visualization/presets.ts'
@@ -87,9 +86,6 @@ function initialState(init?: RectifierInitial): LabState {
   return s
 }
 
-/** One-time hint (replaces the permanent 6-step guide). */
-const HINT_KEY = 'pel.hints'
-
 const MODE_LABEL = { lab: 'Explore', learn: 'Lesson', experiment: 'Experiment', predict: 'Predict', challenge: 'Challenge', reverse: 'Reverse', compare: 'Compare' } as const
 
 /**
@@ -103,11 +99,6 @@ export function App({ initial, onActivity, carryReport }: { initial?: RectifierI
   useEffect(() => rememberParams('rectifiers', state.params), [state.params])
   const [noticeOpen, setNoticeOpen] = useState(true)
   const circuitId = circuitIdOf(state)
-  const [hintSeen, setHintSeen] = useState(() => loadJSON<{ rect?: boolean }>(HINT_KEY, {}).rect === true)
-  const dismissHint = () => {
-    setHintSeen(true)
-    saveJSON(HINT_KEY, { ...loadJSON<Record<string, boolean>>(HINT_KEY, {}), rect: true })
-  }
 
   // ── Simulation: the single source of truth. Re-runs whenever parameters change. ──
   const result = useMemo(() => (state.hasRun ? runSimulation(state.params, circuitId) : null), [state.hasRun, state.params, circuitId])
@@ -424,7 +415,6 @@ export function App({ initial, onActivity, carryReport }: { initial?: RectifierI
         }}
         scopeViews={scopeViews}
         scopeView={scopeView}
-        hint={{ seen: hintSeen, dismiss: dismissHint }}
         fwCircuit={fwCircuit}
         std={std}
         angleOf={angleOf}

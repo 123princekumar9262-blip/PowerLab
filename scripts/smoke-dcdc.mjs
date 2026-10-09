@@ -27,6 +27,7 @@ const stateText = () => page.locator('.dc-state').innerText()
 const scope = page.locator('.cscope canvas.scope-layer--overlay')
 /** Click the scope at a fraction of the shown time window. */
 const clickScope = async (frac) => {
+  await scope.scrollIntoViewIfNeeded()
   const b = await scope.boundingBox()
   await page.mouse.click(b.x + 64 + (b.width - 64 - 54) * frac, b.y + b.height / 2)
   await page.waitForTimeout(150)
@@ -46,7 +47,7 @@ check(!(await page.getByRole('heading', { name: 'Rectifier Lab' }).isVisible().c
 // Buck uses the universal workspace shell (simplified, Phase 4): header, parameters, circuit, one status
 // line, WHY + Explore, waveforms.
 const wsMode = async (name) => {
-  if (['Explore', 'Learn', 'Experiment'].includes(name)) return page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
+  if (['Explore', 'Learn', 'Experiment', 'Predict'].includes(name)) return page.locator('.ws-modes-tabs').getByRole('tab', { name, exact: true }).click()
   await page.locator('.ws-more-modes summary').click()
   await page.locator('.ws-more-modes').getByRole('button', { name, exact: true }).click()
 }
@@ -68,8 +69,8 @@ const openWhy = async () => {
 }
 check(await page.getByRole('heading', { name: 'Buck converter', level: 1 }).isVisible(), 'Buck workspace header names the circuit')
 check(await page.getByRole('link', { name: 'Back to DC-DC Converters' }).isVisible(), 'the header has a back link to the lab')
-for (const m of ['Explore', 'Learn', 'Experiment']) check(await page.locator('.ws-modes-tabs').getByRole('tab', { name: m, exact: true }).isVisible(), `mode tab ${m}`)
-check((await page.locator('.ws-more-modes summary').innerText()).startsWith('More'), 'Predict is a practice mode under More')
+for (const m of ['Explore', 'Learn', 'Experiment', 'Predict']) check(await page.locator('.ws-modes-tabs').getByRole('tab', { name: m, exact: true }).isVisible(), `mode tab ${m}`)
+check((await page.locator('.ws-more-modes').count()) === 0, 'DC-DC has exactly four modes, all tabs: no More menu')
 check((await page.locator('.ws-modes').getByRole('tab', { name: 'Analyze' }).count()) === 0, 'Analyze is not a mode (Explore → Measurements & theory)')
 
 // ── Explore: defaults, channels, state at cursor ───────────────────────────────

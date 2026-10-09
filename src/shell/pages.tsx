@@ -2,11 +2,14 @@ import { useState } from 'react'
 import {
   areaById,
   CATEGORY_LABEL,
+  CATEGORY_LINE,
   CATEGORY_ORDER,
   ENGINEERING,
   labById,
   LABS,
+  MODE_HINT,
   MODE_LABEL,
+  PRIMARY_MODES,
   targetOf,
   type Lab,
 } from '../catalogue/catalogue.ts'
@@ -17,6 +20,12 @@ import { href } from './router.ts'
 import { Crumbs, LabCard, modesText, PageHead, StatusTag } from './ui.tsx'
 
 const activityHref = (a: Activity) => href.workspace(a.lab, a.topic, a.mode, a.query)
+/** Home → "How it works": the three things every lab is about. */
+const HOW: Array<[string, string]> = [
+  ['Choose a circuit', 'Every lab below is a working circuit. New to the subject? Start with Rectifiers.'],
+  ['Change a value', 'Move a slider. The circuit is simulated again at once and every waveform updates.'],
+  ['Ask WHY', 'Drag the cursor along the waveforms. WHY explains what the circuit is doing at that instant, and what happens next.'],
+]
 const PATH_MARK: Record<PathState, string> = { done: '✓', recommended: '→', started: '●', open: '○' }
 const PATH_TEXT: Record<PathState, string> = { done: 'completed', recommended: 'recommended next', started: 'started', open: '' }
 
@@ -32,7 +41,7 @@ export function HomePage() {
     <div className="page page--home">
       <header className="home-head">
         <h1 tabIndex={-1}>Power Electronics Lab</h1>
-        <p className="page-lead">Interactive simulation · learn by seeing · experiment by doing</p>
+        <p className="page-lead">See what really happens inside power-electronic circuits. Pick a circuit, change it, and watch every voltage and current respond — each one is simulated, never drawn by hand.</p>
       </header>
 
       {last ? (
@@ -63,6 +72,35 @@ export function HomePage() {
         </section>
       )}
 
+      <section className="home-section" aria-labelledby="h-how">
+        <h2 id="h-how" className="section-title">
+          How it works
+        </h2>
+        <ol className="how-steps">
+          {HOW.map(([title, text], k) => (
+            <li key={title}>
+              <span className="how-n" aria-hidden="true">
+                {k + 1}
+              </span>
+              <span>
+                <b>{title}</b>
+                <span className="how-text">{text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="how-modes small">
+          Every lab offers the same four ways to learn:{' '}
+          {PRIMARY_MODES.map((m, k) => (
+            <span key={m}>
+              {k > 0 && ' · '}
+              <b>{MODE_LABEL[m]}</b> — {MODE_HINT[m]}
+            </span>
+          ))}
+          .
+        </p>
+      </section>
+
       <section className="home-section" aria-labelledby="h-learn">
         <h2 id="h-learn" className="section-title">
           Which circuit do you want to learn today?
@@ -70,6 +108,7 @@ export function HomePage() {
         {CATEGORY_ORDER.map((cat) => (
           <div key={cat} className="lab-group">
             <h3 className="group-title">{CATEGORY_LABEL[cat]}</h3>
+            <p className="group-line small">{CATEGORY_LINE[cat]}</p>
             <div className="lab-grid lab-grid--compact">
               {LABS.filter((l) => l.category === cat).map((l) => (
                 <LabCard key={l.id} lab={l} compact />
@@ -143,6 +182,7 @@ export function LabsPage() {
           <h2 id={`g-${cat}`} className="group-title">
             {CATEGORY_LABEL[cat]}
           </h2>
+          <p className="group-line small">{CATEGORY_LINE[cat]}</p>
           <div className="lab-grid">
             {LABS.filter((l) => l.category === cat).map((l) => (
               <LabCard key={l.id} lab={l} detail={labDetail(l)} />
@@ -166,7 +206,7 @@ export function LabLandingPage({ lab, query }: { lab: Lab; query: Record<string,
       <PageHead title={lab.title} lead={lab.description} side={<StatusTag status={lab.status} />} />
       {query.moved === 'engineering' && (
         <p className="notice" role="status">
-          This lab used to be called “Engineering”. Engineering is now the <a href={href.engineering()}>practice area</a> (design, challenges, reverse engineering).
+          This lab used to be called “Engineering”. Design tasks, challenges and reverse engineering are now under <a href={href.engineering()}>Practice</a>.
         </p>
       )}
       {lab.chain && (
@@ -234,7 +274,7 @@ export function LabLandingPage({ lab, query }: { lab: Lab; query: Record<string,
   )
 }
 
-// ── Engineering ─────────────────────────────────────────────────────────────
+// ── Practice (route: /engineering) ──────────────────────────────────────────
 
 export function EngineeringPage({ area }: { area: string | null }) {
   const a = area ? areaById(area) : null
@@ -243,7 +283,7 @@ export function EngineeringPage({ area }: { area: string | null }) {
     const opens = a.opens
     return (
       <div className="page page--narrow">
-        <Crumbs items={[{ label: 'Engineering', href: href.engineering() }, { label: a.title }]} />
+        <Crumbs items={[{ label: 'Practice', href: href.engineering() }, { label: a.title }]} />
         <PageHead title={a.title} lead={a.description} side={<StatusTag status={a.status} />} />
         {opens ? (
           <p>
@@ -264,7 +304,7 @@ export function EngineeringPage({ area }: { area: string | null }) {
   }
   return (
     <div className="page">
-      <PageHead title="Engineering" lead="Practice like an engineer: design, diagnose and explain. For students who already know the labs." />
+      <PageHead title="Practice" lead="Test yourself like an engineer: solve design tasks, identify hidden circuits and diagnose faults — the simulation checks your answer. Best after you know a lab or two." />
       <div className="area-list">
         {ENGINEERING.map((x) => (
           <a key={x.id} className="area-row" href={href.engineering(x.id)}>

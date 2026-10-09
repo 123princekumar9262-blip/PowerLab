@@ -16,7 +16,7 @@ const CH: Record<string, ChannelMeta> = {
 }
 
 /** Double-pulse test circuit with the MOSFET's gate model; states read from the simulation. */
-function DptDiagram({ st, r, selected, onSelect, values }: { st: MosfetState; r: MosfetRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetState; r: MosfetRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -112,9 +112,11 @@ function DptDiagram({ st, r, selected, onSelect, values }: { st: MosfetState; r:
         <text x={85} y={177} textAnchor="middle" className="clabel">
           driver
         </text>
-        <text x={85} y={194} textAnchor="middle" className="cvalue">
-          {formatV(st.vg)}
-        </text>
+        {live && (
+          <text x={85} y={194} textAnchor="middle" className="cvalue">
+            {formatV(st.vg)}
+          </text>
+        )}
       </g>
       <g {...part('caps', 'Gate capacitances')}>
         <path d="M310 180 V205 M300 205 H320 M300 211 H320 M310 211 V230" className="sym" />
@@ -133,7 +135,8 @@ function DptDiagram({ st, r, selected, onSelect, values }: { st: MosfetState; r:
       )}
       <path d="M310 230 H380" className="wire" />
       <text x={345} y={258} className="path-caption" textAnchor="middle">
-        {st.phase} · iD {formatA(st.id)} · p = {formatSI(st.p, 'W')}
+        {st.phase}
+        {live && ` · iD ${formatA(st.id)} · p = ${formatSI(st.p, 'W')}`}
       </text>
     </svg>
   )
@@ -165,7 +168,7 @@ export const MOSFET_TOPIC: Topic<MosfetParams, MosfetRun, MosfetMeasurements, Mo
   state: mosfetStateAt,
   view: (st) => mosfetView(st),
   why: mosfetWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <DptDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <DptDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['vg', 'vgs', 'vds', 'id'],
   addOrder: ['vg', 'vgs', 'ig', 'vds', 'id', 'idiode', 'ich', 'pdev', 'energy'],

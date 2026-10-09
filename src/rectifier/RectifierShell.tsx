@@ -11,7 +11,7 @@ import { Transport } from '../components/Transport.tsx'
 import { pathView } from '../explanations/concise.ts'
 import { rectifierEnergy } from '../explanations/energy.ts'
 import { eventTitle, type EventExplanation, type StateExplanation } from '../explanations/index.ts'
-import { rectifierNextConsequence, rectifierStatus, rectifierTime, rectifierWhy } from '../explanations/status.ts'
+import { rectifierNextConsequence, rectifierStatus, rectifierTime, rectifierWhyQuestions } from '../explanations/status.ts'
 import type { Inspection } from '../inspect/inspect.ts'
 import type { Comparison } from '../measurements/compare.ts'
 import { href } from '../shell/router.ts'
@@ -145,7 +145,6 @@ export interface RectifierShellProps {
   stepThrough: ReactNode
   scopeViews: Array<{ id: ScopeView; label: string }>
   scopeView: ScopeView
-  hint: { seen: boolean; dismiss(): void }
   fwCircuit: boolean
   std: boolean
   angleOf(t: number): number
@@ -266,14 +265,6 @@ export function RectifierShell(p: RectifierShellProps) {
   ) : (
     <>
       {!p.hideCircuit && <StatusLine status={rectifierStatus(ex, result, level !== 'beginner')} time={rectifierTime(ex)} path={showPath ? rectifierPath(result, ex) : null} onOpen={() => setOpen(open === 'state' ? null : 'state')} />}
-      {!p.hint.seen && state.mode === 'lab' && !state.focus && (
-        <p className="first-hint small" role="note">
-          <span>Drag the cursor across the waveforms to see the circuit at any instant — or press WHY to ask what is happening.</span>
-          <button className="text-btn" onClick={p.hint.dismiss}>
-            Got it
-          </button>
-        </p>
-      )}
       {!comparison.allWithinTolerance && (
         <p className="flag" role="alert">
           ⚠ The simulation disagrees with theory for {comparison.rows.filter((r) => !r.withinTolerance).map((r) => r.symbol).join(', ')} — see Explore → Measurements &amp; theory. Try a smaller timestep (Advanced → Simulation).
@@ -373,7 +364,7 @@ export function RectifierShell(p: RectifierShellProps) {
         render: () => (
           <>
             {p.stepThrough}
-            <WhyView questions={[rectifierWhy(result, ex)]} next={rectifierNextConsequence(result, ex)} onGoTo={p.onLand} detailed={level === 'engineer' || state.whyOpen || state.lensStage !== null} extra={p.whyDetail} />
+            <WhyView questions={rectifierWhyQuestions(result, ex)} next={rectifierNextConsequence(result, ex)} onGoTo={p.onLand} detailed={level === 'engineer' || state.whyOpen || state.lensStage !== null} extra={p.whyDetail} />
           </>
         ),
       }

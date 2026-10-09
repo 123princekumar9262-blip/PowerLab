@@ -1,9 +1,9 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { converterIndexAt } from '../converters/engine.ts'
 import type { Run, RunEvent } from '../converters/types.ts'
-import type { AnyTopic, StatusInfo, WhyCard } from '../lab/types.ts'
+import type { AnyTopic, ChannelMeta, StatusInfo, WhyCard } from '../lab/types.ts'
 import type { NextConsequence } from './contract.ts'
-import { formatTime } from '../utils/format.ts'
+import { formatSI, formatTime } from '../utils/format.ts'
 import { setLevel, useLevel, type Level } from '../shell/prefs.ts'
 
 /** Learning modes of a topic workspace (Analyze is an action, not a mode). */
@@ -65,6 +65,98 @@ export function nextEvent(topic: AnyTopic, r: Run, k: number): NextConsequence |
   return { text: `${topic.eventLabel(e)} at t = ${formatTime(e.time)}.${why ? ` ${why}` : ''}`, time: e.time }
 }
 
+/**
+ * A run whose events repeat every period: a converged periodic steady state, or a directly computed
+ * steady view (PWM) that ends exactly where it started — never a start-up, a drive cycle or a single test.
+ */
+export function repeatsEveryPeriod(topic: AnyTopic, r: Run): boolean {
+  const s = r.diagnostics.steady
+  if (!(r.params.period > 0)) return false
+  if (s.method === 'shooting' || s.method === 'integration') return s.converged
+  if (s.method !== 'direct' || (r.params as { view?: string }).view !== 'steady') return false
+  return topic.defaultChannels.every((id) => {
+    const a = r.signals[id]
+    if (!a) return true
+    let mx = 0
+    for (const v of a) mx = Math.max(mx, Math.abs(v))
+    return Math.abs(a[0] - a[a.length - 1]) <= 1e-6 * Math.max(mx, 1e-12)
+  })
+}
+
+/**
+ * A periodic steady state repeats: past the run's last event, the next one is the earliest event of the
+ * pattern one period on. Quoted with its time; there is no sample of it to go to (it lies after the run).
+ */
+export function nextInNextCycle(topic: AnyTopic, r: Run, k: number): NextConsequence | null {
+  if (!r.events.length || !repeatsEveryPeriod(topic, r)) return null
+  const P = r.params.period
+  const after = r.time[k] + 0.5 * r.params.dt
+  let best: { e: RunEvent; t: number } | null = null
+  for (const e of r.events) {
+    const t = e.time + P * Math.max(1, Math.ceil((after - e.time) / P))
+    if (t > after && (!best || t < best.t - 1e-12 * P)) best = { e, t }
+  }
+  if (!best) return null
+  const why = topic.eventWhy(best.e)
+  return { text: `${topic.eventLabel(best.e)} at t = ${formatTime(best.t)}, in the next ${topic.periodName} — the waveforms repeat every ${formatTime(P)}.${why ? ` ${why}` : ''}`, time: null }
+}
+
+const channelUnit = (c: ChannelMeta) => c.unit || (/\[([^\]]+)\]\s*$/.exec(c.name)?.[1] ?? '')
+const channelName = (c: ChannelMeta) => c.name.replace(/\s*\[[^\]]*\]\s*$/, '')
+function channelValue(c: ChannelMeta, v: number): string {
+  if (c.unit) return formatSI(v, c.unit)
+  const u = channelUnit(c)
+  const n = Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) < 1e-9 ? '0' : Number(v.toPrecision(3)).toString()
+  return u ? `${n} ${u}` : n
+}
+
+/**
+ * A run that settles rather than repeats (a motor start-up, a 0–100 run, a saturating core): past its last
+ * event, what happens next is how the main waveforms move until the run ends — read from the simulated
+ * samples (averaged over one switching period when the run spans many), never extrapolated beyond it.
+ */
+export function towardRunEnd(topic: AnyTopic, r: Run, k: number): NextConsequence | null {
+  const last = r.length - 1
+  if (k >= last - 1) return { text: `This is the end of the simulated run (t = ${formatTime(r.time[last])}): nothing later is computed. Move the cursor back to replay it.`, time: null }
+  const spp = r.params.periods > 1 ? Math.max(1, Math.round(r.params.period / r.params.dt)) : 1
+  // over the period ending at a sample: the mean, or the RMS for an alternating quantity (its mean is ~0)
+  const window = (a: Float64Array, end: number) => {
+    const from = Math.max(0, end - spp + 1)
+    let s = 0
+    let q = 0
+    for (let i = from; i <= end; i++) {
+      s += a[i]
+      q += a[i] * a[i]
+    }
+    const n = end - from + 1
+    return { mean: s / n, rms: Math.sqrt(q / n) }
+  }
+  const parts: string[] = []
+  for (const id of topic.defaultChannels) {
+    const c = topic.channels[id]
+    const a = r.signals[id]
+    if (!c || c.logic || !a) continue
+    const w0 = window(a, k)
+    const w1 = window(a, last)
+    const ac = spp > 1 && Math.abs(w0.mean) < 0.25 * w0.rms && Math.abs(w1.mean) < 0.25 * w1.rms
+    const now = ac ? w0.rms : w0.mean
+    const end = ac ? w1.rms : w1.mean
+    let peak = 0
+    for (const v of a) peak = Math.max(peak, Math.abs(v))
+    const v = (x: number) => `${channelValue(c, x)}${ac ? ' RMS' : ''}`
+    // a change smaller than 2 % (of the value, or of 1 % of the run's peak for values near zero) is "stays"
+    const steady = Math.abs(end - now) <= 0.02 * Math.max(Math.abs(now), Math.abs(end), 0.01 * peak, 1e-12)
+    parts.push(steady ? `${channelName(c)} stays at ${v(end)}` : `${channelName(c)} ${v(now)} → ${v(end)}`)
+    if (parts.length === 3) break
+  }
+  if (!parts.length) return null
+  const avg = spp > 1 ? ` (over each ${topic.periodName})` : ''
+  return { text: `No further event in this run. From here to its end at t = ${formatTime(r.time[last])}${avg}: ${parts.join(' · ')}.`, time: r.time[last] }
+}
+
+/** The generic next consequence: the run's next event, else the next cycle's (steady state), else the trend to the run's end. */
+export const nextConsequenceOf = (topic: AnyTopic, r: Run, k: number): NextConsequence | null => nextEvent(topic, r, k) ?? nextInNextCycle(topic, r, k) ?? towardRunEnd(topic, r, k)
+
 /** Per-topic parameters survive leaving and re-entering the workspace. */
 const paramStore = new Map<string, Record<string, unknown>>()
 
@@ -125,7 +217,7 @@ export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undef
       const text = topic.next(result, st, m)
       return text ? { text, time: null } : null
     }
-    return nextEvent(topic, result, k)
+    return nextConsequenceOf(topic, result, k)
   }, [topic, result, st, m, k])
   const next = nextC?.text ?? null
   const view = useMemo(() => topic.view(st, result, level), [topic, st, result, level])

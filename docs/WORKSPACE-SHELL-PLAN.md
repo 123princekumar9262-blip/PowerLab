@@ -1314,5 +1314,38 @@ no page overflow, no console errors. Build: no warnings; Home 268.3 kB (83.1 kB 
 
 **Remaining:** some lab diagrams print their own values at every level (e.g. the EV battery and speed — the
 diagram's subject); the inverter topics take 2–4.5 s to simulate on open (unchanged from before); Predict is
-under "More" for every lab.
+under "More" for every lab. *(All three are addressed in Phase 6.)*
 
+## Phase 6 — as built: simple for anyone (laptop)
+
+**Understanding the app.** Home now says what the app is (every waveform simulated, never drawn), *How it
+works* in three steps (choose a circuit · change a value · ask WHY), what each mode is for, and one plain
+line per group of labs (Conversion, Foundations, Systems). The engineering practice area is labelled
+**Practice** (its address stays `#/engineering`). Every workspace opens once with **How this lab works**:
+four steps — set the values, watch the circuit, move through time, ask WHY — each numbered on its region,
+plus what each of the lab's modes is for; "Got it" closes it for every lab, the header's **How to use**
+brings it back. The level control is labelled **Detail**. The rectifier's one-line hint is replaced by it.
+
+**Predict** is a main mode tab in every lab (Explore · Learn · Experiment · Predict); Challenge, Reverse and
+Compare stay under "More" in the Rectifier Lab.
+
+**Opening a slow circuit.** The workspace frame and "Simulating the circuit…" paint before the first solve,
+and a re-solve that took more than 150 ms says "Updating the simulation…" in the status line. Gate-schedule
+edge lookup is a binary search returning the same edges, times and order (`tests/schedule.identity.test.ts`).
+Production build: the frame in ~2 ms; inverters ready in 0.1–0.7 s.
+
+**What happens next** is never empty while the cursor is inside the run: the run's next event; past the
+last one, the next cycle's event for a run that repeats (converged periodic steady state, or a steady view
+that ends where it started), else how the main waveforms move to the end of the run — averaged over a
+switching period, RMS for alternating quantities, from the samples (DC motor start-up, 0–100, inductor
+start-up, MOSFET). `tests/next-consequence.test.ts`.
+
+**Beginner diagrams** keep names, the values you set and words (motoring, linear, sector 2); live numbers
+(output voltage, power, speed, flux, dwell times) appear from Standard (`DiagramProps.live`).
+
+**Rectifier WHY** answers three questions from the explainer's chain at the cursor: *why is the circuit
+doing this now?*, *why does the current take this path?* (the conducting devices close the loop; KCL),
+*why does the output look like this?* (the output and waveform steps; the load's own rule for R, RL, RC, RLC).
+
+**Verification.** 935 unit tests; 10 browser suites, 655 checks, against the production build; build has
+no warnings.

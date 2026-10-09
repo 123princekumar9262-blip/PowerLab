@@ -116,8 +116,13 @@ export interface DiagramProps<R, S> {
   st: S
   selected: string | null
   onSelect: (part: string) => void
-  /** Values printed on the circuit (Standard and Engineer). */
+  /** Extra measured values printed on the circuit (Engineer). */
   values: boolean
+  /**
+   * Live numbers that change with the cursor (output voltage, power, speed, flux…): Standard and Engineer.
+   * At Beginner the diagram keeps names, the values you set and words (motoring, linear…) only.
+   */
+  live?: boolean
   showPath: boolean
 }
 

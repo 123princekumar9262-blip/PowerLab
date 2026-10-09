@@ -17,7 +17,7 @@ const CH: Record<string, ChannelMeta> = {
   ebatt: { id: 'ebatt', label: 'E', name: 'Energy from the battery terminals', unit: 'J', color: '#d55181', group: 'Energy' },
 }
 
-function EvDiagram({ st, r, selected, onSelect, values }: { st: EvState; r: EvRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+function EvDiagram({ st, r, selected, onSelect, values, live }: { st: EvState; r: EvRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -56,9 +56,11 @@ function EvDiagram({ st, r, selected, onSelect, values }: { st: EvState; r: EvRu
         <text x={85} y={97} textAnchor="middle" className="clabel">
           battery
         </text>
-        <text x={85} y={114} textAnchor="middle" className="cvalue">
-          {st.soc.toFixed(2)} %
-        </text>
+        {live && (
+          <text x={85} y={114} textAnchor="middle" className="cvalue">
+            {st.soc.toFixed(2)} %
+          </text>
+        )}
         {values && (
           <text x={85} y={146} textAnchor="middle" className="cvalue cvalue--strong">
             {formatV(st.vBatt, false)} · {formatA(st.iBatt, true)}
@@ -98,18 +100,21 @@ function EvDiagram({ st, r, selected, onSelect, values }: { st: EvState; r: EvRu
         <path d="M420 150 V120 L455 92 H560 L600 120 H630 V150 Z" className="sym-body" />
         <circle cx={460} cy={155} r={16} className="sym-body" />
         <circle cx={590} cy={155} r={16} className="sym-body" />
-        <text x={525} y={128} textAnchor="middle" className="clabel">
-          {(st.v * 3.6).toFixed(1)} km/h
-        </text>
+        {live && (
+          <text x={525} y={128} textAnchor="middle" className="clabel">
+            {(st.v * 3.6).toFixed(1)} km/h
+          </text>
+        )}
         <text x={525} y={84} textAnchor="middle" className="cvalue">
           {p.mass.toFixed(0)} kg · Cd {p.cd}
         </text>
       </g>
-      {arrow(525, 205, st.f * scale, 'sym sym--on-q', `motor ${st.f.toFixed(0)} N`)}
-      {arrow(470, 232, -st.fAero * scale, 'sym', `drag ${st.fAero.toFixed(0)} N`)}
-      {st.fBrake > 1 && arrow(600, 232, -st.fBrake * scale, 'sym', `brake ${st.fBrake.toFixed(0)} N`)}
+      {arrow(525, 205, st.f * scale, 'sym sym--on-q', live ? `motor ${st.f.toFixed(0)} N` : 'motor')}
+      {arrow(470, 232, -st.fAero * scale, 'sym', live ? `drag ${st.fAero.toFixed(0)} N` : 'drag')}
+      {st.fBrake > 1 && arrow(600, 232, -st.fBrake * scale, 'sym', live ? `brake ${st.fBrake.toFixed(0)} N` : 'brake')}
       <text x={210} y={258} className="path-caption" textAnchor="middle">
-        {st.phase} · {formatW(st.pBatt)} · {(st.dist / 1000).toFixed(2)} km
+        {st.phase}
+        {live && ` · ${formatW(st.pBatt)} · ${(st.dist / 1000).toFixed(2)} km`}
       </text>
     </svg>
   )
@@ -216,7 +221,7 @@ export const EV_TOPIC: Topic<EvParams, EvRun, EvMeasurements, EvState> = {
   state: evStateAt,
   view: (st) => evView(st),
   why: evWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <EvDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <EvDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['vkmh', 'vref', 'pbatt'],
   addOrder: ['vkmh', 'vref', 'f', 'fbrake', 'pbatt', 'pwheel', 'pbrake', 'ibatt', 'soc', 'ebatt'],

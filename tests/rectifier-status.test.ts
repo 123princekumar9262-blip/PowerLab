@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getExplainer } from '../src/explanations/index.ts'
-import { rectifierNext, rectifierStatus } from '../src/explanations/status.ts'
+import { rectifierNext, rectifierStatus, rectifierWhyQuestions } from '../src/explanations/status.ts'
 import { DEFAULT_PARAMS, THREE_PHASE_DEFAULTS } from '../src/simulation/params.ts'
 import { runSimulation } from '../src/simulation/engine.ts'
 import type { CircuitId, LabParams, SimulationResult } from '../src/types/simulation.ts'
@@ -118,5 +118,44 @@ describe('rectifier status line and next consequence (real samples)', () => {
     const k = hw.trace.length - 1
     expect(nextDeviceEvent(hw, k)).toBeUndefined()
     expect(at(hw, k).next).toBeNull()
+  })
+})
+
+describe('rectifier WHY: three questions, each from the explanation of the same sample', () => {
+  const cases: Array<[CircuitId, { device?: 'diode' | 'scr'; fw?: boolean; ls?: number }]> = [
+    ['half-wave:R', {}],
+    ['half-wave:RL', { fw: true }],
+    ['bridge:RC', {}],
+    ['bridge:RL', { device: 'scr' }],
+    ['center-tap:RLC', {}],
+    ['3ph-bridge:RL', { ls: 2e-3 }],
+    ['3ph-half-wave:R', { device: 'scr' }],
+  ]
+  it.each(cases)('%s: now · path · output, every part filled, no NaN, at samples across a cycle', (id, o) => {
+    const r = run(id, o)
+    for (let k = Math.floor(r.trace.length * 0.6); k < r.trace.length; k += 37) {
+      const { ex } = at(r, k)
+      const qs = rectifierWhyQuestions(r, ex)
+      expect(qs.map((q) => q.id)).toEqual(['now', 'path', 'output'])
+      for (const q of qs) for (const part of [q.question, q.what, q.why, q.principle]) {
+        expect(part.length, `${id} k=${k} ${q.id}`).toBeGreaterThan(0)
+        expect(part).not.toMatch(/NaN|undefined/)
+      }
+      // the path question quotes the explainer's own path step, the output question its output step
+      const by = (s: string) => ex.chain.find((c) => c.stage === s)
+      expect(qs[1].what).toBe(by('path')?.text ?? ex.current.text)
+      expect(qs[2].what).toBe(by('output')?.text ?? ex.output.text)
+    }
+  })
+  it('a blocking instant: the path question says there is no closed loop', () => {
+    const hw = run('half-wave:R')
+    const k = find(hw, (i) => hw.trace.diodes[0].on[i] === 0)
+    const path = rectifierWhyQuestions(hw, at(hw, k).ex)[1]
+    expect(path.why).toMatch(/no closed loop/)
+  })
+  it('the output question names the load’s own rule (RC: the capacitor)', () => {
+    const r = run('bridge:RC')
+    const out = rectifierWhyQuestions(r, at(r, Math.floor(r.trace.length * 0.8)).ex)[2]
+    expect(out.principle).toMatch(/capacitor holds its voltage/)
   })
 })

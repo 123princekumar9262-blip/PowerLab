@@ -11,7 +11,7 @@ export type ResultKind = 'Lab' | 'Circuit' | 'Topic' | 'Concept' | 'Practice'
 export interface SearchEntry {
   kind: ResultKind
   title: string
-  /** Where it lives ("Rectifiers", "Engineering"). */
+  /** Where it lives ("Rectifiers", "Practice"). */
   context: string
   detail: string
   status: Status
@@ -55,7 +55,7 @@ export function searchIndex(): SearchEntry[] {
     out.push({
       kind: 'Practice',
       title: a.title,
-      context: 'Engineering',
+      context: 'Practice',
       detail: a.purpose,
       status: a.status,
       hash: href.engineering(a.id),

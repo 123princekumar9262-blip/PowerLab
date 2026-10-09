@@ -5,13 +5,13 @@
 An interactive power-electronics laboratory.
 
 **Navigation.**
-- **Home** (`#/home`) answers *what can I do here?*: continue learning, the labs, a recommended learning path, and recent items.
+- **Home** (`#/home`) says what the app is and how it works (choose a circuit · change a value · ask WHY, and what each mode is for), then: continue learning, the labs with a one-line meaning per group, a recommended learning path, and recent items.
 - **Labs** (`#/labs`) lists the full catalogue, in three groups:
   - **Conversion:** Rectifiers, DC-DC Converters (buck, boost, buck-boost), PWM, Inverters (single-phase, three-phase, SPWM, SVPWM).
   - **Foundations:** Switching Devices (MOSFET double-pulse test), Magnetics (gapped inductor, saturation), Control (closed-loop buck and boost).
   - **Systems:** Drives & Motors (DC motor on a 1Q/2Q chopper), Losses & Thermal (switch losses and the thermal path), EV Power Electronics (drivetrain on a drive cycle, 0–100 km/h).
 - **Lab landing pages** (`#/labs/:lab`) let you pick a circuit. **Workspaces** (`#/labs/:lab/:topic[/:mode]`) open it already running.
-- **Engineering** (`#/engineering`) is the practice area: Challenge and Reverse Engineering are ready; Design, Fault Diagnosis and Interview are coming soon.
+- **Practice** (`#/engineering`) is the practice area: Challenge and Reverse Engineering are ready; Design, Fault Diagnosis and Interview are coming soon.
 - **Progress** (`#/progress`) and **Settings** (`#/settings`, information level).
 - **Search:** Ctrl/⌘ K.
 - **Old links redirect:** `#dcdc` → `#/labs/dc-dc`, and `#engineering` → `#/labs/thermal`.
@@ -44,7 +44,7 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
-**Tests.** 910 unit tests pass:
+**Tests.** 935 unit tests pass:
 
 | Area | Tests |
 |---|---|
@@ -61,11 +61,12 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Losses & Thermal | 19 |
 | Shell (router, catalogue honesty, search, progress) | 14 |
 | Workspace shell (Buck: one timestep in every panel, Analyze) | 9 |
-| Rectifier in the workspace shell (golden numbers, status / next consequence, one sample in every region, Analyze, routing) | 37 |
+| Rectifier in the workspace shell (golden numbers, status / next consequence, WHY questions, one sample in every region, Analyze, routing) | 46 |
 | Workspace contract on real runs (cursor never re-simulates, events, path, inspector, WHY, energy, Change circuit) | 17 |
-| Exact DC-DC solution bit-identical to its snapshot; `expm` bit-identical to the original | 35 |
+| Exact DC-DC solution bit-identical to its snapshot; `expm` and gate-schedule edges bit-identical to the originals | 37 |
+| "What happens next" is never empty: the next event, the next cycle, or the trend to the end of the run | 14 |
 
-**Browser smoke suites.** Ten suites pass (623 checks):
+**Browser smoke suites.** Ten suites pass (655 checks):
 
 | Suite | Checks |
 |---|---|
@@ -73,12 +74,12 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Three-phase | 41 |
 | Freewheeling diode | 30 |
 | Controlled / compare | 36 |
-| DC-DC | 70 |
+| DC-DC | 71 |
 | PWM / inverters | 33 |
-| Control, Devices, Drives, Magnetics, EV, Losses & Thermal | 93 |
-| Shell (Home, Labs, routes, redirects, Continue, level, search, Back, 390 px) | 70 |
+| Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence) | 106 |
+| Shell (Home and how it works, Labs, routes, redirects, Continue, workspace guide, level, search, Back, 390 px) | 85 |
 | Workspace shell (Buck at 1440/1024/820/768/390/375: regions, WHY + Explore, drawers, sheets, sync, Focus, levels) | 109 |
-| Rectifier workspace (six widths, entry points, WHY, Explore, Change circuit, levels, Focus, sheets, Compare) | 84 |
+| Rectifier workspace (six widths, entry points, WHY questions, Explore, Change circuit, levels, Focus, sheets, Compare) | 87 |
 
 ## Run it
 

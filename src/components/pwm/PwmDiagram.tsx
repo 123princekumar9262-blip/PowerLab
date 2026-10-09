@@ -8,6 +8,8 @@ interface Props {
   selected: string | null
   onSelect: (part: string) => void
   values: boolean
+  /** Live numbers (Standard and Engineer). */
+  live?: boolean
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * output into the dead-time block and a half-bridge output stage. Values and states are the
  * simulated ones at the cursor; the active path is highlighted.
  */
-export function PwmDiagram({ st, p, selected, onSelect, values }: Props) {
+export function PwmDiagram({ st, p, selected, onSelect, values, live = true }: Props) {
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -104,16 +106,19 @@ export function PwmDiagram({ st, p, selected, onSelect, values }: Props) {
           GL
         </text>
         <circle cx={645} cy={125} r={4} className="node-dot" />
-        <text x={645} y={208} textAnchor="middle" className="cvalue cvalue--out">
-          vout {formatV(st.vout)}
-        </text>
+        {live && (
+          <text x={645} y={208} textAnchor="middle" className="cvalue cvalue--out">
+            vout {formatV(st.vout)}
+          </text>
+        )}
         <text x={645} y={54} textAnchor="middle" className="cvalue">
           {p.output === 'bipolar' ? `±${formatV(p.vdc / 2, false)}` : `0 … ${formatV(p.vdc, false)}`}
         </text>
       </g>
       <text x={345} y={256} className="path-caption" textAnchor="middle">
-        {st.gate ? 'r > c: upper switch commanded ON' : 'r < c: lower switch commanded ON'} · local duty {(st.localDuty * 100).toFixed(1)} %
-        {st.pulse ? ` · this pulse ${formatTime(st.pulse.end - st.pulse.start)}` : ''}
+        {st.gate ? 'r > c: upper switch commanded ON' : 'r < c: lower switch commanded ON'}
+        {live && ` · local duty ${(st.localDuty * 100).toFixed(1)} %`}
+        {live && st.pulse ? ` · this pulse ${formatTime(st.pulse.end - st.pulse.start)}` : ''}
       </text>
     </svg>
   )

@@ -10,6 +10,49 @@
   padding: 0 20px 28px;
 }
 
+/* the frame shown while a workspace's first simulation runs */
+.ws-boot {
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 14px 20px;
+}
+.ws-boot .eyebrow {
+  margin: 0;
+  font-size: 11px;
+}
+.ws-boot-title {
+  margin: 2px 0 0;
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--text-1);
+}
+.ws-boot-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 56px 0 0;
+  justify-content: center;
+  color: var(--text-2);
+}
+.ws-boot-spin {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ws-spin 0.8s linear infinite;
+  will-change: transform;
+}
+@keyframes ws-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.wp-busy {
+  color: var(--accent);
+  font-family: var(--font-ui);
+}
+
 /* ── Header: where am I, what mode ───────────────────────────────────────── */
 .ws-head {
   padding: 12px 0 12px;
@@ -218,6 +261,121 @@
 .ws-wave {
   margin-top: 16px;
   min-width: 0;
+}
+/* the guide's step numbers sit on the regions they describe */
+.ws-params,
+.ws-bench,
+.ws-wave {
+  position: relative;
+}
+
+/* ── "How this lab works" ────────────────────────────────────────────────── */
+.ws-guide {
+  margin: 0 0 14px;
+  padding: 14px 16px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border-strong));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+}
+.ws-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ws-guide-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-1);
+}
+.ws-guide-close {
+  min-height: 32px;
+  padding: 0 14px;
+}
+.ws-guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 18px;
+}
+.ws-guide-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.ws-guide-steps b {
+  display: block;
+  color: var(--text-1);
+  font-size: 13.5px;
+}
+.ws-guide-modes {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.ws-guide-modes b {
+  color: var(--text-1);
+}
+.ws-mark {
+  position: absolute;
+  z-index: 5;
+  top: -11px;
+  left: -11px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #08101c;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px var(--bg);
+}
+/* the parameter column scrolls (its overflow would clip a mark outside it): the mark sits inside its top */
+.ws--guide .ws-params {
+  padding-top: 40px;
+}
+.ws-params > .ws-mark {
+  top: 10px;
+  left: 12px;
+  box-shadow: none;
+}
+.ws-mark--inline {
+  position: static;
+  flex: none;
+  box-shadow: none;
+}
+.ws-actions .ws-mark--inline {
+  align-self: center;
+}
+.ws-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.ws-level-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.ws-help span {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ── Parameters ──────────────────────────────────────────────────────────── */

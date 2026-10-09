@@ -67,8 +67,8 @@ export function CircuitView({ w, showPath, selected, onSelect }: { w: WorkspaceM
   const Diagram = w.topic.Diagram
   return (
     <div className="wp-circuit">
-      {/* numbers on the circuit only at Engineer level; State and Inspect hold them otherwise */}
-      <Diagram r={w.result} st={w.st} selected={selected} onSelect={onSelect} values={w.level === 'engineer'} showPath={showPath} />
+      {/* extra numbers on the circuit only at Engineer; live numbers from Standard (Beginner: names and words) */}
+      <Diagram r={w.result} st={w.st} selected={selected} onSelect={onSelect} values={w.level === 'engineer'} live={w.level !== 'beginner'} showPath={showPath} />
     </div>
   )
 }

@@ -80,7 +80,7 @@ export const PWM_TOPIC: Topic<PwmParams, PwmRun, PwmMeasurements, PwmState> = {
   state: pwmStateAt,
   view: (st, r) => pwmView(st, r),
   why: pwmWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <PwmDiagram st={st} p={r.params} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <PwmDiagram st={st} p={r.params} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['carrier', 'cmp', 'gate', 'vout'],
   addOrder: ['carrier', 'ref', 'cmp', 'gate', 'gh', 'gl', 'vout', 'vavg'],

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fullName, labById, modesOf, topicOf, workspaceModes } from '../catalogue/catalogue.ts'
 import { MeasureTable, Numerics } from '../components/lab/Analyze.tsx'
 import { ExperimentPanel, LearnPanel, PredictPanel } from '../components/lab/Modes.tsx'
@@ -12,11 +12,13 @@ import type { AnalysisCategory, AnalysisRow, ComponentInspection, WhyQuestion, W
 import { categoryRows, CircuitView, ParameterPanel, WaveformPanel } from './panels.tsx'
 import { useTopicWorkspace, type WorkspaceModel, type WsMode } from './useTopicWorkspace.ts'
 import { AnalyzeView, EnergyView, EventsView, InspectorView, StatusLine, WhyView } from './views.tsx'
-import { WorkspaceShell, type ExploreItem, type ShellPanel } from './WorkspaceShell.tsx'
+import { WorkspaceBoot, WorkspaceShell, type ExploreItem, type ShellPanel } from './WorkspaceShell.tsx'
 import '../styles/workspace.css'
 
 const WS_MODES: WsMode[] = ['explore', 'learn', 'experiment', 'predict']
 const isWsMode = (m: string): m is WsMode => (WS_MODES as string[]).includes(m)
+/** A circuit whose last solve took longer than this says "Updating" while it is re-solved (faster ones would only flicker). */
+const SLOW_MS = 150
 
 // ── Topic → workspace contract (pure; tested) ───────────────────────────────
 
@@ -111,7 +113,26 @@ export function topicAnalysis(topic: AnyTopic, w: Pick<WorkspaceModel, 'result' 
  */
 export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
   const lab = labById(labId)!
-  return function TopicShellWorkspace({ topic: topicId, mode, query, onActivity }: WorkspaceProps) {
+  /**
+   * The first solve of a circuit can take a second (the inverters): the lab's frame and a "Simulating" line are
+   * painted first, then the circuit is solved — the page never sits blank.
+   */
+  return function TopicShellBoot(props: WorkspaceProps) {
+    const [ready, setReady] = useState(false)
+    useEffect(() => {
+      let t = 0
+      const f = requestAnimationFrame(() => (t = window.setTimeout(() => setReady(true), 0)))
+      return () => {
+        cancelAnimationFrame(f)
+        clearTimeout(t)
+      }
+    }, [])
+    if (ready) return <TopicShellWorkspace {...props} />
+    const entry = topicOf(lab, props.topic)
+    return <WorkspaceBoot lab={lab.title} title={entry ? fullName(entry) : ''} />
+  }
+
+  function TopicShellWorkspace({ topic: topicId, mode, query, onActivity }: WorkspaceProps) {
     const topic = topics[topicId]
     const entry = topicOf(lab, topicId)!
     const lessonQ = query.lesson ? { id: query.lesson, step: Number(query.step) || 0 } : undefined
@@ -244,7 +265,7 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
             }}
           />
         }
-        status={<StatusLine status={w.status} time={`t = ${formatTime(w.result.time[w.k])}`} path={path} onOpen={() => setOpen(open === 'state' ? null : 'state')} />}
+        status={<StatusLine status={w.status} time={`t = ${formatTime(w.result.time[w.k])}`} path={path} onOpen={() => setOpen(open === 'state' ? null : 'state')} busy={w.pending && w.result.diagnostics.computeMs > SLOW_MS} />}
         waveform={<WaveformPanel w={w} focus={focus} compact={false} />}
         why={why}
         explore={explore}

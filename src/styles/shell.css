@@ -294,7 +294,63 @@
 .lab-group .group-title {
   margin-top: 18px;
 }
+/* a group's plain one-line meaning, under its title */
+.group-line {
+  margin: -4px 0 10px;
+  color: var(--text-3);
+}
 
+/* ── Home: how it works ──────────────────────────────────────────────────── */
+.how-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.how-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.how-steps b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14.5px;
+  color: var(--text-1);
+}
+.how-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #08101c;
+  font-weight: 700;
+}
+.how-modes {
+  margin: 12px 0 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.how-modes b {
+  color: var(--text-1);
+}
+@media (max-width: 900px) {
+  .how-steps {
+    grid-template-columns: 1fr;
+  }
+}
 /* ── Lab cards ───────────────────────────────────────────────────────────── */
 .lab-grid {
   display: grid;
@@ -643,23 +699,6 @@ a.topic-card:focus-visible {
   padding: 60px 24px;
   text-align: center;
   color: var(--text-3);
-}
-
-/* the rectifier lab's one-time hint (replaces the permanent guide) */
-.first-hint button {
-  white-space: nowrap;
-}
-.first-hint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 8px;
-  padding: 7px 12px;
-  border: 1px solid var(--border-strong);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  color: var(--text-2);
 }
 
 /* ── Search palette ──────────────────────────────────────────────────────── */

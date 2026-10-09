@@ -74,7 +74,7 @@ const acts = await p.locator('.ws-actions .ws-act').allInnerTexts()
 check(acts.map((x) => x.replace(/\s+/g, ' ').replace(/^[?☰⚙] /, '').trim()).join('|') === 'WHY|Explore', `two everyday actions: WHY and Explore (${acts.length})`)
 check((await menuItems(p)).join('|') === 'Show current path|Inspect a component|State details|Energy|Switching events|Measurements & theory|Lessons|Focus view', 'Explore holds the rest: path, inspect, state, energy, events, measurements, lessons, focus')
 const modeTabs = await p.locator('.ws-modes-tabs [role=tab]').allInnerTexts()
-check(modeTabs.join('|') === 'Explore|Learn|Experiment' && (await p.locator('.ws-more-modes summary').innerText()).startsWith('More'), 'modes: Explore · Learn · Experiment, practice under More')
+check(modeTabs.join('|') === 'Explore|Learn|Experiment|Predict' && (await p.locator('.ws-more-modes').count()) === 0, 'modes: Explore · Learn · Experiment · Predict, all tabs (DC-DC has no practice modes under More)')
 // Basic parameters only; Advanced on demand
 const labels = await p.locator('.ws-params .pfield-label').allInnerTexts()
 check((await p.locator('.ws-params details.wp-advanced').getAttribute('open')) === null, 'Advanced parameters closed by default (Beginner)')
@@ -198,10 +198,9 @@ for (const m of ['Learn', 'Experiment', 'Explore']) {
 }
 await p.locator('.ws-modes-tabs').getByRole('tab', { name: 'Learn' }).click()
 check(await p.locator('.ws-side .ws-activity').isVisible(), 'Learn: the lesson list is the side panel (the activity of the mode)')
-await p.locator('.ws-more-modes summary').click()
-await p.locator('.ws-more-modes').getByRole('button', { name: 'Predict' }).click()
+await p.locator('.ws-modes-tabs').getByRole('tab', { name: 'Predict' }).click()
 await p.waitForTimeout(150)
-check((await p.evaluate(() => location.hash)).includes('/predict') && /Predict/.test(await p.locator('.ws-more-modes summary').innerText()), 'More → Predict (the menu shows where you are)')
+check((await p.evaluate(() => location.hash)).includes('/predict') && (await p.locator('.ws-modes-tabs [aria-selected=true]').innerText()) === 'Predict', 'Predict is a main mode tab')
 await p.locator('.ws-modes-tabs').getByRole('tab', { name: 'Explore' }).click()
 // navigation: back link, change circuit, Back
 await p.getByRole('link', { name: 'Back to DC-DC Converters' }).click()

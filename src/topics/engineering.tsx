@@ -14,7 +14,7 @@ const CH: Record<string, ChannelMeta> = {
   load: { id: 'load', label: 'Load', name: 'Load on', unit: '', color: '#aeb7c5', group: 'Load', logic: true },
 }
 
-function ThermalDiagram({ st, r, selected, onSelect, values }: { st: ThermalState; r: ThermalRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+function ThermalDiagram({ st, r, selected, onSelect, values, live }: { st: ThermalState; r: ThermalRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -48,9 +48,11 @@ function ThermalDiagram({ st, r, selected, onSelect, values }: { st: ThermalStat
         <text x={85} y={100} textAnchor="middle" className="clabel">
           switch
         </text>
-        <text x={85} y={118} textAnchor="middle" className="cvalue cvalue--strong">
-          {formatW(st.p)}
-        </text>
+        {live && (
+          <text x={85} y={118} textAnchor="middle" className="cvalue cvalue--strong">
+            {formatW(st.p)}
+          </text>
+        )}
         <text x={85} y={134} textAnchor="middle" className="cvalue">
           {st.on ? 'loaded' : 'idle'}
         </text>
@@ -92,8 +94,16 @@ function ThermalDiagram({ st, r, selected, onSelect, values }: { st: ThermalStat
         </text>
       </g>
       <text x={345} y={240} className="path-caption" textAnchor="middle">
-        Tj {st.tj.toFixed(1)} °C · Rth(j-a) {p.rth.toFixed(2)} K/W · b·Rth {(p.b * p.rth).toFixed(2)}
-        {p.b * p.rth >= 1 ? ' — RUNAWAY' : ''}
+        {live ? (
+          <>
+            Tj {st.tj.toFixed(1)} °C · Rth(j-a) {p.rth.toFixed(2)} K/W · b·Rth {(p.b * p.rth).toFixed(2)}
+            {p.b * p.rth >= 1 ? ' — RUNAWAY' : ''}
+          </>
+        ) : p.b * p.rth >= 1 ? (
+          'Thermal runaway: the heat path cannot keep up'
+        ) : (
+          'Heat flows: junction → case → heatsink → air'
+        )}
       </text>
     </svg>
   )
@@ -190,7 +200,7 @@ export const THERMAL_TOPIC: Topic<ThermalParams, ThermalRun, ThermalMeasurements
   state: thermalStateAt,
   view: (st, r) => thermalView(st, r),
   why: thermalWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <ThermalDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <ThermalDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['tj', 'ths', 'p'],
   addOrder: ['tj', 'ths', 'ta', 'p', 'pc', 'ps', 'load'],

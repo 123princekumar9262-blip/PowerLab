@@ -39,6 +39,12 @@ for (const g of ['Conversion', 'Foundations', 'Systems']) check(await page.locat
 check((await page.locator('.home-section .lab-card').count()) === 10, 'Home lists the ten labs')
 check((await page.locator('.lpath-step--recommended').innerText()).includes('Rectifiers'), 'learning path recommends Rectifiers first')
 check(/recommendation/i.test(await page.locator('.home-section', { hasText: 'learning path' }).innerText()), 'the path is presented as a recommendation, not a gate')
+// Home explains the app: what it is, how it works, what each mode is for, what each group means
+check(/simulated, never drawn by hand/.test(await page.locator('.page-lead').innerText()), 'Home says what the app is: real simulation')
+check((await page.locator('.how-steps li').count()) === 3, 'How it works: three steps (choose · change · ask WHY)')
+const how = await page.locator('.home-section', { hasText: 'How it works' }).innerText()
+for (const m of ['Explore', 'Learn', 'Experiment', 'Predict']) check(how.includes(m), `How it works explains the ${m} mode`)
+check((await page.locator('.group-line').count()) === 3, 'each group of labs has a one-line meaning')
 await page.screenshot({ path: `${OUT}shell-home.png`, fullPage: true })
 
 // ── TEST 1: Home → Rectifiers → Three-phase → 6-pulse bridge ─────────────────
@@ -54,6 +60,21 @@ check((await hash()).startsWith('#/labs/rectifiers/3ph-6pulse'), 'the circuit ha
 check((await page.getByRole('button', { name: /Run simulation/ }).count()) === 0, 'no Run step: the circuit opens running')
 check(/D\d \+ D\d conducting/i.test(await page.locator('.wp-status-line').innerText()), 'the 6-pulse bridge is simulated (conducting pair shown)')
 check(await page.getByRole('link', { name: 'Back to Rectifiers' }).isVisible(), 'a back link to the lab is always there')
+// the first workspace visit explains the workspace: four numbered steps marked on their regions
+check(await page.locator('.ws-guide').isVisible(), 'first visit: "How this lab works" is shown')
+check((await page.locator('.ws-guide-steps li').count()) === 4, 'the guide has four steps (values · circuit · waveforms · WHY)')
+check((await page.locator('.ws-params .ws-mark, .ws-bench > .ws-mark, .ws-wave > .ws-mark, .ws-actions .ws-mark').count()) === 4, 'each step is marked on its region (1 values, 2 circuit, 3 waveforms, 4 WHY)')
+check(/Predict/.test(await page.locator('.ws-guide-modes').innerText()), 'the guide says what each of the lab’s modes is for')
+await page.locator('.ws-guide').getByRole('button', { name: 'Got it' }).click()
+await wait(200)
+check((await page.locator('.ws-guide').count()) === 0 && (await page.locator('.ws-mark').count()) === 0, '“Got it” closes the guide and its marks')
+await page.getByRole('button', { name: 'How to use' }).click()
+await wait(200)
+check(await page.locator('.ws-guide').isVisible(), '“How to use” opens the guide again')
+await page.getByRole('button', { name: 'How to use' }).click()
+await wait(200)
+check((await page.locator('.ws-guide').count()) === 0, '… and closes it')
+check((await page.locator('.ws-level-label').innerText()) === 'Detail', 'the level control is labelled “Detail”')
 await page.screenshot({ path: `${OUT}shell-workspace.png` })
 
 // ── TEST 10: Back ────────────────────────────────────────────────────────────
@@ -104,14 +125,14 @@ await wait(900)
 check((await hash()) === '#/labs/dc-dc/buck', 'Buck workspace opens')
 check(await page.locator('.buck-diagram').isVisible(), 'the buck circuit is shown')
 
-// ── TEST 3: Engineering ───────────────────────────────────────────────────────
+// ── TEST 3: Practice (the engineering practice area, #/engineering) ──────────
 console.log('── Test 3')
-await page.locator('.shell-nav').getByRole('link', { name: 'Engineering' }).click()
+await page.locator('.shell-nav').getByRole('link', { name: 'Practice' }).click()
 await wait()
-check((await hash()) === '#/engineering', 'Engineering opens the practice area')
+check((await hash()) === '#/engineering' && (await h1()) === 'Practice', 'Practice opens the practice area')
 const eng = await page.locator('main').innerText()
 for (const a of ['Design', 'Challenge', 'Reverse Engineering', 'Fault Diagnosis', 'Interview']) check(eng.includes(a), `practice area lists ${a}`)
-check(!/junction|heatsink/i.test(eng), 'Engineering is not the losses/thermal lab any more')
+check(!/junction|heatsink/i.test(eng), 'Practice is not the losses/thermal lab')
 await page.getByRole('link', { name: /^Design/ }).click()
 await wait()
 check((await hash()) === '#/engineering/design' && /Coming soon/i.test(await page.locator('main').innerText()), 'Design is honest: coming soon')

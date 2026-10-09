@@ -13,7 +13,7 @@ const CH: Record<string, ChannelMeta> = {
   linc: { id: 'linc', label: 'L', name: 'Incremental inductance [H]', unit: '', color: '#d95926', group: 'Inductance' },
 }
 
-function CoreDiagram({ st, r, selected, onSelect, values }: { st: CoreState; r: CoreRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+function CoreDiagram({ st, r, selected, onSelect, values, live }: { st: CoreState; r: CoreRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -77,12 +77,16 @@ function CoreDiagram({ st, r, selected, onSelect, values }: { st: CoreState; r: 
         <text x={562} y={139} className="cvalue">
           gap {formatSI(p.lg, 'm')}
         </text>
-        <text x={460} y={140} textAnchor="middle" className="clabel">
-          B {st.b.toFixed(3)} T
-        </text>
-        <text x={460} y={156} textAnchor="middle" className="cvalue">
-          {sat ? 'SATURATED' : `${(fill * 100).toFixed(0)} % of Bsat`}
-        </text>
+        {live && (
+          <text x={460} y={140} textAnchor="middle" className="clabel">
+            B {st.b.toFixed(3)} T
+          </text>
+        )}
+        {(live || sat) && (
+          <text x={460} y={156} textAnchor="middle" className="cvalue">
+            {sat ? 'SATURATED' : `${(fill * 100).toFixed(0)} % of Bsat`}
+          </text>
+        )}
       </g>
       {/* winding on the left leg */}
       <g {...part('winding', `Winding N = ${p.n}`)}>
@@ -100,7 +104,8 @@ function CoreDiagram({ st, r, selected, onSelect, values }: { st: CoreState; r: 
         )}
       </g>
       <text x={345} y={258} className="path-caption" textAnchor="middle">
-        {REGION[st.region]} · L now {formatSI(st.linc, 'H')}
+        {REGION[st.region]}
+        {live && ` · L now ${formatSI(st.linc, 'H')}`}
       </text>
     </svg>
   )
@@ -193,7 +198,7 @@ export const CORE_TOPIC: Topic<CoreParams, CoreRun, CoreMeasurements, CoreState>
   state: coreStateAt,
   view: (st, r) => coreView(st, r),
   why: coreWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <CoreDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <CoreDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['v', 'b', 'i'],
   addOrder: ['v', 'b', 'i', 'vl', 'h', 'linc'],

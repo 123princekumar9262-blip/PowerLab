@@ -16,7 +16,7 @@ const CH: Record<string, ChannelMeta> = {
   pin: { id: 'pin', label: 'Pin', name: 'Power from the supply', unit: 'W', color: '#d55181', group: 'Power' },
 }
 
-function DriveDiagram({ st, r, selected, onSelect, values }: { st: DriveState; r: DriveRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+function DriveDiagram({ st, r, selected, onSelect, values, live }: { st: DriveState; r: DriveRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -143,9 +143,11 @@ function DriveDiagram({ st, r, selected, onSelect, values }: { st: DriveState; r
         <text x={480} y={186} textAnchor="middle" className="clabel">
           M
         </text>
-        <text x={448} y={176} textAnchor="end" className="cvalue">
-          E {formatV(st.e)}
-        </text>
+        {live && (
+          <text x={448} y={176} textAnchor="end" className="cvalue">
+            E {formatV(st.e)}
+          </text>
+        )}
         {values && (
           <text x={448} y={192} textAnchor="end" className="cvalue cvalue--out">
             {st.n.toFixed(0)} rpm
@@ -160,15 +162,17 @@ function DriveDiagram({ st, r, selected, onSelect, values }: { st: DriveState; r
         <text x={614} y={178} textAnchor="middle" className="clabel">
           load
         </text>
-        <text x={614} y={192} textAnchor="middle" className="cvalue">
-          {st.tl.toFixed(2)} N·m
-        </text>
+        {live && (
+          <text x={614} y={192} textAnchor="middle" className="cvalue">
+            {st.tl.toFixed(2)} N·m
+          </text>
+        )}
       </g>
       <text x={540} y={168} textAnchor="middle" className="cvalue">
         J, B
       </text>
       <text x={345} y={258} className="path-caption" textAnchor="middle">
-        {st.phase} · Te {st.te.toFixed(3)} N·m · {p.bridge === '1q' ? 'one-quadrant chopper' : 'two-quadrant chopper'}
+        {st.phase}{live ? ` · Te ${st.te.toFixed(3)} N·m` : ''} · {p.bridge === '1q' ? 'one-quadrant chopper' : 'two-quadrant chopper'}
       </text>
     </svg>
   )
@@ -287,7 +291,7 @@ export const DRIVE_TOPIC: Topic<DriveParams, DriveRun, DriveMeasurements, DriveS
   state: driveStateAt,
   view: (st, r) => driveView(st, r),
   why: driveWhy,
-  Diagram: ({ r, st, selected, onSelect, values }) => <DriveDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <DriveDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
   channels: CH,
   defaultChannels: ['n', 'ia', 'va'],
   addOrder: ['n', 'ia', 'va', 'e', 'te', 'tl', 'gate', 'duty', 'iin', 'pin'],

@@ -34,7 +34,7 @@ export function CarryNotice({ report, onDismiss }: { report: CarryReport | null 
 
 // ── Status line (+ the current path when it is shown) ───────────────────────
 
-export function StatusLine({ status, time, path, onOpen }: { status: StatusInfo; time: string; path?: CurrentPath | null; onOpen?(): void }) {
+export function StatusLine({ status, time, path, onOpen, busy }: { status: StatusInfo; time: string; path?: CurrentPath | null; onOpen?(): void; busy?: boolean }) {
   const body = (
     <>
       <span className={`wp-dot wp-dot--${status.tone ?? 'neutral'}`} aria-hidden="true" />
@@ -44,7 +44,14 @@ export function StatusLine({ status, time, path, onOpen }: { status: StatusInfo;
           {f}
         </span>
       ))}
-      <span className="wp-time">{time}</span>
+      {/* a slow circuit (inverters) is re-solved after a change: the line says so instead of looking frozen */}
+      {busy ? (
+        <span className="wp-time wp-busy" role="status">
+          Updating the simulation…
+        </span>
+      ) : (
+        <span className="wp-time">{time}</span>
+      )}
     </>
   )
   return (

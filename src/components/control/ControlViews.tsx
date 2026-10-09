@@ -6,7 +6,7 @@ import { formatA, formatSI, formatV } from '../../utils/format.ts'
  * The feedback loop as a block diagram: reference → comparison → PID → PWM → converter → output,
  * and the sampled measurement back. Every value is the simulated one at the cursor.
  */
-export function ControlDiagram({ st, r, selected, onSelect, values }: { st: ControlState; r: ControlRun; selected: string | null; onSelect: (s: string) => void; values: boolean }) {
+export function ControlDiagram({ st, r, selected, onSelect, values, live = true }: { st: ControlState; r: ControlRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live?: boolean }) {
   const p = r.params
   const part = (id: string, label: string) => ({
     'data-part': id,
@@ -60,7 +60,7 @@ export function ControlDiagram({ st, r, selected, onSelect, values }: { st: Cont
           e = {formatV(st.e)}
         </text>
       )}
-      {box(215, 56, 130, 70, 'pid', closed ? 'PID' : 'Feed-forward', closed ? `d = ${(st.d * 100).toFixed(2)} %` : 'loop open', closed && !st.sat)}
+      {box(215, 56, 130, 70, 'pid', closed ? 'PID' : 'Feed-forward', closed ? (live ? `d = ${(st.d * 100).toFixed(2)} %` : 'sets the duty') : 'loop open', closed && !st.sat)}
       {closed && values && (
         <text x={280} y={142} textAnchor="middle" className="cvalue">
           P {(st.pTerm * 100).toFixed(2)} · I {(st.iTerm * 100).toFixed(2)} · D {(st.dTerm * 100).toFixed(2)} %
@@ -72,20 +72,23 @@ export function ControlDiagram({ st, r, selected, onSelect, values }: { st: Cont
         </text>
       )}
       {box(380, 64, 90, 52, 'pwm', 'PWM', `fs ${formatSI(p.fs, 'Hz')}`, st.gate)}
-      {box(505, 56, 120, 70, 'plant', p.kind === 'buck' ? 'Buck' : 'Boost', `Vout ${formatV(st.vout)}`)}
-      <text x={565} y={142} textAnchor="middle" className="cvalue cvalue--il">
-        iL {formatA(st.il)}
-      </text>
+      {box(505, 56, 120, 70, 'plant', p.kind === 'buck' ? 'Buck' : 'Boost', live ? `Vout ${formatV(st.vout)}` : 'converter')}
+      {live && (
+        <text x={565} y={142} textAnchor="middle" className="cvalue cvalue--il">
+          iL {formatA(st.il)}
+        </text>
+      )}
       {box(520, 210, 130, 46, 'load', p.loadStep === 'on' ? (st.t >= p.tload ? 'Load (stepped)' : 'Load') : 'Load', formatSI(st.rload, 'Ω'))}
       <path d="M580 126 V210" className="wire wire--load" />
       <g {...part('sensor', 'Sampler')}>
         <rect x={260} y={186} width={200} height={28} rx={8} className="pblock" />
         <text x={360} y={205} textAnchor="middle" className="cvalue">
-          sample every Ts: {formatV(st.sampled)}
+          {live ? `sample every Ts: ${formatV(st.sampled)}` : 'measures Vout every Ts'}
         </text>
       </g>
       <text x={345} y={256} className="path-caption" textAnchor="middle">
-        {closed ? 'Closed loop' : 'Open loop'} · period {st.m + 1} · THEORY (averaged model) now {formatV(st.vmodel)}
+        {closed ? 'Closed loop' : 'Open loop'}
+        {live && ` · period ${st.m + 1} · THEORY (averaged model) now ${formatV(st.vmodel)}`}
       </text>
     </svg>
   )
