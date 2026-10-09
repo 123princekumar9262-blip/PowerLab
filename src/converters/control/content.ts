@@ -194,8 +194,8 @@ export function controlWhy(r: ControlRun, st: ControlState, m: ControlMeasuremen
       ? {
           id: 'integral',
           question: 'Why is there no steady-state error?',
-          what: `At the end of the run the sampled output is ${formatV(vrefAt(p, p.duration) - m.ssError, false)} for Vref ${formatV(vrefAt(p, p.duration), false)}: error ${formatV(m.ssError)}.`,
-          why: 'The integral term keeps changing as long as any error remains. It only stops when e = 0 — and then it holds exactly the duty the converter needs, including its losses.',
+          what: `At the end of the run the sampled output is ${formatV(vrefAt(p, p.duration) - m.ssError, false)} for Vref ${formatV(vrefAt(p, p.duration), false)}: error ${formatV(m.ssError)}.${m.avg.length ? ` The average over the last period is ${formatV(m.avg[m.avg.length - 1], false)}.` : ''}`,
+          why: 'The integral term keeps changing as long as any error remains. It only stops when e = 0 — and then it holds exactly the duty the converter needs, including its losses. The controller sees the output only once per period, at the start: it is that sample that equals Vref; the period average differs by part of the ripple.',
           equation: 'I[k+1] = I[k] + Ki·Ts·e[k]  ⇒  steady state only if e = 0',
           physics: `The final duty (SIMULATION ${(m.dFinal * 100).toFixed(2)} %) differs slightly from the ideal ${(idealDuty(p.kind, p.vin, vrefAt(p, p.duration)) * 100).toFixed(2)} %: the integrator found it by itself.`,
           whatIf: 'With Ki = 0 (P-only) an error must remain to keep the duty away from its starting value.',
@@ -267,6 +267,12 @@ export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, Con
       id: 'why-loop',
       title: 'Why a converter needs a feedback loop',
       summary: 'Open loop vs closed loop under a load step; what each PID term does.',
+      check: {
+        question: 'Why does the closed loop end with zero error after the load step, when a P-only loop would not?',
+        options: ['the integral term keeps changing until the error is zero', 'the duty is fixed', 'the capacitor removes the error'],
+        answer: 0,
+        explain: 'The integral term accumulates the error, so it only stops changing when e = 0, and it then holds the new duty. A P-only loop needs a permanent error to produce that duty change.',
+      },
       base: {},
       steps: [
         {
@@ -302,6 +308,12 @@ export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, Con
       id: 'step',
       title: 'Reference step and the phase margin',
       summary: 'How fast and how smooth the output follows a new reference.',
+      check: {
+        question: 'Pushing the loop’s crossover frequency too high mainly…',
+        options: ['reduces the phase margin: overshoot and ringing', 'removes every overshoot', 'changes the final output voltage'],
+        answer: 0,
+        explain: 'At higher frequency the sampling delay (and, in the boost, the right-half-plane zero) takes more phase, so the margin shrinks and the step response rings. The final value is still set by the integrator.',
+      },
       base: { loadStep: 'off' },
       steps: [
         {
@@ -319,7 +331,7 @@ export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, Con
           window: (r) => [Math.max(0, r.params.tref - 0.3e-3), r.params.duration],
           channels: ['vout', 'vref', 'vmodel', 'duty'],
           look: 'A faster loop — less phase margin — overshoots.',
-          body: (_st, m, r) => `Now fc = ${r.loop.fc ? formatSI(r.loop.fc, 'Hz') : '—'}, phase margin ${r.loop.pm?.toFixed(0) ?? '—'}°, |λ|max = ${r.rho.toFixed(3)}. Overshoot ${m.overshoot !== null ? `${(m.overshoot * 100).toFixed(1)} %` : '—'}: the sampling delay eats phase at high frequency.`,
+          body: (_st, m, r) => `Now fc = ${r.loop.fc ? formatSI(r.loop.fc, 'Hz') : '—'}, phase margin ${r.loop.pm?.toFixed(0) ?? '—'}°, |λ|max = ${r.rho.toFixed(3)}. Overshoot ${m.overshoot !== null ? `${(m.overshoot * 100).toFixed(1)} %` : '—'}: a faster loop has less phase to spare — the sampling delay${kind === 'boost' ? ' and the right-half-plane zero eat' : ' eats'} phase at high frequency. The Bode margins are linearised at the starting point; after the reference step the operating point moves, so the exact test is |λ|max (< 1: stable).`,
         },
       ],
     },

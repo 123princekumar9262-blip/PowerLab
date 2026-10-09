@@ -52,6 +52,11 @@ export interface ResolvedEv extends EvParams, RunParams {
   kAero: number
   fConst: number
   fTmax: number
+  /**
+   * The traction power limit at the wheels [W]: the motor's Pmax, or less when the battery cannot supply it —
+   * its terminals deliver at most Voc²/(4·Rb) (at I = Voc/(2·Rb)); minus the auxiliaries, times η.
+   */
+  pDrive: number
 }
 
 export const RHO = 1.2
@@ -181,6 +186,11 @@ export function resolveEv(input: Partial<EvParams>): { params: ResolvedEv; issue
   const steps = Math.round(duration / DT)
   const th = Math.atan(q.grade / 100)
   const fTmax = (q.tmax * q.gear) / q.wheel
+  // the battery's maximum terminal power, less the auxiliaries, through the drivetrain efficiency
+  const pBattMax = (q.voc * q.voc) / (4 * q.rb)
+  const pDrive = Math.min(q.pmax, Math.max(0, (pBattMax - q.aux) * q.eta))
+  if (pDrive < q.pmax)
+    issues.push(`the battery limits the drive: at most ${(pBattMax / 1000).toFixed(1)} kW at its terminals (Voc²/4·Rb), so ${(pDrive / 1000).toFixed(1)} kW reach the wheels instead of the motor's ${(q.pmax / 1000).toFixed(0)} kW`)
   const params: ResolvedEv = {
     ...p,
     ...q,
@@ -192,10 +202,11 @@ export function resolveEv(input: Partial<EvParams>): { params: ResolvedEv; issue
     dt: duration / steps,
     duration,
     profile,
-    vBase: q.pmax / fTmax,
+    vBase: pDrive / fTmax,
     kAero: 0.5 * RHO * q.cd * q.area,
     fConst: q.mass * G * (q.crr * Math.cos(th) + Math.sin(th)),
     fTmax,
+    pDrive,
   }
   return { params, issues }
 }
@@ -222,8 +233,8 @@ export function roadLoad(p: ResolvedEv, v: number): number {
   return p.kAero * v * Math.abs(v) + roll + p.mass * G * Math.sin(th)
 }
 
-/** Motor envelope at the wheel [N]: traction and regenerative limits. */
-export const tractionMax = (p: ResolvedEv, v: number) => Math.min(p.fTmax, p.pmax / Math.max(v, 1e-9))
+/** Motor envelope at the wheel [N]: traction (torque, then the motor's or the battery's power) and regenerative limits. */
+export const tractionMax = (p: ResolvedEv, v: number) => Math.min(p.fTmax, p.pDrive / Math.max(v, 1e-9))
 export const regenMax = (p: ResolvedEv, v: number) => Math.min(p.fTmax, p.pregen / Math.max(v, 1e-9))
 
 /** Battery power for a wheel power and the current that delivers it. */

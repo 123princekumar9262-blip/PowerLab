@@ -137,12 +137,23 @@ export interface LessonStep<P, R, M, S> {
   body(st: S, m: M, r: R): string
   look: string
 }
+/**
+ * A short check at the end of a lesson: one question about what the lesson just showed, three options,
+ * the right one and why (answered once, then the explanation is shown).
+ */
+export interface LessonCheck {
+  question: string
+  options: string[]
+  answer: number
+  explain: string
+}
 export interface Lesson<P, R, M, S> {
   id: string
   title: string
   summary: string
   base: Partial<P>
   steps: Array<LessonStep<P, R, M, S>>
+  check?: LessonCheck
 }
 
 export interface Experiment<P, M> {
@@ -258,6 +269,11 @@ export interface Topic<P, R extends Run, M, S> {
   analysis?: Array<AnalysisCategory<R, M>>
   /** Inspectable parts (keyboard / small-screen access to the same inspector as clicking the circuit). */
   parts?: Array<{ id: string; label: string }>
+  /**
+   * Does the shown run repeat every `params.period`? Declared by topics whose run is not found by the
+   * periodic steady-state solver (PWM: periodic by construction; a double-pulse test: a single test).
+   */
+  repeats?(r: R): boolean
   /** The next consequence with the time of the event it quotes (WHY → "Go to that instant"). */
   nextConsequence?(r: R, st: S, m: M): NextConsequence | null
   /** The conducting loop at the cursor (the "Show current path" overlay). */

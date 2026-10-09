@@ -146,9 +146,19 @@ for (const M of MODULES) {
   await page.getByRole('button', { name: new RegExp(M.lesson) }).first().click()
   await page.waitForTimeout(500)
   check(((await page.locator('.lesson-text').innerText()) ?? '').length > 40 && !/NaN|undefined/.test(await page.locator('.lesson-text').innerText()), `${M.tab}: lesson "${M.lesson}" starts with text from the simulation`)
+  // the last step asks a check question; one answer, then the right option and why
+  for (let i = 0; i < 8 && (await page.getByRole('button', { name: 'Next →' }).count()); i++) {
+    await page.getByRole('button', { name: 'Next →' }).click()
+    await page.waitForTimeout(250)
+  }
+  check(await page.locator('.lesson-check').isVisible(), `${M.tab}: the lesson ends with a check question`)
+  await page.locator('.lesson-check .choice').first().click()
+  check(/Right\.|Not quite/.test(await page.locator('.lesson-check .exp-verdict').innerText()) && (await page.locator('.lesson-check .choice[disabled]').count()) === 3, `${M.tab}: the check is answered once and explained`)
   await page.getByRole('button', { name: '← Lessons' }).click()
   await mode('Predict').click()
   await page.waitForTimeout(200)
+  // nothing on screen gives the answer away before it is checked: waveforms, values, WHY covered
+  check((await page.locator('.wp-covered--wave').isVisible()) && (await page.locator('.ws-wave .cscope canvas').count()) === 0 && (await page.locator('.ws-act--why').count()) === 0, `${M.tab}: Predict covers the waveforms, values and WHY until the answer is checked`)
   const input = page.locator('.predict-input input')
   if (await input.count()) await input.fill('1')
   else await page.locator('.dc-mode-panel .choice').first().click()
@@ -156,6 +166,7 @@ for (const M of MODULES) {
   await page.waitForTimeout(500)
   check(await page.locator('.dc-mode-panel .exp-verdict').isVisible(), `${M.tab}: a prediction is answered by the simulation`)
   check(/THEORY/.test(await page.locator('.dc-mode-panel').innerText()), `${M.tab}: the theory is shown after the simulation answered`)
+  check((await page.locator('.ws-wave .cscope canvas').count()) > 0 && (await page.locator('.wp-covered--wave').count()) === 0, `${M.tab}: once checked, the waveforms come back`)
   await mode('Explore').click()
   await density('Beginner')
 }

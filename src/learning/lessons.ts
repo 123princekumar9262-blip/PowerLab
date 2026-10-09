@@ -445,7 +445,7 @@ export const LESSONS: Lesson[] = [
       },
       {
         title: 'Vdc ∝ cos α',
-        body: 'Each segment now uses a later part of the line voltage: Vdc = 1.35·VLL·cos α − 2Vf = {vdc}. At α = 90° the average would reach zero; beyond that a bridge can invert.',
+        body: 'Each segment now uses a later part of the line voltage: Vdc = 1.35·VLL·cos α − 2Vf = {vdc}. At α = 90° the average would reach zero; beyond that a bridge can invert — but only with a source in the load (a motor\'s back-EMF) to keep the current flowing, which this lab does not model: here an R-L load just becomes discontinuous.',
         quiz: { question: 'At α = 90° with a large inductance, Vdc is about…', options: ['the same as α = 0', 'half', 'zero'], answer: 2, explain: 'cos 90° = 0: the positive and negative parts of the output cancel on average while the inductor keeps the current flowing.' },
       },
     ],

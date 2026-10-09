@@ -157,7 +157,8 @@ export function BodePlot({ lg }: { lg: LoopGain }) {
       </svg>
       <p className="small muted">
         THEORY (small-signal, averaged): crossover {lg.fc ? formatSI(lg.fc, 'Hz') : '—'}, phase margin {lg.pm !== null ? `${lg.pm.toFixed(1)}°` : '—'}, gain margin {lg.gm !== null ? `${lg.gm.toFixed(1)} dB` : '—'}, LC resonance {formatSI(lg.f0, 'Hz')}
-        {lg.fRhp ? `, RHP zero ${formatSI(lg.fRhp, 'Hz')}` : ''}.
+        {lg.fRhp ? `, RHP zero ${formatSI(lg.fRhp, 'Hz')}` : ''}. Linearised at the starting operating point (without the inductor's DCR): if the
+        reference or the load moves the converter far from it, trust the exact stability test |λ|max in the badge.
       </p>
     </div>
   )

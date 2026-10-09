@@ -374,7 +374,7 @@ export function advise(r: CompareResult, app: Application): { lean: 'A' | 'B' | 
       return {
         lean: w,
         reasons: [
-          w === 'either' ? 'Both offer the same kind of control for a DC motor.' : `${name(w)} ${full(w === 'A' ? a : b) ? 'is fully controlled: with α > 90° it can invert (Vdc < 0) and return energy from the motor — regenerative braking' : 'is controlled: speed can be set with α'}.`,
+          w === 'either' ? 'Both offer the same kind of control for a DC motor.' : `${name(w)} ${full(w === 'A' ? a : b) ? 'is fully controlled: with α > 90° and a motor whose back-EMF keeps the current flowing it can invert (Vdc < 0) and return energy — regenerative braking (not shown here: this lab has no back-EMF, so an R-L load just goes discontinuous)' : 'is controlled: speed can be set with α'}.`,
           `Current continuity (minimum load current, simulated): ${a.comparison.measurements.ioMin.toFixed(3)} A vs ${b.comparison.measurements.ioMin.toFixed(3)} A — continuous current means smoother torque.`,
         ],
         tradeoffs: ['Semi-controlled bridges freewheel through their own leg: better power factor, but no inversion.', 'This lab models the motor as R + L only (no back-EMF).'],
@@ -386,7 +386,10 @@ export function advise(r: CompareResult, app: Application): { lean: 'A' | 'B' | 
       return {
         lean: w,
         reasons: [
-          `${w === 'either' ? 'Either works' : name(w)}: a single-phase diode bridge (usually with a capacitor filter) is the common choice — no control circuitry, both half-cycles used (TUF ${ma.tufSim.value?.toFixed(2)} vs ${mb.tufSim.value?.toFixed(2)}).`,
+          // the reason must describe the side it picks: a diode bridge only when that side is one
+          w !== 'either' && simple(w === 'A' ? a : b)
+            ? `${name(w)}: a single-phase diode bridge (usually with a capacitor filter) is the common choice — no control circuitry, both half-cycles used (TUF ${ma.tufSim.value?.toFixed(2)} vs ${mb.tufSim.value?.toFixed(2)}).`
+            : `${w === 'either' ? 'Either works' : name(w)}: ${w === 'either' ? 'similar' : 'lower'} ripple (ripple factor ${ma.rippleFactor.value?.toFixed(3) ?? '—'} vs ${mb.rippleFactor.value?.toFixed(3) ?? '—'}, simulated); for a general-purpose supply a single-phase diode bridge with a capacitor filter is the usual choice (TUF ${ma.tufSim.value?.toFixed(2)} vs ${mb.tufSim.value?.toFixed(2)}).`,
         ],
         tradeoffs: ['A half-wave rectifier is cheaper but has high ripple and poor transformer use.', 'Three-phase is worth it only when a three-phase supply exists and the power is large.'],
       }

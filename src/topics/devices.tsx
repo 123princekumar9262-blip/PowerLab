@@ -177,6 +177,8 @@ export const MOSFET_TOPIC: Topic<MosfetParams, MosfetRun, MosfetMeasurements, Mo
   eventLabel: mosfetEventLabel,
   eventWhy: mosfetEventWhy,
   eventColor: (e) => (e.kind === 'gate-on' || e.kind === 'gate-off' ? '#aeb7c5' : '#3987e5'),
+  // one double-pulse test: nothing repeats after it
+  repeats: () => false,
   initialCursor: (r) => {
     const m = measureMosfet(r)
     return r.params.ton + (m.tdOn ?? 0) + (m.tri ?? 0) + 0.5 * (m.tfv ?? 0)

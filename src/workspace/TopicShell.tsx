@@ -144,6 +144,9 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
     const [part, setPart] = useState<string | null>(null)
     const [showPath, setShowPath] = useState(false)
     const [focus, setFocus] = useState(false)
+    // Predict: until the student checks the answer, nothing on screen may give it away (values, waveforms, WHY)
+    const [predictOpen, setPredictOpen] = useState(true)
+    const covered = w.mode === 'predict' && predictOpen
 
     const setMode = (id: string) => {
       if (!isWsMode(id)) return
@@ -161,7 +164,7 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
         : w.mode === 'experiment'
           ? { title: 'Experiment', eyebrow: 'Change one thing, predict, run', render: () => <ExperimentPanel topic={topic} params={w.params} m={w.m as Record<string, unknown>} onApply={w.goExplore} captureRows={topic.experiments[0]?.rows ?? []} /> }
           : w.mode === 'predict'
-            ? { title: 'Predict', eyebrow: 'Predict first, then simulate', render: () => <PredictPanel topic={topic} onShow={w.goExplore} /> }
+            ? { title: 'Predict', eyebrow: 'Predict first, then simulate', render: () => <PredictPanel topic={topic} onShow={w.goExplore} onCovered={setPredictOpen} /> }
             : null
 
     // ── WHY (primary) and the Explore menu (everything else) ──
@@ -253,22 +256,24 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
           level: w.level,
           onLevel: w.setLevel,
         }}
-        params={<ParameterPanel w={w} focus={focus} locked={inLesson} />}
+        params={covered ? <p className="wp-covered small">The prediction uses its own circuit values (in the question). The values, waveforms and WHY stay covered until you check your answer.</p> : <ParameterPanel w={w} focus={focus} locked={inLesson} />}
         circuit={
           <CircuitView
             w={w}
-            showPath={showPath}
+            showPath={showPath && !covered}
+            quiet={covered}
             selected={open === 'inspect' ? part : null}
             onSelect={(x) => {
+              if (covered) return
               setPart(x)
               setOpen('inspect')
             }}
           />
         }
-        status={<StatusLine status={w.status} time={`t = ${formatTime(w.result.time[w.k])}`} path={path} onOpen={() => setOpen(open === 'state' ? null : 'state')} busy={w.pending && w.result.diagnostics.computeMs > SLOW_MS} />}
-        waveform={<WaveformPanel w={w} focus={focus} compact={false} />}
-        why={why}
-        explore={explore}
+        status={covered ? <p className="wp-status-line muted">The state is covered until you check your prediction.</p> : <StatusLine status={w.status} time={`t = ${formatTime(w.result.time[w.k])}`} path={path} onOpen={() => setOpen(open === 'state' ? null : 'state')} busy={w.pending && w.result.diagnostics.computeMs > SLOW_MS} />}
+        waveform={covered ? <p className="wp-covered wp-covered--wave">Waveforms are covered until you check your prediction — then the simulation answers it.</p> : <WaveformPanel w={w} focus={focus} compact={false} />}
+        why={covered ? null : why}
+        explore={covered ? [] : explore}
         panels={panels}
         open={open}
         onOpen={setOpen}

@@ -102,7 +102,8 @@ export function controlTopic(kind: PlantKind): Topic<ControlParams, ControlRun, 
     badge: (r, m) => (
       <section className="dc-mode" aria-label="Loop">
         <div className="dc-mode-head">
-          <span className={`mode-pill ${r.params.loop === 'open' ? 'mode-pill--dcm' : r.rho < 1 && m.stable ? 'mode-pill--ccm' : 'mode-pill--dcm'}`}>{r.params.loop === 'open' ? 'OPEN' : r.rho < 1 && m.stable ? 'STABLE' : 'UNSTABLE'}</span>
+          {/* stability is the exact test (|λ|max < 1); a stable loop still ringing at the end of the run says so */}
+          <span className={`mode-pill ${r.params.loop === 'open' || !(r.rho < 1) ? 'mode-pill--dcm' : 'mode-pill--ccm'}`}>{r.params.loop === 'open' ? 'OPEN' : !(r.rho < 1) ? 'UNSTABLE' : m.stable ? 'STABLE' : 'STABLE · STILL SETTLING'}</span>
           <span className="small">
             fc {r.loop.fc ? formatSI(r.loop.fc, 'Hz') : '—'} · PM {r.loop.pm !== null ? `${r.loop.pm.toFixed(0)}°` : '—'} · |λ|max {Number.isFinite(r.rho) ? r.rho.toFixed(3) : '—'}
             <span className="muted"> · THEORY</span>

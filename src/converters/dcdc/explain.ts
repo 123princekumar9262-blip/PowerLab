@@ -1,5 +1,6 @@
 import { formatA, formatSI, formatTime, formatV, formatW } from '../../utils/format.ts'
-import { converterSample, segmentAverage } from '../engine.ts'
+import { nextRunEvent } from '../cursor.ts'
+import { converterIndexAt, converterSample, segmentAverage } from '../engine.ts'
 import type { BuckInterval, ConverterEvent, ConverterKind, ConverterResult } from '../types.ts'
 import { dcdcBoundary } from './theory.ts'
 
@@ -343,8 +344,9 @@ export function dcdcStatus(st: DcdcState): { headline: string; facts: string[]; 
  * turn-off, iL reaching zero). Null when the shown run has no such event ahead — nothing is invented.
  */
 export function dcdcNextConsequence(r: ConverterResult, st: DcdcState): { text: string; time: number } | null {
-  const after = st.t + 0.5 * r.params.dt
-  const next = (kinds: string[]) => r.events.filter((e) => e.time > after && kinds.includes(e.kind)).sort((a, b) => a.time - b.time)[0]
+  // the next event whose new state the cursor does not show yet (an edge on the cursor's sample is still ahead)
+  const k = converterIndexAt(r, st.t)
+  const next = (kinds: string[]) => nextRunEvent(r, k, kinds) ?? undefined
   const at = (t: number) => `t = ${formatTime(t)}`
   const say = (text: string, e: { time: number }) => ({ text, time: e.time })
   if (st.interval === 'on') {

@@ -1,4 +1,4 @@
-import type { Mat } from '../expm.ts'
+import { expm, matMul, type Mat } from '../expm.ts'
 import { simulatePwl, type PwlResult, type PwlSystem } from '../pwl.ts'
 import type { Run, RunEvent, RunParams } from '../types.ts'
 
@@ -16,7 +16,8 @@ import type { Run, RunEvent, RunParams } from '../types.ts'
  * The Foster stages are a curve fit, not physical layers: only Tj (and roughly the heatsink, θ4) is
  * meaningful. Because P is affine in Tj the whole system is LINEAR (piecewise in time when the load is
  * pulsed) — solved by the PWL toolkit: time-stepping (SIMULATION) and matrix exponential (THEORY).
- * If b·Rth ≥ 1 the feedback wins: THERMAL RUNAWAY.
+ * If the feedback wins — b·Rth ≥ 1 for a constant load, a growth per load cycle ρ ≥ 1 for a pulsed one (the
+ * idle time cools the junction, so a pulsed load can stay stable with b·Rth ≥ 1) — THERMAL RUNAWAY.
  */
 export type LoadProfile = 'constant' | 'pulsed'
 
@@ -61,6 +62,10 @@ export interface ResolvedThermal extends ThermalParams, RunParams {
   b: number
   pc25: number
   ps25: number
+  /** Runaway measure: the growth per load cycle ρ (pulsed; see cycleGrowth), b·Rth (constant load). */
+  growth: number
+  /** growth ≥ 1: no stable state — the junction heats without limit. */
+  runaway: boolean
 }
 
 export const THERMAL_DEFAULTS: ThermalParams = {
@@ -137,7 +142,6 @@ export function resolveThermal(input: Partial<ThermalParams>): { params: Resolve
     // resolve the fastest stage where possible within a sample budget
     spp = Math.max(40, Math.min(2000, 2 * Math.round(60000 / periods / 2)))
   }
-  if (b * rth >= 1) issues.push('thermal runaway: the losses grow faster with temperature than the heatsink can remove them (b·Rth ≥ 1)')
   const params: ResolvedThermal = {
     ...p,
     ...q,
@@ -155,8 +159,42 @@ export function resolveThermal(input: Partial<ThermalParams>): { params: Resolve
     b,
     pc25,
     ps25,
+    growth: 0,
+    runaway: false,
   }
+  params.growth = load === 'pulsed' ? cycleGrowth(params) : b * rth
+  params.runaway = params.growth >= 1
+  if (params.runaway)
+    issues.push(
+      load === 'pulsed'
+        ? `thermal runaway: every load cycle leaves the junction hotter than the last (growth per cycle ρ = ${params.growth.toFixed(3)} ≥ 1)`
+        : 'thermal runaway: the losses grow faster with temperature than the heatsink can remove them (b·Rth ≥ 1)',
+    )
   return { params, issues }
+}
+
+/**
+ * THE RUNAWAY TEST for a pulsed load. A small extra temperature δθ at the start of a cycle is carried through
+ * the loaded interval (losses rise with Tj: the feedback b acts) and the idle interval (no loss, no feedback):
+ * δθ(T) = Φ·δθ(0), Φ = e^(A_off·t_off)·e^(A_on·t_on). The steady pulsed state is stable while the spectral
+ * radius ρ(Φ) < 1, even when b·Rth ≥ 1 — the idle time removes heat the feedback cannot replace. For a
+ * constant load the same test is b·Rth < 1 (A_on alone is stable exactly then).
+ */
+export function cycleGrowth(p: ResolvedThermal): number {
+  const scaled = (on: boolean, t: number) => thermalMatrices(p, on).A.map((row) => row.map((v) => v * t))
+  const phi = matMul(expm(scaled(false, p.period - p.ton)), expm(scaled(true, p.ton)))
+  if (!phi.every((row) => row.every(Number.isFinite))) return Infinity
+  // power iteration (Φ is a positive matrix here: its largest eigenvalue is real and dominant)
+  let x = phi.map(() => 1)
+  let rho = 0
+  for (let it = 0; it < 200; it++) {
+    const y = phi.map((row) => row.reduce((s, v, j) => s + v * x[j], 0))
+    const norm = Math.hypot(...y)
+    if (!(norm > 0)) return 0
+    rho = norm / Math.hypot(...x)
+    x = y.map((v) => v / norm)
+  }
+  return rho
 }
 
 /** Load on at t (an instant on an edge takes the new value). */
@@ -238,7 +276,7 @@ export function periodicTheta(map: (x: number[]) => number[], n: number): { x: n
 export function simulateThermal(input: Partial<ThermalParams>): ThermalRun {
   const started = performance.now()
   const { params: p, issues } = resolveThermal(input)
-  if (p.view === 'steady' && p.b * p.rth >= 1) {
+  if (p.view === 'steady' && p.runaway) {
     // no stable periodic state exists (the fixed point is unstable): show the heating from ambient instead
     const r = simulateThermal({ ...input, view: 'startup' })
     r.diagnostics.issues.push('no stable steady state exists (thermal runaway): showing the heating from ambient instead')
@@ -255,7 +293,7 @@ export function simulateThermal(input: Partial<ThermalParams>): ThermalRun {
     }
     const sh = periodicTheta(map, n4)
     x0 = sh.x
-    steady = { method: 'shooting', iterations: 1, residual: sh.residual / Math.max(1, p.a * p.rth), converged: p.b * p.rth < 1 && sh.residual / Math.max(1, p.a * p.rth) < 1e-8 }
+    steady = { method: 'shooting', iterations: 1, residual: sh.residual / Math.max(1, p.a * p.rth), converged: !p.runaway && sh.residual / Math.max(1, p.a * p.rth) < 1e-8 }
   }
   const sys = thermalSystem(p)
   const steps = p.periods * p.stepsPerPeriod
@@ -282,7 +320,7 @@ export function simulateThermal(input: Partial<ThermalParams>): ThermalRun {
     const spp = p.stepsPerPeriod
     const a = s.tj[p.periods * spp]
     const b = s.tj[(p.periods - 1) * spp]
-    steady = { method: 'startup', iterations: 0, residual: Math.abs(a - b) / Math.max(1, Math.abs(a - p.ta)), converged: p.b * p.rth < 1 && Math.abs(a - b) / Math.max(1, Math.abs(a - p.ta)) < 2e-3 }
+    steady = { method: 'startup', iterations: 0, residual: Math.abs(a - b) / Math.max(1, Math.abs(a - p.ta)), converged: !p.runaway && Math.abs(a - b) / Math.max(1, Math.abs(a - p.ta)) < 2e-3 }
   }
   const events: RunEvent[] = []
   let seq = 0
@@ -295,9 +333,11 @@ export function simulateThermal(input: Partial<ThermalParams>): ThermalRun {
       if (m > 0) ev('gate-on', m * p.period, 'load-on')
       ev('gate-off', m * p.period + p.ton, 'load-off')
     }
+  // the hottest instant is an event only where it is a real peak: the end of a load pulse inside the run (a
+  // constant load has no peak — its maximum would be numerical noise or simply the last sample of a rise)
   let kMax = 0
   for (let k = 0; k < n; k++) if (s.tj[k] > s.tj[kMax]) kMax = k
-  ev('mode', res.t[kMax], 'tj-max')
+  if (p.load === 'pulsed' && kMax > 0 && kMax < n - 1) ev('mode', res.t[kMax], 'tj-max')
   events.sort((a, b) => a.time - b.time)
   return {
     kind: 'thermal',
@@ -410,7 +450,7 @@ export function measureThermal(r: ThermalRun): ThermalMeasurements {
     psMean: psInt / spp,
     tjPeakRun,
     t90,
-    runaway: p.b * p.rth >= 1,
+    runaway: p.runaway,
     settled: r.diagnostics.steady.converged,
   }
 }

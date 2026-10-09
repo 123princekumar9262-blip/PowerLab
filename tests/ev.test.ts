@@ -52,6 +52,30 @@ describe('EV drivetrain: physics', () => {
     expect(r.signals.pwheel[kHigh]).toBeCloseTo(r.params.pmax, 3)
     expect(timeToSpeed(r.params, (th.vTop / 3.6) * 1.01)).toBeNull()
   })
+  it('a weak battery limits the drive: the wheels never get more power than the battery can supply', () => {
+    // Voc = 100 V, Rb = 0.5 Ω: at most Voc²/(4·Rb) = 5 kW at the terminals — far below the motor's 150 kW
+    for (const cycle of ['accel', 'highway'] as const) {
+      const { r } = run({ cycle, voc: 100, rb: 0.5 })
+      const p = r.params
+      expect(p.pDrive).toBeCloseTo((5000 - p.aux) * p.eta, 6)
+      expect(r.diagnostics.issues.some((x) => /battery limits the drive/.test(x))).toBe(true)
+      // energy is conserved at every sample: terminal power = wheel power / η + auxiliaries (nothing is clipped away)
+      for (let k = 0; k < r.length; k++) {
+        const pw = r.signals.pwheel[k]
+        const want = (pw >= 0 ? pw / p.eta : pw * p.eta) + p.aux
+        expect(Math.abs(r.signals.pbatt[k] - want)).toBeLessThan(1e-6 * Math.max(1, Math.abs(want)))
+        expect(pw).toBeLessThanOrEqual(p.pDrive * (1 + 1e-9))
+      }
+    }
+    // the exact theory uses the same limit: the speed reached agrees (5 kW never reaches 100 km/h, so no t100 row)
+    const { r, m } = run({ cycle: 'accel', voc: 100, rb: 0.5 })
+    expect(m.t100).toBeNull()
+    const cmp = compareEv(r, m)
+    expect(cmp.rows.length).toBeGreaterThanOrEqual(1)
+    for (const row of cmp.rows) expect(row.pass, row.key).toBe(true)
+    // and the default battery (500 kW available) does not limit the 150 kW motor
+    expect(resolveEv({}).params.pDrive).toBe(resolveEv({}).params.pmax)
+  })
 })
 
 describe('EV drivetrain: simulation vs theory', () => {

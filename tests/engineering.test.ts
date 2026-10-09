@@ -58,6 +58,37 @@ describe('Losses and thermal: physics', () => {
     expect(measureThermal(r).runaway).toBe(true)
     expect(exactThermal(resolveThermal({}).params).rho).toBeLessThan(1)
   })
+  it('a PULSED load can be stable with b·Rth ≥ 1: the test is the growth per load cycle ρ (the idle time cools the junction)', () => {
+    const o: Partial<ThermalParams> = { i: 100, rha: 1, alpha: 0.012, kappa: 0.01, ton: 0.5, toff: 5, load: 'pulsed' }
+    const p = resolveThermal(o).params
+    expect(p.b * p.rth).toBeGreaterThan(1.2)
+    // the simulator's growth factor is the independent exact one-cycle map's spectral radius
+    const ex = exactThermal({ ...p, view: 'steady' })
+    expect(p.growth).toBeCloseTo(ex.rho, 9)
+    expect(p.growth).toBeLessThan(0.95)
+    expect(p.runaway).toBe(false)
+    // a stable periodic state exists, and it is the exact one
+    const { r, m } = run(o)
+    expect(m.runaway).toBe(false)
+    expect(r.params.view).toBe('steady')
+    expect(r.diagnostics.steady.converged).toBe(true)
+    expect(m.tjMax).toBeCloseTo(ex.tjMax, 3)
+    expect(m.tjMin).toBeCloseTo(ex.tjMin, 3)
+    // and heating from ambient settles onto it (no runaway)
+    const s = run({ ...o, view: 'startup' }).m
+    expect(Number.isFinite(s.tjPeakRun) && s.tjPeakRun < ex.tjMax + 1).toBe(true)
+    // the same parts with a constant load (b·Rth ≥ 1) do run away
+    expect(resolveThermal({ ...o, load: 'constant' }).params.runaway).toBe(true)
+  })
+  it('a pulsed load whose cycle grows (ρ ≥ 1) is a runaway: no steady view', () => {
+    const o: Partial<ThermalParams> = { i: 160, rha: 2, alpha: 0.012, kappa: 0.01, ton: 1, toff: 2, load: 'pulsed' }
+    const p = resolveThermal(o).params
+    expect(p.growth).toBeGreaterThan(1)
+    expect(p.growth).toBeCloseTo(exactThermal({ ...p, view: 'steady' }).rho, 9)
+    const { r, m } = run(o)
+    expect(m.runaway).toBe(true)
+    expect(r.diagnostics.steady.converged).toBe(false)
+  })
   it('Zth rises from 0 to Rth', () => {
     const p = resolveThermal({}).params
     expect(zth(p, 0)).toBe(0)

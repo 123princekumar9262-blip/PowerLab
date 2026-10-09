@@ -52,7 +52,10 @@ export function randomTask(rand: () => number = Math.random, fixed?: { topology:
     load: { resistance: pick([10, 22, 47]), inductance: three ? pick([0.01, 0.03]) : pick([0.02, 0.05, 0.1]), capacitance: pick([470e-6, 1000e-6, 2200e-6]) },
     sim: { ...DEFAULT_PARAMS.sim, cycles: load === 'RLC' ? 14 : 8 },
   }
-  return { topology, load, params, questions: QUESTIONS[load] }
+  // β is an EXTINCTION angle only where D1 stops because the current reaches zero (half-wave); in a bridge or a
+  // three-phase circuit D1 hands the current over to another device: its turn-off angle
+  const questions = QUESTIONS[load].map((q) => (q.key === 'beta' && topology !== 'half-wave' ? { ...q, label: 'D1 turn-off angle (hand-over to the next device)' } : q))
+  return { topology, load, params, questions }
 }
 
 /** vin and vout over the last cycle, sampled at source angles 0°, 2°, … 358°. */

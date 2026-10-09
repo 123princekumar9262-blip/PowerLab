@@ -393,7 +393,17 @@ function simulateOnce(input: Partial<DriveParams>): DriveRun {
     if (kPk > 0) ev('mode', res.t[kPk], 'peak')
     const firstZ = res.events.find((x) => x.to === 'z')
     if (firstZ) ev('il-zero', firstZ.t, 'c→z')
-    if (p.tstep !== null) ev('mode', p.tstep, p.event === 'load' ? 'load-step' : 'duty-step')
+    if (p.tstep !== null) {
+      ev('mode', p.tstep, p.event === 'load' ? 'load-step' : 'duty-step')
+      // what the step changes, and where the run ends up: the explanation follows the simulated direction
+      const e = events[events.length - 1]
+      const kStep = Math.min(n - 1, Math.max(0, Math.round(p.tstep / p.dt) - 1))
+      e.values.from = p.event === 'load' ? p.tl : (p.duties[Math.max(0, Math.round(p.tstep / p.period) - 1)] ?? p.duty)
+      e.values.to = p.event === 'load' ? p.tl2 : p.d2
+      e.values.nBefore = s.n[kStep]
+      e.values.nEnd = s.n[n - 1]
+      e.values.iEnd = s.ia[n - 1]
+    }
     if (p.tramp > 0 && p.tramp < p.duration) ev('mode', p.tramp, 'ramp-end')
   }
   events.sort((a, b) => a.time - b.time)

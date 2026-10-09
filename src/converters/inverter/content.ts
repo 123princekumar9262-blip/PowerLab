@@ -123,11 +123,17 @@ export function invWhy(r: InverterRun, st: InvState, m: InverterMeasurements): W
   const dl = st.legs.find((l) => l.kind === 'diode')
   if (dl) {
     const upper = ['D1', 'D3', 'D5'].includes(dl.conducting!)
+    // dead time: neither IGBT of the leg is gated — the current's direction alone picks the diode (and the rail)
+    const deadTime = !dl.gUp && !dl.gLo
     cards.push({
       id: 'diode',
       question: `Why does ${dl.conducting} conduct (not the IGBT)?`,
-      what: `Leg ${dl.name} is switched to the ${upper ? 'upper' : 'lower'} rail, but its current is ${formatA(dl.i, true)} — flowing ${dl.i < 0 ? 'INTO' : 'OUT of'} the leg.`,
-      why: `An IGBT conducts only forward (from its collector to its emitter). The ${upper ? 'upper' : 'lower'} IGBT cannot carry this current direction, so the diode beside it does. The inductive load keeps its current flowing after the switching instant, even though the voltage has already reversed.`,
+      what: deadTime
+        ? `Both gates of leg ${dl.name} are OFF (dead time), but its current is ${formatA(dl.i, true)} — flowing ${dl.i < 0 ? 'INTO' : 'OUT of'} the leg. ${dl.conducting} carries it and ties the leg to the ${upper ? 'upper' : 'lower'} rail.`
+        : `Leg ${dl.name} is gated to the ${upper ? 'upper' : 'lower'} rail, but its current is ${formatA(dl.i, true)} — flowing ${dl.i < 0 ? 'INTO' : 'OUT of'} the leg.`,
+      why: deadTime
+        ? `During the dead time neither IGBT is ON, yet the inductive load keeps its current flowing. Only a diode can carry it, and the current's direction decides which one: here ${dl.conducting}, so the leg voltage is set by the current, not by the gates.`
+        : `An IGBT conducts only forward (from its collector to its emitter). The ${upper ? 'upper' : 'lower'} IGBT cannot carry this current direction, so the diode beside it does. The inductive load keeps its current flowing after the switching instant, even though the voltage has already reversed.`,
       equation: `L·di/dt = v − R·i: the current needs time τ = L/R = ${formatTime(p.l / p.r)} to reverse`,
       physics: `While the diode conducts, current flows against the applied voltage: the load gives energy BACK to the DC source (P = ${formatW(st.pdc)} now; ${formatSI(m.eReturned, 'J')} per cycle).`,
       whatIf: 'With a purely resistive load the current reverses together with the voltage and no diode ever conducts.',
@@ -146,13 +152,16 @@ export function invWhy(r: InverterRun, st: InvState, m: InverterMeasurements): W
     })
   if (p.topology === 'three') {
     const vx = st.legs.map((l) => l.v)
+    const sixStep = p.modulation === 'six-step'
     cards.push({
       id: 'van',
-      question: 'Why does van have steps of Vdc/3?',
+      question: sixStep ? 'Why does van have steps of Vdc/3?' : 'Why is the phase voltage van not simply the leg voltage?',
       what: `Leg voltages: vaN ${formatV(vx[0])}, vbN ${formatV(vx[1])}, vcN ${formatV(vx[2])}. The load neutral sits at vnN = ${formatV(st.vnN)}, so van = ${formatV(st.van)}.`,
       why: 'The star point of a balanced load is not connected to the DC supply: it settles at the average of the three leg voltages (the three phase currents must add to zero).',
       equation: `vnN = (vaN + vbN + vcN)/3 = ${formatV((vx[0] + vx[1] + vx[2]) / 3)},  van = vaN − vnN`,
-      physics: 'With two legs up and one down (or one up, two down) the neutral is at 2/3 or 1/3 of Vdc, giving phase voltages of ±Vdc/3 and ±2Vdc/3: the six-step staircase.',
+      physics: sixStep
+        ? 'With two legs up and one down (or one up, two down) the neutral is at 2/3 or 1/3 of Vdc, giving phase voltages of ±Vdc/3 and ±2Vdc/3: the six-step staircase.'
+        : 'As the legs switch, the neutral jumps between 0, Vdc/3, 2Vdc/3 and Vdc, so van takes the levels 0, ±Vdc/3 and ±2Vdc/3; averaged over a carrier period it follows the sine reference.',
       whatIf: 'Triplen harmonics (3rd, 9th …) are the same in all three legs, so the neutral absorbs them: the phase and line voltages contain none.',
     })
   } else
@@ -163,7 +172,12 @@ export function invWhy(r: InverterRun, st: InvState, m: InverterMeasurements): W
       why: p.topology === 'half' ? 'The load sits between the leg and the DC midpoint, so it sees ±Vdc/2.' : 'The load sits between the two legs: it sees the difference of the leg voltages — +Vdc, −Vdc or 0 when both legs are on the same rail.',
       equation: p.topology === 'half' ? 'vo = ±Vdc/2' : `vo = vA − vB = ${formatV(st.legs[0].v)} − ${formatV(st.legs[1].v)}`,
       physics: p.modulation === 'quasi' ? `The zero intervals (both legs on the same rail, width 2α = ${2 * p.alphaDeg}°) shape the waveform: V1 = (4Vdc/π)·cos α and the h-th harmonic ∝ cos(h·α).` : p.tc ? 'Pulse-width modulation: the average of vo over one carrier period follows the sine reference.' : 'A square wave: the fundamental is 4/π times the step height, plus every odd harmonic at 1/h of it.',
-      whatIf: p.modulation === 'quasi' ? 'At α = 30° the 3rd harmonic vanishes (cos 90° = 0).' : 'Unipolar switching (both legs modulated) would add a zero level and push the harmonics to twice the carrier frequency.',
+      whatIf:
+        p.modulation === 'quasi'
+          ? 'At α = 30° the 3rd harmonic vanishes (cos 90° = 0).'
+          : p.modulation === 'spwm-unipolar'
+            ? 'Bipolar switching (vo only ±Vdc, never 0) would put the first harmonics around the carrier frequency instead of twice it.'
+            : 'Unipolar switching (both legs modulated) would add a zero level and push the harmonics to twice the carrier frequency.',
     })
   if (p.load === 'RL')
     cards.push({
@@ -260,6 +274,12 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
         id: 'square',
         title: 'The H-bridge and the square wave',
         summary: 'Two legs, four switches: how DC becomes AC — and why the diodes are needed.',
+        check: {
+          question: 'Just after the output voltage of an H-bridge with an R-L load reverses, which devices carry the current?',
+          options: ['the IGBTs that were just turned ON', 'the diodes beside the switches that were just turned ON', 'none: the current stops'],
+          answer: 1,
+          explain: 'The inductive load keeps its current flowing in the old direction, which the newly gated IGBTs cannot carry. The diodes across them conduct, and energy flows back to the DC source until the current reverses.',
+        },
         base: { topology: 'full', modulation: 'square', load: 'RL' },
         steps: [
           {
@@ -299,6 +319,12 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
         id: 'quasi',
         title: 'Quasi-square wave: removing the 3rd harmonic',
         summary: 'A zero interval of width 2α controls the fundamental and kills chosen harmonics.',
+        check: {
+          question: 'Which zero-interval half-width α removes the 3rd harmonic?',
+          options: ['α = 15°', 'α = 30°', 'α = 60°'],
+          answer: 1,
+          explain: 'The h-th harmonic of the quasi-square wave is proportional to cos(h·α). For h = 3: cos(3·30°) = cos 90° = 0.',
+        },
         base: { topology: 'full', modulation: 'quasi', alphaDeg: 30, load: 'RL' },
         steps: [
           {
@@ -324,6 +350,12 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
         id: 'sixstep',
         title: 'Six-step operation',
         summary: 'Three legs, 180° each: six switching states per cycle and a stepped phase voltage.',
+        check: {
+          question: 'In six-step operation, which levels does the phase voltage van take?',
+          options: ['0 and ±Vdc', '±Vdc/3 and ±2Vdc/3', '±Vdc/2 only'],
+          answer: 1,
+          explain: 'The load’s star point sits at the average of the three leg voltages (1/3 or 2/3 of Vdc), so van = vaN − vnN steps through ±Vdc/3 and ±2Vdc/3.',
+        },
         base: {},
         steps: [
           {
@@ -356,6 +388,12 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
         id: 'spwm',
         title: 'Sinusoidal PWM in an H-bridge',
         summary: 'Bipolar vs unipolar switching: same fundamental, very different harmonics.',
+        check: {
+          question: 'Switching from bipolar to unipolar SPWM at the same m, the fundamental of vo…',
+          options: ['stays the same; the first harmonics move to about twice the carrier frequency', 'doubles', 'becomes smaller'],
+          answer: 0,
+          explain: 'Both give V1 = m·Vdc in the linear range. Unipolar switching adds a zero level, and the carrier components of the two legs cancel in vA − vB, so the first harmonic group moves to 2·mf.',
+        },
         base: { modulation: 'spwm-bipolar' },
         steps: [
           {
@@ -392,6 +430,12 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
       id: 'sv',
       title: 'Space-vector PWM',
       summary: 'Eight switching states, six sectors, dwell times — and 15 % more voltage than SPWM.',
+      check: {
+        question: 'Why can SVPWM reach about 15 % more line voltage than sine-triangle PWM?',
+        options: ['It switches faster', 'It adds a common (zero-sequence) part to all three legs, which the line voltages do not see', 'It uses a higher DC voltage'],
+        answer: 1,
+        explain: 'The common part shifts the neutral but cancels in every line voltage. It lets the legs use the DC voltage better: the reference can reach Vdc/√3 (m = 2/√3) instead of Vdc/2.',
+      },
       base: {},
       steps: [
         {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AnyTopic } from '../src/lab/types.ts'
 import { formatTime } from '../src/utils/format.ts'
 import { nextConsequenceOf, nextEvent, repeatsEveryPeriod } from '../src/workspace/useTopicWorkspace.ts'
+import { TOPICS as DCDC } from '../src/workspaces/dcdc.tsx'
 import { TOPICS as DRIVES } from '../src/workspaces/drives.tsx'
 import { TOPICS as EV } from '../src/workspaces/ev.tsx'
 import { TOPICS as INV } from '../src/workspaces/inverters.tsx'
@@ -35,7 +36,8 @@ describe('what happens next — never empty, always from the run', () => {
       const n = nextConsequenceOf(t, r, k)
       expect(n, `k=${k}`).not.toBeNull()
       expect(n!.text).not.toMatch(/NaN|undefined|Infinity/)
-      if (n!.time !== null) expect(n!.time).toBeGreaterThan(r.time[k])
+      // a quoted instant is later than the cursor, or on it while the trace still shows the state before it
+      if (n!.time !== null) expect(n!.time).toBeGreaterThanOrEqual(r.time[k] - 1e-9 * r.params.dt)
     }
   })
 })
@@ -91,8 +93,45 @@ describe('past the last event', () => {
     expect(n.time).toBeNull()
   })
 
-  it('a single test that does not repeat (MOSFET double pulse) is not treated as periodic', () => {
+  it('a single test that does not repeat (MOSFET double pulse) is not treated as periodic — not even when the gate decays to 0', () => {
     const t = DEV.mosfet
     expect(repeatsEveryPeriod(t, sim(t))).toBe(false)
+    expect(repeatsEveryPeriod(t, sim(t, { vdc: 1000 }))).toBe(false)
+  })
+
+  it('a sawtooth PWM run repeats (its carrier resets at the period boundary, the pattern still repeats)', () => {
+    const t = PWM.lab
+    const r = sim(t, { carrier: 'sawtooth' })
+    expect(repeatsEveryPeriod(t, r)).toBe(true)
+    expect(nextConsequenceOf(t, r, r.length - 1)!.text).toMatch(/in the next/)
+  })
+})
+
+describe('an edge exactly on the cursor’s sample is still ahead while the trace shows the state before it', () => {
+  // the stored sample k holds the interval (k−1, k]: an edge at t_k shows its new state from sample k + 1
+  const onSample = (r: { time: Float64Array; params: { dt: number } }, t: number) => {
+    const k = Math.round(t / r.params.dt)
+    return Math.abs(r.time[k] - t) < 1e-9 * r.params.dt ? k : -1
+  }
+  it('Buck: at t = D·Ts the switch is still shown ON and WHY quotes the gate going LOW at that very instant', () => {
+    const t = DCDC.buck
+    const r = sim(t)
+    const e = r.events.find((x: { kind: string; time: number }) => x.kind === 'gate-off' && onSample(r, x.time) > 0)!
+    expect(e).toBeDefined()
+    const k = onSample(r, e.time)
+    expect(r.signals.gate[k]).toBeGreaterThan(0.5)
+    const n = t.nextConsequence!(r, t.state(r, k), t.measure(r))!
+    expect(n.time).toBe(e.time)
+    // one sample later the switch is shown OFF and the next consequence moves on
+    expect(r.signals.gate[k + 1]).toBeLessThan(0.5)
+    expect(t.nextConsequence!(r, t.state(r, k + 1), t.measure(r))!.time).toBeGreaterThan(e.time)
+  })
+  it('single-phase inverter: the commutation at T/2 is quoted at the sample on T/2 (generic rule)', () => {
+    const t = INV['1ph']
+    const r = sim(t)
+    const k = onSample(r, r.params.period / 2)
+    expect(k).toBeGreaterThan(0)
+    const n = nextEvent(t, r, k)!
+    expect(n.time).toBeCloseTo(r.params.period / 2, 12)
   })
 })

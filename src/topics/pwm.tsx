@@ -70,7 +70,8 @@ export const PWM_TOPIC: Topic<PwmParams, PwmRun, PwmMeasurements, PwmState> = {
     },
     { kind: 'number', key: 'vdc', label: 'DC voltage Vdc', unit: 'V', min: L.vdc.min, max: L.vdc.max, log: true },
     { kind: 'number', key: 'bits', label: 'Counter resolution (0 = analog)', unit: 'bit', min: L.bits.min, max: L.bits.max, step: 1, hint: (p) => (p.sampling === 'natural' ? 'applies to regular sampling' : undefined) },
-    { kind: 'number', key: 'td', label: 'Dead time td', unit: 'µs', scale: 1e-6, min: L.td.min, max: L.td.max, step: 0.1 },
+    // (this lab has no load: what the output does during the dead time depends on the load current — see Inverters)
+    { kind: 'number', key: 'td', label: 'Dead time td', unit: 'µs', scale: 1e-6, min: L.td.min, max: L.td.max, step: 0.1, hint: () => 'shapes the gate signals GH/GL only — its effect on vout needs a load (Inverters)' },
     { kind: 'number', key: 'periods', label: 'Periods shown', unit: '', min: L.periods.min, max: L.periods.max, step: 1 },
     { kind: 'number', key: 'stepsPerPeriod', label: 'Display samples per carrier period', unit: '', min: L.stepsPerPeriod.min, max: L.stepsPerPeriod.max, log: true, step: 10, hint: () => 'edges are exact at any resolution' },
   ],
@@ -90,6 +91,8 @@ export const PWM_TOPIC: Topic<PwmParams, PwmRun, PwmMeasurements, PwmState> = {
   eventWhy: pwmEventWhy,
   eventColor: (e) => (e.kind === 'gate-on' ? '#3987e5' : '#aeb7c5'),
   initialCursor: (r) => (r.params.reference === 'sine' ? r.params.period / 4 : r.params.tc * 1.05),
+  // mf is a whole number (sine) and a DC reference repeats every carrier period: the pattern repeats exactly
+  repeats: () => true,
   periodName: 'period',
   badge: (r, m) => (
     <section className="dc-mode" aria-label="Modulation">

@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { eventSample, nextRunEvent } from '../converters/cursor.ts'
 import { converterIndexAt } from '../converters/engine.ts'
 import type { Run, RunEvent } from '../converters/types.ts'
 import type { AnyTopic, ChannelMeta, StatusInfo, WhyCard } from '../lab/types.ts'
@@ -36,51 +37,29 @@ function coerce(defaults: Record<string, unknown>, patch?: Record<string, unknow
   return out
 }
 
-/**
- * The sample an event lands on (the workspace's event → cursor rule, shared with the rectifier): the first
- * sample after the event's refined time, moved forward (at most 3 samples) until the simulated trace shows
- * the new state — a device ON/OFF event lands where that device is ON/OFF, a gate edge where the gate is.
- */
-export function eventSample(r: Run, e: RunEvent): number {
-  let k = Math.min(r.length - 1, converterIndexAt(r, Math.min(r.params.duration, (Math.floor(e.time / r.params.dt + 1e-6) + 1) * r.params.dt)))
-  const on = /-on$/.test(e.kind) ? 1 : /-off$/.test(e.kind) ? 0 : null
-  if (on === null) return k
-  const gate = e.kind.startsWith('gate') ? r.signals.gate : undefined
-  const dev = e.device ? r.devices.find((d) => d.id === e.device) : undefined
-  const state = (i: number) => (gate ? (gate[i] > 0.5 ? 1 : 0) : dev ? (dev.on[i] ? 1 : 0) : on)
-  for (let g = 0; g < 3 && k < r.length - 1 && state(k) !== on; g++) k++
-  return k
-}
+export { eventSample }
 
 /**
- * The generic next consequence: the run's next detected event after the cursor, in the topic's own words
- * (its event label and explanation). Null when the shown run has no event ahead — nothing is extrapolated.
+ * The generic next consequence: the run's next event after the cursor (one whose new state the cursor does
+ * not show yet — eventAhead), in the topic's own words. Null when the run has none ahead — nothing invented.
  */
 export function nextEvent(topic: AnyTopic, r: Run, k: number): NextConsequence | null {
-  const after = r.time[k] + 0.5 * r.params.dt
-  let e: RunEvent | null = null
-  for (const x of r.events) if (x.time > after && (!e || x.time < e.time)) e = x
+  const e = nextRunEvent(r, k)
   if (!e) return null
   const why = topic.eventWhy(e)
   return { text: `${topic.eventLabel(e)} at t = ${formatTime(e.time)}.${why ? ` ${why}` : ''}`, time: e.time }
 }
 
 /**
- * A run whose events repeat every period: a converged periodic steady state, or a directly computed
- * steady view (PWM) that ends exactly where it started — never a start-up, a drive cycle or a single test.
+ * A run whose events repeat every period: what the topic declares (`repeats`), else a converged periodic
+ * steady state (shooting or period-by-period integration) — never a start-up, a drive cycle or a single test.
  */
 export function repeatsEveryPeriod(topic: AnyTopic, r: Run): boolean {
-  const s = r.diagnostics.steady
   if (!(r.params.period > 0)) return false
-  if (s.method === 'shooting' || s.method === 'integration') return s.converged
-  if (s.method !== 'direct' || (r.params as { view?: string }).view !== 'steady') return false
-  return topic.defaultChannels.every((id) => {
-    const a = r.signals[id]
-    if (!a) return true
-    let mx = 0
-    for (const v of a) mx = Math.max(mx, Math.abs(v))
-    return Math.abs(a[0] - a[a.length - 1]) <= 1e-6 * Math.max(mx, 1e-12)
-  })
+  // a topic that knows its run (PWM: periodic by construction; a double-pulse test: never) says so
+  if (topic.repeats) return topic.repeats(r)
+  const s = r.diagnostics.steady
+  return (s.method === 'shooting' || s.method === 'integration') && s.converged
 }
 
 /**

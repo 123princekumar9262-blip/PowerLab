@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import type { AnyTopic, Experiment, Lesson, MeasureLabel } from '../../lab/types.ts'
+import { useEffect, useMemo, useState } from 'react'
+import type { AnyTopic, Experiment, Lesson, LessonCheck, MeasureLabel } from '../../lab/types.ts'
 import { formatSI } from '../../utils/format.ts'
 
 type M = Record<string, unknown>
@@ -46,9 +46,13 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
   const [choice, setChoice] = useState<number | null>(null)
   const [res, setRes] = useState<{ before: M; after: M; p0: object; p1: object } | null>(null)
   const [snap, setSnap] = useState<{ m: M; p: object } | null>(null)
+  // An experiment starts from the lab's standard values: its question, its "before" and its judgement are all
+  // about that circuit (from the student's own settings a fixed judgement could call the wrong answer right).
+  const base = { ...(topic.defaults as object), view: 'steady' }
+  const changed = Object.keys(base).some((k) => k !== 'view' && (params as Record<string, unknown>)[k] !== (base as Record<string, unknown>)[k])
   const run = () => {
     if (!exp) return
-    const p0 = { ...params, view: 'steady' }
+    const p0 = base
     const p1 = { ...p0, ...exp.change(p0) }
     setRes({ before: topic.measure(topic.simulate(p0)), after: topic.measure(topic.simulate(p1)), p0, p1 })
   }
@@ -67,8 +71,9 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
           ← All experiments
         </button>
         <h3>{exp.title}</h3>
+        {changed && <p className="small muted">This experiment starts from the lab’s standard values, not the ones you set in Explore.</p>}
         <p className="exp-q">
-          <b>1 · Predict.</b> {exp.question(params)}
+          <b>1 · Predict.</b> {exp.question(base)}
         </p>
         <div className="choice-list" role="radiogroup" aria-label="Your prediction">
           {exp.choices.map((c, i) => (
@@ -102,7 +107,7 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
               <b>4 · Why.</b> {exp.why(res.before, res.after, res.p0, res.p1)}
             </p>
             <div className="why-actions">
-              <button className="text-btn" onClick={() => onApply(exp.change(res.p0))}>
+              <button className="text-btn" onClick={() => onApply(res.p1)}>
                 Open the “after” circuit in Explore
               </button>
               <button
@@ -129,7 +134,7 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
           <li key={e.id}>
             <button className="exp-item" onClick={() => setExp(e)}>
               <b>{e.title}</b>
-              <span className="small muted">{e.question(params)}</span>
+              <span className="small muted">{e.question(base)}</span>
             </button>
           </li>
         ))}
@@ -177,13 +182,15 @@ function ChangedParams({ topic, a, b }: { topic: AnyTopic; a: object; b: object 
 }
 
 /** PREDICT: the simulation answers first; the theory is shown afterwards. */
-export function PredictPanel({ topic, onShow }: { topic: AnyTopic; onShow: (patch: object) => void }) {
+export function PredictPanel({ topic, onShow, onCovered }: { topic: AnyTopic; onShow: (patch: object) => void; onCovered?: (covered: boolean) => void }) {
   const [seed, setSeed] = useState(1)
   const tasks = useMemo(() => topic.predictions(seed), [topic, seed])
   const [idx, setIdx] = useState(0)
   const [text, setText] = useState('')
   const [pick, setPick] = useState<number | null>(null)
   const [revealed, setRevealed] = useState<null | { truth: number; ok: boolean; theory: string }>(null)
+  // the workspace covers its answers (waveforms, values, WHY) until this prediction is checked
+  useEffect(() => onCovered?.(!revealed), [revealed]) // eslint-disable-line react-hooks/exhaustive-deps
   const [score, setScore] = useState({ right: 0, total: 0 })
   const task = tasks[Math.min(idx, tasks.length - 1)]
   const reveal = () => {
@@ -260,6 +267,38 @@ export function PredictPanel({ topic, onShow }: { topic: AnyTopic; onShow: (patc
   )
 }
 
+/** The lesson's check: one question about what it showed — answered once, then the right option and why. */
+function LessonCheckView({ check }: { check: LessonCheck }) {
+  const [pick, setPick] = useState<number | null>(null)
+  const done = pick !== null
+  return (
+    <section className="lesson-check" aria-label="Check your understanding">
+      <p className="lesson-check-q">
+        <b>Check:</b> {check.question}
+      </p>
+      <div className="choice-list" role="radiogroup" aria-label="Your answer">
+        {check.options.map((o, i) => (
+          <button
+            key={o}
+            role="radio"
+            aria-checked={pick === i}
+            disabled={done}
+            className={`choice ${pick === i ? 'on' : ''} ${done && i === check.answer ? 'choice--right' : ''} ${done && pick === i && i !== check.answer ? 'choice--wrong' : ''}`}
+            onClick={() => setPick(i)}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+      {done && (
+        <p className={`exp-verdict ${pick === check.answer ? 'tone-ok' : 'tone-bad'}`}>
+          {pick === check.answer ? '✓ Right.' : `✗ Not quite — the answer is “${check.options[check.answer]}”.`} {check.explain}
+        </p>
+      )}
+    </section>
+  )
+}
+
 /** LEARN: lesson list, or the present step (its text is generated from the simulation). */
 export function LearnPanel(props: {
   topic: AnyTopic
@@ -305,6 +344,7 @@ export function LearnPanel(props: {
       <p className="small">
         <b>Look:</b> {s.look}
       </p>
+      {step + 1 === lesson.steps.length && lesson.check && <LessonCheckView key={lesson.id} check={lesson.check} />}
       <div className="lesson-dots" aria-hidden="true">
         {lesson.steps.map((_, k) => (
           <span key={k} className={k === step ? 'on' : k < step ? 'done' : ''} />

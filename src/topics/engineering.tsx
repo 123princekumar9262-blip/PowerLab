@@ -97,9 +97,9 @@ function ThermalDiagram({ st, r, selected, onSelect, values, live }: { st: Therm
         {live ? (
           <>
             Tj {st.tj.toFixed(1)} °C · Rth(j-a) {p.rth.toFixed(2)} K/W · b·Rth {(p.b * p.rth).toFixed(2)}
-            {p.b * p.rth >= 1 ? ' — RUNAWAY' : ''}
+            {p.runaway ? ' — RUNAWAY' : ''}
           </>
-        ) : p.b * p.rth >= 1 ? (
+        ) : p.runaway ? (
           'Thermal runaway: the heat path cannot keep up'
         ) : (
           'Heat flows: junction → case → heatsink → air'
@@ -192,7 +192,7 @@ export const THERMAL_TOPIC: Topic<ThermalParams, ThermalRun, ThermalMeasurements
   ],
   paramNote: (_p, r) => {
     const p = r.params
-    return `P at 25 °C = ${formatW(p.pc25)} conduction + ${formatW(p.ps25)} switching · Rth(j-a) = ${p.rth.toFixed(2)} K/W · b·Rth = ${(p.b * p.rth).toFixed(2)}${p.b * p.rth >= 1 ? ' — THERMAL RUNAWAY' : ''}`
+    return `P at 25 °C = ${formatW(p.pc25)} conduction + ${formatW(p.ps25)} switching · Rth(j-a) = ${p.rth.toFixed(2)} K/W · b·Rth = ${(p.b * p.rth).toFixed(2)}${p.load === 'pulsed' ? ` · growth per cycle ρ = ${p.growth.toFixed(3)}` : ''}${p.runaway ? ' — THERMAL RUNAWAY' : ''}`
   },
   viewKey: 'view',
   simulate: (p) => simulateThermal(p),
@@ -265,7 +265,8 @@ export const THERMAL_TOPIC: Topic<ThermalParams, ThermalRun, ThermalMeasurements
             <b>Thermal path</b> — Foster stages <span className="mono">Ci·dθi/dt = P − θi/Ri</span>, Tj = Ta + Σθi; Zth(t) = Σ Ri·(1 − e^(−t/τi)).
           </li>
           <li>
-            <b>Steady state</b> — constant load: <span className="mono">Tj = (Ta + Rth·(a − 25·b))/(1 − b·Rth)</span>; it exists only while b·Rth &lt; 1 — otherwise thermal runaway.
+            <b>Steady state</b> — constant load: <span className="mono">Tj = (Ta + Rth·(a − 25·b))/(1 − b·Rth)</span>; it exists only while b·Rth &lt; 1 — otherwise thermal runaway. Pulsed load: stable while one load cycle shrinks a disturbance,{' '}
+            <span className="mono">ρ(e^(A_off·t_off)·e^(A_on·t_on)) &lt; 1</span> — the idle time cools the junction, so a pulsed load can stay stable even with b·Rth ≥ 1.
           </li>
           <li>
             <b>Pulsed load</b> — the exact periodic solution; the datasheet estimate Tj,max ≈ Ta + δ·P·Rth + (1 − δ)·P·Zth(ton) ignores the feedback and the exact pulse history.

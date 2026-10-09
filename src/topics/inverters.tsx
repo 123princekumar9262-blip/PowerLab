@@ -80,9 +80,12 @@ function basicSpecs(kind: InvKind): Array<ParamSpec<InverterParams>> {
   return [m, mf, vdc, f1, ...loadSpecs]
 }
 
-/** SPWM topic: the scheme decides the bridge. */
+/**
+ * SPWM topic: the scheme decides the bridge. SVPWM topic: three-phase SVPWM — or three-phase sine-triangle PWM
+ * when asked for explicitly (its "SVPWM vs SPWM" experiment compares the two on the same bridge).
+ */
 const normalise = (kind: InvKind, p: InverterParams): InverterParams =>
-  kind === 'spwm' ? { ...p, topology: p.modulation === 'spwm' ? 'three' : 'full' } : kind === 'svpwm' ? { ...p, topology: 'three', modulation: 'svpwm' } : kind === '3ph' ? { ...p, topology: 'three', modulation: 'six-step' } : p.topology === 'half' ? { ...p, modulation: 'square' } : p
+  kind === 'spwm' ? { ...p, topology: p.modulation === 'spwm' ? 'three' : 'full' } : kind === 'svpwm' ? { ...p, topology: 'three', modulation: p.modulation === 'spwm' ? 'spwm' : 'svpwm' } : kind === '3ph' ? { ...p, topology: 'three', modulation: 'six-step' } : p.topology === 'half' ? { ...p, modulation: 'square' } : p
 
 const COLORS = { v: '#3987e5', i: '#d95926' }
 function channels(kind: InvKind): Record<string, ChannelMeta> {

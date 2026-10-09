@@ -49,6 +49,17 @@ const LEFT = 64
 const RIGHT = 54
 const EVENT_ROW = 16
 const AXIS_H = 22
+/** Room above each lane for its name and unit ("Speed [rpm]", "Output voltage [V]"). */
+const TITLE_H = 16
+
+/** A channel's unit: its SI unit, else the one its name carries in brackets ("Speed [rpm]" → rpm). */
+const unitOf = (m: ChannelMeta) => m.unit || (/\[([^\]]+)\]\s*$/.exec(m.name)?.[1] ?? '')
+/** A lane's title with its unit, unless the name already ends with one. */
+function laneTitle(title: string, signals: string[], meta: Record<string, ChannelMeta>): string {
+  if (/\]\s*$/.test(title)) return title
+  const units = [...new Set(signals.map((s) => unitOf(meta[s])))].filter(Boolean)
+  return units.length ? `${title} [${units.join(', ')}]` : title
+}
 
 function lanesOf(channels: string[], layout: Props['layout'], meta: Record<string, ChannelMeta>): Array<{ id: string; title: string; signals: string[] }> {
   if (layout === 'separate') return channels.map((c) => ({ id: c, title: meta[c].name, signals: [c] }))
@@ -72,7 +83,7 @@ export function LabScope(props: Props) {
 
   const laneDefs = useMemo(() => lanesOf(channels, layout, meta), [channels, layout, meta])
   const laneH = (l: { signals: string[] }) => (l.signals.length === 1 && CHANNELS[l.signals[0]].logic ? 46 : layout === 'separate' ? 92 : 132)
-  const height = EVENT_ROW + 8 + laneDefs.reduce((s, l) => s + laneH(l) + 8, 0) + AXIS_H
+  const height = EVENT_ROW + 8 + laneDefs.reduce((s, l) => s + TITLE_H + laneH(l) + 8, 0) + AXIS_H
 
   useLayoutEffect(() => {
     const el = wrapRef.current
@@ -116,6 +127,7 @@ export function LabScope(props: Props) {
         max += pad
       }
       const h = laneH(l)
+      y += TITLE_H
       const lane = { ...l, top: y, bottom: y + h, min, max }
       y += h + 8
       return lane
@@ -204,9 +216,16 @@ export function LabScope(props: Props) {
       ctx.textAlign = 'center'
       ctx.fillStyle = col('--text-3', '#8591a3')
       ctx.font = '10.5px ' + col('--font-ui', 'sans-serif')
-      const units = [...new Set(l.signals.map((s) => CHANNELS[s].unit))].filter(Boolean)
-      ctx.fillText(meta.logic ? 'gate' : units.map((u) => `${yp.prefix}${u}`).join(' · '), 0, 0)
+      // SI units take the axis prefix (mV, kA); a unit from the name (rpm, °C, %) is shown as it is
+      const units = [...new Set(l.signals.map((s) => (CHANNELS[s].unit ? `${yp.prefix}${CHANNELS[s].unit}` : unitOf(CHANNELS[s]))))].filter(Boolean)
+      ctx.fillText(meta.logic ? 'gate' : units.join(' · '), 0, 0)
       ctx.restore()
+      // Lane title: what the trace is, and its unit.
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillStyle = col('--text-2', '#aeb7c5')
+      ctx.font = '11.5px ' + col('--font-ui', 'sans-serif')
+      ctx.fillText(laneTitle(l.title, l.signals, CHANNELS), LEFT, l.top - 4)
       // Traces: min/max per pixel column (decimation that never hides a spike).
       ctx.save()
       ctx.beginPath()

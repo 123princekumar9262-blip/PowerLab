@@ -63,12 +63,13 @@ export function ParameterPanel({ w, focus, locked }: { w: WorkspaceModel; focus:
 
 // ── Circuit and status ──────────────────────────────────────────────────────
 
-export function CircuitView({ w, showPath, selected, onSelect }: { w: WorkspaceModel; showPath: boolean; selected: string | null; onSelect(part: string): void }) {
+export function CircuitView({ w, showPath, selected, onSelect, quiet }: { w: WorkspaceModel; showPath: boolean; selected: string | null; onSelect(part: string): void; quiet?: boolean }) {
   const Diagram = w.topic.Diagram
   return (
     <div className="wp-circuit">
-      {/* extra numbers on the circuit only at Engineer; live numbers from Standard (Beginner: names and words) */}
-      <Diagram r={w.result} st={w.st} selected={selected} onSelect={onSelect} values={w.level === 'engineer'} live={w.level !== 'beginner'} showPath={showPath} />
+      {/* extra numbers on the circuit only at Engineer; live numbers from Standard (Beginner: names and words);
+          `quiet` (an unanswered prediction): no numbers at all */}
+      <Diagram r={w.result} st={w.st} selected={selected} onSelect={onSelect} values={!quiet && w.level === 'engineer'} live={!quiet && w.level !== 'beginner'} showPath={showPath} />
     </div>
   )
 }

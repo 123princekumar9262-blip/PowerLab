@@ -44,7 +44,7 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
-**Tests.** 935 unit tests pass:
+**Tests.** 1039 unit tests pass (what each lab models and how it is validated: `docs/LAB-CAPABILITIES.md`):
 
 | Area | Tests |
 |---|---|
@@ -57,16 +57,19 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Devices | 18 |
 | Drives | 22 |
 | Magnetics | 17 |
-| EV | 18 |
-| Losses & Thermal | 19 |
+| EV (incl. the battery power limit) | 19 |
+| Losses & Thermal (incl. pulsed-load runaway by the growth per cycle) | 21 |
 | Shell (router, catalogue honesty, search, progress) | 14 |
 | Workspace shell (Buck: one timestep in every panel, Analyze) | 9 |
 | Rectifier in the workspace shell (golden numbers, status / next consequence, WHY questions, one sample in every region, Analyze, routing) | 46 |
 | Workspace contract on real runs (cursor never re-simulates, events, path, inspector, WHY, energy, Change circuit) | 17 |
 | Exact DC-DC solution bit-identical to its snapshot; `expm` and gate-schedule edges bit-identical to the originals | 37 |
-| "What happens next" is never empty: the next event, the next cycle, or the trend to the end of the run | 14 |
+| "What happens next" is never empty: the next event (an edge on the cursor's sample included), the next cycle, or the trend to the end of the run | 17 |
+| Every topic-lab lesson ends with a check question; the checks that state a result agree with the simulation | 34 |
+| Every Experiment in the topic labs: a real change, a verdict from the two simulations | 57 |
+| WHY and events stay true away from the defaults (dead time, saturation, steps, peaks, Reverse) | 7 |
 
-**Browser smoke suites.** Ten suites pass (655 checks):
+**Browser smoke suites.** Ten suites pass (679 checks):
 
 | Suite | Checks |
 |---|---|
@@ -76,7 +79,7 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Controlled / compare | 36 |
 | DC-DC | 71 |
 | PWM / inverters | 33 |
-| Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence) | 106 |
+| Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence, Predict cover, lesson checks) | 130 |
 | Shell (Home and how it works, Labs, routes, redirects, Continue, workspace guide, level, search, Back, 390 px) | 85 |
 | Workspace shell (Buck at 1440/1024/820/768/390/375: regions, WHY + Explore, drawers, sheets, sync, Focus, levels) | 109 |
 | Rectifier workspace (six widths, entry points, WHY questions, Explore, Change circuit, levels, Focus, sheets, Compare) | 87 |

@@ -1,7 +1,7 @@
 import type { CompareResult, CompareRow, Experiment, Lesson, PredictTask, StateView, TextbookValue, WhyCard } from '../../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../../utils/format.ts'
 import type { RunEvent } from '../types.ts'
-import { DRIVE_DEFAULTS, gateAt, measureDrive, rpm, simulateDrive, type DriveMeasurements, type DriveParams, type DriveRun } from './motor.ts'
+import { DRIVE_DEFAULTS, gateAt, loadAt, measureDrive, rpm, simulateDrive, type DriveMeasurements, type DriveParams, type DriveRun } from './motor.ts'
 import { averagedDrive, exactDrive } from './theory.ts'
 
 export { measureDrive, simulateDrive }
@@ -92,6 +92,8 @@ export function driveWhy(r: DriveRun, st: DriveState, m: DriveMeasurements): Why
   const p = r.params
   const cards: WhyCard[] = []
   const dEnd = p.duties[p.periods - 1]
+  // the load the motor carries at the end of the run (after a load step, the new one)
+  const tlEnd = loadAt(p, p.duration)
   const now: Record<DriveState['phase'], Omit<WhyCard, 'id' | 'question'>> = {
     supply: {
       what: `Q1 is on: the armature sees Vdc = ${formatV(p.vdc, false)} while the back-EMF is ${formatV(st.e)}.`,
@@ -136,7 +138,7 @@ export function driveWhy(r: DriveRun, st: DriveState, m: DriveMeasurements): Why
     what: `SIMULATION: ${m.nEnd.toFixed(0)} rpm with ${formatA(m.iEnd)} mean current and ${formatV(m.vaEnd)} mean terminal voltage${m.settled ? '' : ' — not yet settled at the end of the run'}.`,
     why: 'The speed rises until the back-EMF k·ω is almost equal to the mean applied voltage: what is left, Ra·ī, drives just the current whose torque k·ī balances the load.',
     equation: 'k·ω = v̄a − Ra·ī,   k·ī = TL + B·ω',
-    physics: `Averaged model: ω = (d·Vdc − Ra·TL/k)/(k + Ra·B/k) = ${rpm(((dEnd * p.vdc - (p.ra * p.tl) / p.ke) / (p.ke + (p.ra * p.b) / p.ke))).toFixed(0)} rpm at d = ${(dEnd * 100).toFixed(0)} %${m.dcm ? ' — but the current is discontinuous here, so the mean voltage is higher' : ''}.`,
+    physics: `Averaged model: ω = (d·Vdc − Ra·TL/k)/(k + Ra·B/k) = ${rpm(((dEnd * p.vdc - (p.ra * tlEnd) / p.ke) / (p.ke + (p.ra * p.b) / p.ke))).toFixed(0)} rpm at d = ${(dEnd * 100).toFixed(0)} %${tlEnd !== p.tl ? `, TL = ${tlEnd.toFixed(2)} N·m (after the load step)` : ''}${m.dcm ? ' — but the current is discontinuous here, so the mean voltage is higher' : ''}.`,
     whatIf: 'More load torque needs more current, so a little more voltage is lost in Ra: the speed droops by Ra·ΔTL/k².',
   })
   if (p.view === 'startup')
@@ -211,8 +213,24 @@ export function driveEventLabel(e: RunEvent): string {
 export function driveEventWhy(e: RunEvent): string {
   const v = `ia = ${formatA(e.values.ia ?? 0, true)}, speed ${(e.values.n ?? 0).toFixed(0)} rpm.`
   if (e.device === 'peak') return `${v} The back-EMF has grown enough that the mean applied voltage minus k·ω no longer drives the current up: from here the current falls as the motor speeds up.`
-  if (e.device === 'load-step') return `${v} More load torque: the motor decelerates until the lower back-EMF lets enough extra current flow to carry it.`
-  if (e.device === 'duty-step') return `${v} The mean voltage drops below the back-EMF: the current reverses if the chopper allows it (2Q, braking) or stops (1Q, the motor coasts).`
+  // the step's direction and the run's outcome are read from the event (recorded by the simulation)
+  const from = e.values.from ?? 0
+  const to = e.values.to ?? 0
+  const nB = e.values.nBefore ?? 0
+  const nE = e.values.nEnd ?? 0
+  const speed = Math.abs(nE - nB) < 0.005 * Math.max(Math.abs(nB), 1) ? `the speed stays near ${nB.toFixed(0)} rpm` : `the speed ${nE > nB ? 'rises' : 'falls'} from ${nB.toFixed(0)} to ${nE.toFixed(0)} rpm by the end of the run`
+  if (e.device === 'load-step') {
+    if (to === from) return `${v} The load torque does not change (${from.toFixed(2)} N·m): ${speed}.`
+    return to > from
+      ? `${v} More load torque (${from.toFixed(2)} → ${to.toFixed(2)} N·m): the motor slows until the lower back-EMF lets enough extra current flow to carry it — ${speed}.`
+      : `${v} Less load torque (${from.toFixed(2)} → ${to.toFixed(2)} N·m): the extra motor torque accelerates the rotor until the higher back-EMF cuts the current back — ${speed}.`
+  }
+  if (e.device === 'duty-step') {
+    if (to === from) return `${v} The duty does not change (${(from * 100).toFixed(0)} %): ${speed}.`
+    if (to > from) return `${v} The duty rises (${(from * 100).toFixed(0)} → ${(to * 100).toFixed(0)} %): the mean voltage d·Vdc rises above the back-EMF, the current grows and the motor accelerates — ${speed}.`
+    const iE = e.values.iEnd ?? 0
+    return `${v} The duty falls (${(from * 100).toFixed(0)} → ${(to * 100).toFixed(0)} %): the mean voltage d·Vdc drops below the back-EMF, so the current falls — it reverses if the chopper allows it (2Q, braking: energy flows back to the supply) or stops (1Q, the motor coasts) — ${speed}${iE < 0 ? '; the current is still negative at the end of the run (braking)' : ''}.`
+  }
   if (e.kind === 'il-zero') return `${v} The inductor's energy is used up before the next on-time: the diode blocks and the terminal voltage jumps to the back-EMF.`
   return `${v} The circuit equations change form here.`
 }
@@ -224,6 +242,12 @@ export const DRIVE_LESSONS: L[] = [
     id: 'start',
     title: 'Starting a DC motor',
     summary: 'Inrush current, back-EMF, and where the starting energy goes.',
+    check: {
+      question: 'Why is the starting current of a DC motor so large?',
+      options: ['the inductance is largest at standstill', 'at standstill there is no back-EMF, so only Ra (and La) limit the current', 'the load torque is largest at standstill'],
+      answer: 1,
+      explain: 'The back-EMF k·ω is zero at rest, so the applied voltage only meets Ra (and briefly La). As the motor speeds up, k·ω opposes the supply and the current falls.',
+    },
     base: { view: 'startup', bridge: '1q', event: 'none', tramp: 0 },
     steps: [
       {
@@ -263,6 +287,12 @@ export const DRIVE_LESSONS: L[] = [
     id: 'brake',
     title: 'Slowing down: one quadrant or two',
     summary: 'Reduce the duty — and see why only a two-quadrant chopper can brake.',
+    check: {
+      question: 'You lower the duty of a ONE-quadrant chopper. The armature current…',
+      options: ['reverses and brakes the motor', 'falls to zero and the motor coasts down', 'stays the same'],
+      answer: 1,
+      explain: 'A one-quadrant chopper can only drive current into the motor. When d·Vdc falls below the back-EMF the current drops to zero and the motor coasts. Braking (negative current, energy back to the supply) needs the second switch of a two-quadrant chopper.',
+    },
     base: { view: 'startup', event: 'duty', d2: 0.3, tramp: 0 },
     steps: [
       {
@@ -289,6 +319,12 @@ export const DRIVE_LESSONS: L[] = [
     id: 'ripple',
     title: 'Current ripple and discontinuous conduction',
     summary: 'Zoom into the PWM periods — and see the current stop at light load.',
+    check: {
+      question: 'At light load the armature current stops during each off-time. Compared with the averaged model, the speed is…',
+      options: ['higher', 'lower', 'the same'],
+      answer: 0,
+      explain: 'While the current is zero the terminals show the back-EMF instead of 0 V, so the mean armature voltage is higher than d·Vdc, and so is the speed.',
+    },
     base: { view: 'steady', bridge: '1q' },
     steps: [
       {

@@ -129,9 +129,9 @@ export function evWhy(r: EvRun, st: EvState, m: EvMeasurements): WhyCard[] {
       whatIf: 'A higher regen limit (or gentler braking) recovers more.',
     },
     'full throttle': {
-      what: `Full throttle at ${(st.v * 3.6).toFixed(1)} km/h: the motor delivers ${st.f.toFixed(0)} N — ${st.v < p.vBase ? 'limited by its torque' : 'limited by its power'}.`,
-      why: `Below the base speed ${(p.vBase * 3.6).toFixed(0)} km/h the force is constant (Tmax·G/r); above it the power is constant, so the force falls as 1/v.`,
-      equation: 'F = min(Tmax·G/r, Pmax/v)',
+      what: `Full throttle at ${(st.v * 3.6).toFixed(1)} km/h: the motor delivers ${st.f.toFixed(0)} N — ${st.v < p.vBase ? 'limited by its torque' : p.pDrive < p.pmax ? 'limited by the power the battery can supply' : 'limited by its power'}.`,
+      why: `Below the base speed ${(p.vBase * 3.6).toFixed(0)} km/h the force is constant (Tmax·G/r); above it the power is constant, so the force falls as 1/v.${p.pDrive < p.pmax ? ` Here the battery sets that power: its terminals give at most Voc²/(4·Rb) = ${formatW((p.voc * p.voc) / (4 * p.rb))}, so ${formatW(p.pDrive)} reach the wheels — less than the motor's ${formatW(p.pmax)}.` : ''}`,
+      equation: p.pDrive < p.pmax ? 'F = min(Tmax·G/r, Pdrive/v),  Pdrive = (Voc²/(4·Rb) − Paux)·η' : 'F = min(Tmax·G/r, Pmax/v)',
       physics: `Drag now ${st.fAero.toFixed(0)} N; the battery delivers ${formatW(st.pBatt)} at ${formatA(st.iBatt)}.`,
       whatIf: 'More power shortens the high-speed part; more torque (or gear ratio) the low-speed part.',
     },
@@ -238,6 +238,12 @@ export const EV_LESSONS: L[] = [
     id: 'city',
     title: 'Where the energy goes in the city',
     summary: 'Accelerate, cruise, brake — and get part of it back.',
+    check: {
+      question: 'While the car brakes with regeneration, where does its kinetic energy go?',
+      options: ['all of it back into the battery', 'part back into the battery; the rest into drag, rolling resistance, drivetrain losses and the friction brakes', 'none of it is recovered'],
+      answer: 1,
+      explain: 'Regeneration recovers only what the motor can absorb, after drag, rolling resistance and the drivetrain efficiency take their share. Braking harder than the regen limit uses the friction brakes, and that energy is lost as heat.',
+    },
     base: { cycle: 'urban' },
     steps: [
       {
@@ -270,6 +276,12 @@ export const EV_LESSONS: L[] = [
     id: 'accel',
     title: '0–100 km/h: torque, then power',
     summary: 'Full throttle from rest — and why the force falls with speed.',
+    check: {
+      question: 'Above the base speed, the motor’s force at full throttle…',
+      options: ['stays constant', 'falls about as 1/v (constant power)', 'rises with speed'],
+      answer: 1,
+      explain: 'Below the base speed the torque limit holds the force constant. Above it the power limit holds F·v constant, so the force falls as 1/v.',
+    },
     base: { cycle: 'accel' },
     steps: [
       {

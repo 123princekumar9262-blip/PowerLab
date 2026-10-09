@@ -181,6 +181,12 @@ export const PWM_LESSONS: Array<Lesson<PwmParams, PwmRun, PwmMeasurements, PwmSt
     id: 'basics',
     title: 'How a PWM signal is made',
     summary: 'Carrier, reference, comparator — and why the average equals D·Vdc.',
+    check: {
+      question: 'A DC reference sets the duty ratio to 30 %. The average of the 0…Vdc pulse train is…',
+      options: ['0.3·Vdc', '0.7·Vdc', 'Vdc/2'],
+      answer: 0,
+      explain: 'The output is Vdc for D·Tc and 0 for the rest of each carrier period: its average is D·Vdc.',
+    },
     base: { reference: 'dc', duty: 0.3, output: 'unipolar', periods: 4 },
     steps: [
       {
@@ -218,6 +224,12 @@ export const PWM_LESSONS: Array<Lesson<PwmParams, PwmRun, PwmMeasurements, PwmSt
     id: 'spwm',
     title: 'Sine-triangle PWM',
     summary: 'A sine reference: the pulse widths follow it, and the fundamental is M·Vdc/2.',
+    check: {
+      question: 'In the linear range (M ≤ 1), halving the modulation index M makes the fundamental…',
+      options: ['halve', 'stay the same', 'drop to a quarter'],
+      answer: 0,
+      explain: 'The local average of the pulses follows the reference, so the fundamental is M·Vdc/2: proportional to M.',
+    },
     base: { reference: 'sine', m: 0.8, mf: 15, sampling: 'natural', output: 'bipolar', periods: 1 },
     steps: [
       {

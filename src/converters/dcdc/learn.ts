@@ -1,3 +1,4 @@
+import type { LessonCheck } from '../../lab/types.ts'
 import { formatA, formatSI, formatV } from '../../utils/format.ts'
 import { resolveConverter } from '../params.ts'
 import type { ConverterKind, ConverterParams, ConverterResult } from '../types.ts'
@@ -25,6 +26,7 @@ export interface DcdcLesson {
   summary: string
   base: Partial<ConverterParams>
   steps: DcdcLessonStep[]
+  check?: LessonCheck
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(0)} %`
@@ -34,6 +36,12 @@ export const BOOST_LESSONS: DcdcLesson[] = [
     id: 'how',
     title: 'How a boost converter works',
     summary: 'Why the output ends up ABOVE the input: the inductor adds its voltage to Vin.',
+    check: {
+      question: 'Why is the boost converter’s output above its input?',
+      options: ['The capacitor raises the voltage on its own', 'While the switch is OFF the inductor’s voltage adds to Vin', 'The diode amplifies the voltage'],
+      answer: 1,
+      explain: 'With the switch OFF the inductor keeps its current flowing and its voltage adds to Vin to push it into the output. Volt-second balance gives Vout = Vin/(1 − D).',
+    },
     base: {},
     steps: [
       {
@@ -84,6 +92,12 @@ export const BOOST_LESSONS: DcdcLesson[] = [
     id: 'dcm',
     title: 'Discontinuous conduction in a boost',
     summary: 'Light load: iL reaches zero, the switch node rests at Vin, and Vout climbs above Vin/(1 − D).',
+    check: {
+      question: 'At light load the boost’s inductor current reaches zero every period. Its output…',
+      options: ['is exactly Vin/(1 − D)', 'climbs above Vin/(1 − D)', 'drops below Vin'],
+      answer: 1,
+      explain: 'In discontinuous conduction each period delivers a fixed parcel of energy, ½·L·i², however little the load takes, so the output climbs above the CCM value Vin/(1 − D).',
+    },
     base: { r: 200 },
     steps: [
       {
@@ -113,6 +127,12 @@ export const BUCK_BOOST_LESSONS: DcdcLesson[] = [
     id: 'how',
     title: 'How an inverting buck-boost works',
     summary: 'The inductor charges from Vin, then discharges into the output with reversed polarity.',
+    check: {
+      question: 'Why is the output of an inverting buck-boost negative?',
+      options: ['The diode reverses the source', 'The inductor discharges into the output with reversed polarity', 'The switch connects the output backwards'],
+      answer: 1,
+      explain: 'The inductor charges from Vin while Q1 is ON, then pushes the same current up through the output from its negative side: Vout = −D·Vin/(1 − D).',
+    },
     base: {},
     steps: [
       {

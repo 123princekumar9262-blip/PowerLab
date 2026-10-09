@@ -84,8 +84,14 @@ export function thermalWhy(r: ThermalRun, st: ThermalState, m: ThermalMeasuremen
     id: 'feedback',
     question: 'Why is Tj higher than Ta + P·Rth?',
     what: `SIMULATION: mean Tj ${degC(m.tjMean)}; with the loss taken at 25 °C the textbook gives ${degC(tb.tjMeanNoFeedback)}.`,
-    why: 'Hotter silicon loses more (Ron and the switching energy rise with temperature), which heats it further. The loop converges as long as the extra loss per kelvin, b, times Rth stays below 1.',
-    equation: `P = a + b·(Tj − 25),  b·Rth = ${(p.b * p.rth).toFixed(3)}${p.b * p.rth >= 1 ? ' ≥ 1: RUNAWAY' : ' < 1: stable'}`,
+    why:
+      p.load === 'pulsed'
+        ? 'Hotter silicon loses more (Ron and the switching energy rise with temperature), which heats it further. With a pulsed load the idle time cools the junction between pulses: the loop converges as long as each load cycle shrinks an extra degree rather than growing it (growth per cycle ρ < 1).'
+        : 'Hotter silicon loses more (Ron and the switching energy rise with temperature), which heats it further. The loop converges as long as the extra loss per kelvin, b, times Rth stays below 1.',
+    equation:
+      p.load === 'pulsed'
+        ? `P = a + b·(Tj − 25),  b·Rth = ${(p.b * p.rth).toFixed(3)},  growth per cycle ρ = ${p.growth.toFixed(3)}${p.runaway ? ' ≥ 1: RUNAWAY' : ' < 1: stable'}`
+        : `P = a + b·(Tj − 25),  b·Rth = ${(p.b * p.rth).toFixed(3)}${p.runaway ? ' ≥ 1: RUNAWAY' : ' < 1: stable'}`,
     physics: p.load === 'constant' && tb.tjSelfConsistent !== null ? `Constant load: Tj = (Ta + Rth·(a − 25·b))/(1 − b·Rth) = ${degC(tb.tjSelfConsistent)}.` : `Rth junction-to-ambient = ${p.rth.toFixed(3)} K/W.`,
     whatIf: 'A better heatsink (lower Rha) helps twice: less temperature rise per watt, and fewer watts.',
   })
@@ -156,6 +162,12 @@ export const THERMAL_LESSONS: L[] = [
     id: 'heatup',
     title: 'From cold to hot: four time constants',
     summary: 'Switch on a constant load and watch the die, the case and the heatsink warm up.',
+    check: {
+      question: 'After a constant load is switched on, which part warms up slowest?',
+      options: ['the silicon die', 'the heatsink', 'they all warm up at the same rate'],
+      answer: 1,
+      explain: 'The die has a tiny heat capacity and heats in milliseconds. The heatsink stores far more heat, so its time constant is minutes, and it sets how long the whole device takes to settle.',
+    },
     base: { load: 'constant', view: 'startup' },
     steps: [
       {
@@ -188,6 +200,12 @@ export const THERMAL_LESSONS: L[] = [
     id: 'cycling',
     title: 'Power cycling',
     summary: 'A pulsed load: the junction temperature swings every cycle.',
+    check: {
+      question: 'Shorter load pulses at the same duty: the junction temperature swing ΔTj…',
+      options: ['gets smaller', 'gets larger', 'stays the same'],
+      answer: 0,
+      explain: 'A shorter pulse gives the slow thermal stages less time to heat, so the swing follows Zth(ton) and shrinks. The mean temperature stays nearly the same.',
+    },
     base: { load: 'pulsed', view: 'steady' },
     steps: [
       {

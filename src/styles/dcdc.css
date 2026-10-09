@@ -596,6 +596,25 @@
   font-size: 14px;
   line-height: 1.55;
 }
+/* the lesson's check question (last step) */
+.lesson-check {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+.lesson-check-q {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.lesson-check .exp-verdict {
+  margin: 8px 0 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .lesson-dots {
   display: flex;
   gap: 6px;

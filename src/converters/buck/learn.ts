@@ -1,3 +1,4 @@
+import type { LessonCheck } from '../../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV } from '../../utils/format.ts'
 import type { ConverterParams, ConverterResult, ConverterSignal } from '../types.ts'
 import type { BuckMeasurements } from './measure.ts'
@@ -29,6 +30,7 @@ export interface Lesson {
   summary: string
   base: Partial<ConverterParams>
   steps: LessonStep[]
+  check?: LessonCheck
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(0)} %`
@@ -38,6 +40,12 @@ export const BUCK_LESSONS: Lesson[] = [
     id: 'how',
     title: 'How a buck converter works',
     summary: 'The switch, the inductor, the diode and the capacitor — one switching period, instant by instant.',
+    check: {
+      question: 'In steady state, why is the average output voltage about D·Vin?',
+      options: ['The capacitor divides Vin by D', 'The inductor’s average voltage over a period must be zero (volt-second balance)', 'The diode drops the rest of the voltage'],
+      answer: 1,
+      explain: 'The inductor current ends each period where it started, so its average voltage is zero: (Vin − Vout)·D·Ts = Vout·(1 − D)·Ts, hence Vout = D·Vin.',
+    },
     base: {},
     steps: [
       {
@@ -96,6 +104,12 @@ export const BUCK_LESSONS: Lesson[] = [
     id: 'dcm',
     title: 'Continuous and discontinuous conduction',
     summary: 'Light load: the inductor current reaches zero, the diode turns off, and Vout no longer equals D·Vin.',
+    check: {
+      question: 'When the load gets so light that iL reaches zero every period, Vout…',
+      options: ['stays at D·Vin', 'rises above D·Vin', 'falls below D·Vin'],
+      answer: 1,
+      explain: 'While iL rests at zero the switch node sits at Vout, so the inductor sees no voltage for that part of the period. Volt-second balance then needs a higher Vout than D·Vin.',
+    },
     base: { r: 30 },
     steps: [
       {

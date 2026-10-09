@@ -57,11 +57,12 @@ export function conductingOptions(topology: RectifierTopology): string[] {
   if (topology === 'half-wave') return ['D1', 'none']
   if (topology === 'center-tap') return ['D1', 'D2', 'none']
   if (topology === 'bridge') return ['D1 + D4', 'D2 + D3', 'none']
-  if (topology === '3ph-half-wave') return ['Da', 'Db', 'Dc']
+  // (a controlled three-phase circuit with an R load can have every device off — "none" must be a choice too)
+  if (topology === '3ph-half-wave') return ['Da', 'Db', 'Dc', 'none']
   // Six-pulse pairs (upper, lower) in conduction order.
   const ups = Object.entries(DEVICE_MAP).filter(([k, v]) => /^D\d$/.test(k) && v.upper)
   const los = Object.entries(DEVICE_MAP).filter(([k, v]) => /^D\d$/.test(k) && !v.upper)
   const out: string[] = []
   for (const [u, uv] of ups) for (const [l, lv] of los) if (uv.phase !== lv.phase) out.push([u, l].sort().join(' + '))
-  return out.sort()
+  return [...out.sort(), 'none']
 }

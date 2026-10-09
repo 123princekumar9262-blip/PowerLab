@@ -187,6 +187,12 @@ export const MOSFET_LESSONS: Array<Lesson<MosfetParams, MosfetRun, MosfetMeasure
     id: 'turnon',
     title: 'Turn-on in four phases',
     summary: 'Delay, current rise, Miller plateau, ohmic — and where the energy is lost.',
+    check: {
+      question: 'During the Miller plateau the gate voltage stays flat because…',
+      options: ['the gate driver stops supplying current', 'the gate current goes into discharging Cgd while the drain voltage falls', 'the channel turns off'],
+      answer: 1,
+      explain: 'With the full load current flowing, the channel needs a fixed gate voltage. Every bit of gate current now goes into Cgd as vDS falls, so vGS cannot rise until the voltage fall is over.',
+    },
     base: {},
     steps: [
       {

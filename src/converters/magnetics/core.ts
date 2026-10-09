@@ -262,24 +262,22 @@ export function simulateCore(input: Partial<CoreParams>): CoreRun {
   }
   const events: RunEvent[] = []
   let seq = 0
+  // an event's values are the state AT its instant: the simulator's exact state there (a knot) when it has one,
+  // else the nearest sample's flux; the bridge voltage is the one applied from that instant on
   const ev = (kind: RunEvent['kind'], t: number, device: string) => {
-    const k = Math.min(n - 1, Math.max(0, Math.round(t / p.dt)))
-    events.push({ id: `c${seq++}`, kind, time: t, device, values: { i: s.i[k], b: s.b[k], v: s.v[k] } })
+    const kn = res.knots.find((x) => Math.abs(x.t - t) <= 1e-9 * p.dt)
+    const lam = kn ? kn.x[0] : s.lam[Math.min(n - 1, Math.max(0, Math.round(t / p.dt)))]
+    const b = lam / (p.n * p.ae)
+    events.push({ id: `c${seq++}`, kind, time: t, device, values: { i: currentOf(p, lam), b, v: voltageAt(p, t + p.dt * 1e-6) } })
   }
   const satEvents = res.events.filter((e) => e.from !== e.to)
-  if (p.view === 'steady') {
+  if (p.view === 'steady')
     for (let m = 0; m < p.periods; m++) {
       if (m > 0) ev('gate-on', m * p.period, '+V')
       ev('gate-off', (m + p.duty) * p.period, '−V')
     }
-    for (const x of satEvents) ev('mode', x.t, `${x.from}→${x.to}`)
-  } else {
-    // a start-up has many periods: mark only the first saturation and the last one
-    const firstSat = satEvents.find((e) => e.to !== 'lin')
-    if (firstSat) ev('mode', firstSat.t, `${firstSat.from}→${firstSat.to}`)
-    const lastSat = [...satEvents].reverse().find((e) => e.to !== 'lin')
-    if (lastSat && lastSat !== firstSat) ev('mode', lastSat.t, `${lastSat.from}→${lastSat.to}`)
-  }
+  // every entry into and exit from saturation (a start-up's inrush saturates and recovers several times)
+  for (const x of satEvents) ev('mode', x.t, `${x.from}→${x.to}`)
   events.sort((a, b) => a.time - b.time)
   return {
     kind: 'core',

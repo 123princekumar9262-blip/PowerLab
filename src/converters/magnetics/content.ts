@@ -153,7 +153,14 @@ export function coreEventLabel(e: RunEvent): string {
   return e.device ?? e.kind
 }
 export function coreEventWhy(e: RunEvent): string {
-  return `i = ${formatA(e.values.i ?? 0, true)}, B = ${(e.values.b ?? 0).toFixed(3)} T, v = ${formatV(e.values.v ?? 0)}. ${coreEventLabel(e) === 'The core saturates' ? 'The flux reached Bsat: the inductance collapses and the current rises steeply.' : 'The B–H curve changes slope here, so the winding equation changes.'}`
+  const label = coreEventLabel(e)
+  const why =
+    e.kind === 'gate-on' || e.kind === 'gate-off'
+      ? `The bridge reverses the winding voltage: the flux now ${e.kind === 'gate-on' ? 'rises' : 'falls'} at dλ/dt = v − R·i, and the current follows it.`
+      : label === 'The core saturates'
+        ? 'The flux reached Bsat: the inductance collapses and the current rises steeply.'
+        : 'The flux is back below Bsat: the full inductance returns and the current changes slowly again.'
+  return `i = ${formatA(e.values.i ?? 0, true)}, B = ${(e.values.b ?? 0).toFixed(3)} T, v = ${formatV(e.values.v ?? 0)}. ${why}`
 }
 
 type L = Lesson<CoreParams, CoreRun, CoreMeasurements, CoreState>
@@ -163,6 +170,12 @@ export const CORE_LESSONS: L[] = [
     id: 'voltsec',
     title: 'Volt-seconds set the flux',
     summary: 'A square wave across a winding: the flux is a triangle, and the gap sets the current.',
+    check: {
+      question: 'You double the air gap (same voltage, frequency and turns). The flux swing ΔB…',
+      options: ['halves', 'stays the same — the current rises instead', 'doubles'],
+      answer: 1,
+      explain: 'ΔB = V·D·T/(N·Ae) is set by the volt-seconds alone. A larger gap lowers the inductance, so the same flux swing needs more current.',
+    },
     base: { view: 'steady', duty: 0.5 },
     steps: [
       {
@@ -187,6 +200,12 @@ export const CORE_LESSONS: L[] = [
     id: 'inrush',
     title: 'Start-up flux doubling',
     summary: 'Switch the bridge on at zero flux — and watch the core saturate in the first period.',
+    check: {
+      question: 'Why does the core saturate in the first period after the bridge is switched on?',
+      options: ['The winding resistance is too small', 'The flux starts at zero instead of at its negative peak, so it swings up to about twice the normal peak', 'The frequency is too high'],
+      answer: 1,
+      explain: 'In steady state the flux swings symmetrically around zero. Starting from zero, the first half-period adds the full swing on top: about twice the normal peak, beyond Bsat.',
+    },
     base: { view: 'startup', duty: 0.5 },
     steps: [
       {
@@ -219,6 +238,12 @@ export const CORE_LESSONS: L[] = [
     id: 'dcbias',
     title: 'A small DC bias saturates the core',
     summary: 'Change the duty by 2 % — the DC current walks the flux into saturation.',
+    check: {
+      question: 'A 52 % duty adds a small DC voltage to the winding. What limits the resulting DC current?',
+      options: ['the inductance L', 'only the winding resistance R', 'the air gap'],
+      answer: 1,
+      explain: 'In steady state the inductor’s average voltage is zero, so the DC part of the applied voltage drives a DC current through R alone: Idc = (2d − 1)·V/R. R is small, so the current, and the flux it biases, are large.',
+    },
     base: { view: 'steady' },
     steps: [
       {
