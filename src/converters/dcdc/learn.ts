@@ -2,7 +2,7 @@ import type { LessonCheck } from '../../lab/types.ts'
 import { formatA, formatSI, formatV } from '../../utils/format.ts'
 import { resolveConverter } from '../params.ts'
 import type { ConverterKind, ConverterParams, ConverterResult } from '../types.ts'
-import { voltSecondFromSim, type DcdcState } from './explain.ts'
+import { rippleNote, voltSecondFromSim, type DcdcState } from './explain.ts'
 import type { DcdcMeasurements } from './measure.ts'
 import { dcdcBoundary, dcdcTextbook, idealCcmM } from './theory.ts'
 
@@ -228,8 +228,8 @@ export function dcdcExperiments(kind: ConverterKind): DcdcExperiment[] {
         return q < 0.375 ? 0 : q < 0.75 ? 1 : 2
       },
       rows: ['voutPP', 'voutAvg', 'icRms'],
-      why: (b, a) =>
-        `ΔVout went from ${formatSI(b.voutPP, 'V')} to ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). While Q1 is ON the capacitor alone carries the load current; the same charge on a 4× larger C changes its voltage 4× less. The average output does not depend on C: ${formatV(b.voutAvg)} → ${formatV(a.voutAvg)}.`,
+      why: (b, a, p0) =>
+        `ΔVout went from ${formatSI(b.voutPP, 'V')} to ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). While Q1 is ON the capacitor alone carries the load current; the same charge on a 4× larger C changes its voltage 4× less.${rippleNote(kind, p0.esr, b)} The average output does not depend on C: ${formatV(b.voutAvg)} → ${formatV(a.voutAvg)}.`,
     },
     {
       id: 'frequency',
@@ -243,8 +243,10 @@ export function dcdcExperiments(kind: ConverterKind): DcdcExperiment[] {
         return q1 < 0.75 && q2 < 0.75 ? 0 : q1 > 1.33 && q2 > 1.33 ? 1 : 2
       },
       rows: ['ilPP', 'voutPP', 'voutAvg', 'mode'],
-      why: (b, a) =>
-        `ΔiL: ${formatA(b.ilPP)} → ${formatA(a.ilPP)} (×${ratio(a.ilPP, b.ilPP).toFixed(3)}); ΔVout: ${formatSI(b.voutPP, 'V')} → ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). The ON time halves: the inductor ramps for half as long, and the capacitor feeds the load alone for half as long. D (and so the average output) is unchanged.`,
+      why: (b, a, p0) =>
+        `ΔiL: ${formatA(b.ilPP)} → ${formatA(a.ilPP)} (×${ratio(a.ilPP, b.ilPP).toFixed(3)}); ΔVout: ${formatSI(b.voutPP, 'V')} → ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). The ON time halves: the inductor ramps for half as long, and the capacitor feeds the load alone for half as long.${
+          p0.esr > 0 ? ` The ESR step ESR·iL,max does not halve: iL,max is mostly the average inductor current, which the frequency does not change.${rippleNote(kind, p0.esr, b)}` : ''
+        } D (and so the average output) is unchanged.`,
     },
     {
       id: 'dcm',

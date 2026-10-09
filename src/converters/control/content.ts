@@ -261,6 +261,35 @@ export function controlEventWhy(e: RunEvent): string {
 
 const sampleWindow = (p: ResolvedControl, a: number, b: number) => [a * p.duration, b * p.duration] as [number, number]
 
+/**
+ * The loop at one operating point (before or after the reference/load steps), with the SAME controller gains:
+ * its small-signal crossover and margin, and the exact stability measure of the sampled loop there.
+ */
+export function loopAt(p: ResolvedControl, at: number) {
+  const q: ResolvedControl = { ...p, refStep: 'off', loadStep: 'off', vref: vrefAt(p, at), r: rAt(p, at) }
+  return { vref: q.vref, lg: loopGain(q), rho: spectralRadius(q) }
+}
+
+/**
+ * "Too much gain": why the faster loop overshoots — or goes unstable — from the model at the operating points
+ * the run visits. Low phase margin at a stable point (|λ|max < 1) is overshoot and ringing; |λ|max ≥ 1 at the
+ * point after the step is instability caused by the operating point moving, not by the starting margin.
+ */
+export function gainStepText(r: ControlRun, m: ControlMeasurements): string {
+  const p = r.params
+  const a = loopAt(p, 0)
+  const b = loopAt(p, p.duration)
+  const fc = (x: number | null) => (x ? formatSI(x, 'Hz') : '—')
+  const pm = (x: number | null) => (x !== null ? `${x.toFixed(0)}°` : '—')
+  const os = m.overshoot !== null ? `${(m.overshoot * 100).toFixed(1)} %` : '—'
+  if (!(r.rho < 1)) {
+    const where = b.rho >= a.rho ? b : a
+    const other = where === b ? a : b
+    return `At Vref = ${formatV(other.vref, false)} the loop is stable: fc = ${fc(other.lg.fc)}, phase margin ${pm(other.lg.pm)}, |λ|max = ${other.rho.toFixed(3)}. But the reference step moves the converter to Vref = ${formatV(where.vref, false)}${p.kind === 'boost' ? ': a larger duty, so the boost’s gain rises (∝ 1/(1 − D)²) and its right-half-plane zero moves down' : ''}. With the same controller the loop there crosses over at ${fc(where.lg.fc)} with a phase margin of ${pm(where.lg.pm)}: |λ|max = ${where.rho.toFixed(4)} ≥ 1, UNSTABLE at the new operating point — the output never settles (it is not just slow). A loop must be stable at every operating point it visits.`
+  }
+  return `Now fc = ${fc(a.lg.fc)}, phase margin ${pm(a.lg.pm)}, |λ|max = ${r.rho.toFixed(3)} (< 1: stable). Overshoot ${os}: a faster loop has less phase to spare — the sampling delay${p.kind === 'boost' ? ' and the right-half-plane zero eat' : ' eats'} phase near the crossover, so the step response rings before it settles.${b.lg.pm !== null && a.lg.pm !== null && Math.abs(b.lg.pm - a.lg.pm) > 5 ? ` After the step (Vref = ${formatV(b.vref, false)}) the margin is ${pm(b.lg.pm)}.` : ''}`
+}
+
 export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, ControlRun, ControlMeasurements, ControlState>> {
   const ls: Array<Lesson<ControlParams, ControlRun, ControlMeasurements, ControlState>> = [
     {
@@ -312,7 +341,7 @@ export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, Con
         question: 'Pushing the loop’s crossover frequency too high mainly…',
         options: ['reduces the phase margin: overshoot and ringing', 'removes every overshoot', 'changes the final output voltage'],
         answer: 0,
-        explain: 'At higher frequency the sampling delay (and, in the boost, the right-half-plane zero) takes more phase, so the margin shrinks and the step response rings. The final value is still set by the integrator.',
+        explain: 'At higher frequency the sampling delay (and, in the boost, the right-half-plane zero) takes more phase, so the margin shrinks and the step response rings. The final value is still set by the integrator — as long as the loop stays stable at every operating point it visits: a boost’s gain grows with its duty, so a fast loop tuned at one output voltage can go unstable at a higher one.',
       },
       base: { loadStep: 'off' },
       steps: [
@@ -330,8 +359,8 @@ export function controlLessons(kind: PlantKind): Array<Lesson<ControlParams, Con
           at: (r) => r.params.tref + 3 * r.params.ts,
           window: (r) => [Math.max(0, r.params.tref - 0.3e-3), r.params.duration],
           channels: ['vout', 'vref', 'vmodel', 'duty'],
-          look: 'A faster loop — less phase margin — overshoots.',
-          body: (_st, m, r) => `Now fc = ${r.loop.fc ? formatSI(r.loop.fc, 'Hz') : '—'}, phase margin ${r.loop.pm?.toFixed(0) ?? '—'}°, |λ|max = ${r.rho.toFixed(3)}. Overshoot ${m.overshoot !== null ? `${(m.overshoot * 100).toFixed(1)} %` : '—'}: a faster loop has less phase to spare — the sampling delay${kind === 'boost' ? ' and the right-half-plane zero eat' : ' eats'} phase at high frequency. The Bode margins are linearised at the starting point; after the reference step the operating point moves, so the exact test is |λ|max (< 1: stable).`,
+          look: kind === 'boost' ? 'Watch Vout after the reference step: it never settles — the badge says UNSTABLE.' : 'A faster loop — less phase margin — overshoots and rings, then settles.',
+          body: (_st, m, r) => gainStepText(r, m),
         },
       ],
     },

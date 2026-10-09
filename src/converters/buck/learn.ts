@@ -5,6 +5,7 @@ import type { BuckMeasurements } from './measure.ts'
 import { buckBoundary } from './theory.ts'
 import type { BuckState } from './explain.ts'
 import { voltSecondFromSim } from './explain.ts'
+import { rippleNote } from '../dcdc/explain.ts'
 
 /**
  * Buck learning content: lessons, experiments and prediction tasks. All text that states a value
@@ -198,8 +199,8 @@ export const BUCK_EXPERIMENTS: Experiment[] = [
       return q < 0.375 ? 0 : q < 0.75 ? 1 : 2
     },
     rows: ['voutPP', 'voutAvg', 'ilPP', 'icRms'],
-    why: (b, a) =>
-      `ΔVout went from ${formatSI(b.voutPP, 'V')} to ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). The capacitor still absorbs the same ripple current (ΔiL ${formatA(b.ilPP)} → ${formatA(a.ilPP)}), but a 4× larger C changes its voltage 4× less for the same charge (dv = i·dt/C). The average Vout does not depend on C: ${formatV(b.voutAvg)} → ${formatV(a.voutAvg)}.`,
+    why: (b, a, p0) =>
+      `ΔVout went from ${formatSI(b.voutPP, 'V')} to ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). The capacitor still absorbs the same ripple current (ΔiL ${formatA(b.ilPP)} → ${formatA(a.ilPP)}), but a 4× larger C changes its voltage 4× less for the same charge (dv = i·dt/C).${rippleNote('buck', p0.esr, b)} The average Vout does not depend on C: ${formatV(b.voutAvg)} → ${formatV(a.voutAvg)}.`,
   },
   {
     id: 'frequency',
@@ -212,8 +213,12 @@ export const BUCK_EXPERIMENTS: Experiment[] = [
       return q < 0.75 ? 0 : q > 1.33 ? 1 : 2
     },
     rows: ['ilPP', 'voutPP', 'voutAvg', 'mode'],
-    why: (b, a) =>
-      `ΔiL: ${formatA(b.ilPP)} → ${formatA(a.ilPP)} (×${ratio(a.ilPP, b.ilPP).toFixed(3)}); ΔVout: ${formatSI(b.voutPP, 'V')} → ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). Each ON and OFF interval is half as long, so the inductor current ramps for half the time. The output ripple falls even more, because the capacitor also has half the time to charge with a smaller ripple current. D (and so Vout) is unchanged.`,
+    why: (b, a, p0) =>
+      `ΔiL: ${formatA(b.ilPP)} → ${formatA(a.ilPP)} (×${ratio(a.ilPP, b.ilPP).toFixed(3)}); ΔVout: ${formatSI(b.voutPP, 'V')} → ${formatSI(a.voutPP, 'V')} (×${ratio(a.voutPP, b.voutPP).toFixed(3)}). Each ON and OFF interval is half as long, so the inductor current ramps for half the time. ${
+        p0.esr > 0
+          ? `The capacitor's own ripple falls even more (half the time to charge, with a smaller ripple current), but the ESR step ESR·ΔiL only follows ΔiL.${rippleNote('buck', p0.esr, b)}`
+          : 'The output ripple falls even more, because the capacitor also has half the time to charge with a smaller ripple current.'
+      } D (and so Vout) is unchanged.`,
   },
   {
     id: 'dcm',

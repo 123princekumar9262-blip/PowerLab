@@ -90,6 +90,69 @@ function channelValue(c: ChannelMeta, v: number): string {
 }
 
 /**
+ * The instants where a switched quantity can jump, from the simulation itself: the run's switching events
+ * (…-on / …-off — every gate and device edge of the switched-circuit engine) and the piecewise-linear
+ * simulator's edge states (knots: every gate edge and mode change of the motor, core and thermal models).
+ */
+const edgeCache = new WeakMap<Run, number[]>()
+function edgeTimes(r: Run): number[] {
+  let out = edgeCache.get(r)
+  if (!out) {
+    out = []
+    for (const e of r.events) if (/-on$|-off$/.test(e.kind)) out.push(e.time)
+    for (const kn of (r as { knots?: Array<{ t: number }> }).knots ?? []) out.push(kn.t)
+    out.sort((a, b) => a - b)
+    edgeCache.set(r, out)
+  }
+  return out
+}
+/** The first index with xs[i] >= x (xs sorted). */
+function lowerBound(xs: number[], x: number): number {
+  let lo = 0
+  let hi = xs.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (xs[mid] < x) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
+/**
+ * Mean and RMS of a signal over the period ending at sample `end` (the instantaneous value when the run is a
+ * single period) — a time integral with the engine's sample convention: sample i holds the interval
+ * (t[i−1], t[i]] (an edge exactly on a sample shows from the next one). A chopped quantity also jumps BETWEEN
+ * samples: in an interval holding a recorded edge the old value counts up to the edge and the new one after it.
+ * (A plain sum of the samples counted each jump to a whole sample, or half: a few % off at 16–40 samples per
+ * period, the same in every period because PWM edges repeat at the same place.)
+ */
+export function periodWindow(r: Run, a: Float64Array, end: number): { mean: number; rms: number } {
+  const spp = r.params.periods > 1 ? Math.max(1, Math.round(r.params.period / r.params.dt)) : 1
+  if (spp === 1) return { mean: a[end], rms: Math.abs(a[end]) }
+  const edges = edgeTimes(r)
+  const from = Math.max(0, end - spp)
+  let s = 0
+  let q = 0
+  let j = lowerBound(edges, r.time[from])
+  for (let i = from + 1; i <= end; i++) {
+    const t0 = r.time[i - 1]
+    const t1 = r.time[i]
+    while (j < edges.length && edges[j] <= t0) j++
+    const te = j < edges.length && edges[j] < t1 ? edges[j] : null
+    if (te !== null) {
+      s += a[i - 1] * (te - t0) + a[i] * (t1 - te)
+      q += a[i - 1] * a[i - 1] * (te - t0) + a[i] * a[i] * (t1 - te)
+    } else {
+      // sample i holds the interval (t[i−1], t[i]] — an edge exactly on t[i−1] is already in it
+      s += a[i] * (t1 - t0)
+      q += a[i] * a[i] * (t1 - t0)
+    }
+  }
+  const span = r.time[end] - r.time[from]
+  return { mean: s / span, rms: Math.sqrt(q / span) }
+}
+
+/**
  * A run that settles rather than repeats (a motor start-up, a 0–100 run, a saturating core): past its last
  * event, what happens next is how the main waveforms move until the run ends — read from the simulated
  * samples (averaged over one switching period when the run spans many), never extrapolated beyond it.
@@ -98,18 +161,7 @@ export function towardRunEnd(topic: AnyTopic, r: Run, k: number): NextConsequenc
   const last = r.length - 1
   if (k >= last - 1) return { text: `This is the end of the simulated run (t = ${formatTime(r.time[last])}): nothing later is computed. Move the cursor back to replay it.`, time: null }
   const spp = r.params.periods > 1 ? Math.max(1, Math.round(r.params.period / r.params.dt)) : 1
-  // over the period ending at a sample: the mean, or the RMS for an alternating quantity (its mean is ~0)
-  const window = (a: Float64Array, end: number) => {
-    const from = Math.max(0, end - spp + 1)
-    let s = 0
-    let q = 0
-    for (let i = from; i <= end; i++) {
-      s += a[i]
-      q += a[i] * a[i]
-    }
-    const n = end - from + 1
-    return { mean: s / n, rms: Math.sqrt(q / n) }
-  }
+  const window = (a: Float64Array, end: number) => periodWindow(r, a, end)
   const parts: string[] = []
   for (const id of topic.defaultChannels) {
     const c = topic.channels[id]

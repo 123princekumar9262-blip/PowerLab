@@ -72,9 +72,14 @@ Status words:
 **Waveforms**
 - Every scope lane is titled with its quantity and unit ("Speed [rpm]"). Lanes whose unit is not V/A/W/J used to have no unit at all.
 
-## Known limitations (not changed)
+## Fixed in Phase 7 (educational accuracy)
 
-- Some what-if/why texts in DC-DC still quote ideal ripple ratios when ESR dominates.
-- The SVPWM "dwell times" lesson step lands where T2 = 0.
-- The trend shown after the last event averages switched samples (a few % on chopped voltages).
-- The control lesson "Too much gain" blames the sampling delay; the real cause is the operating point moving after the reference step.
+- **DC-DC ripple with ESR.** Texts that changed C or fs claimed ideal ripple scaling ("ripple ∝ 1/C", "falls even more") for every parameter set. With ESR the output ripple has a part, the step ESR·ΔiC, that no capacitance changes. The texts now name that part, estimated from the simulated currents (ESR·ΔiL for the buck, ESR·iL,max for boost/buck-boost; within 5 % of the simulated ripple when ESR dominates). They say "dominates" only when it exceeds half the simulated ripple, and keep the ideal statements without ESR (`rippleNote`, `tests/ripple-text.test.ts`).
+- **SVPWM dwell-time lesson step.** It landed in the first switching period, whose reference is sampled at exactly 0°: T2 = sin 0 = 0, a true boundary but the wrong example. It now lands in the period sampled nearest 30° (T1, T2, T0 all non-zero). Wherever dwell times are shown, a boundary (T1 = 0 or T2 = 0) is explained: the reference lies exactly on an active vector. The angle shown is the sampled one (`svDwellText`, `svMidSectorTime`, `tests/svpwm-dwell.test.ts`).
+- **Control "Too much gain".** For the boost the loop is stable at the start (24 V: fc 399 Hz, PM 80°, |λ|max 0.977) and unstable after the reference step (28 V, same gains: fc 718 Hz, PM −42°, |λ|max 1.0005). The higher duty raises the boost's gain and lowers its RHP zero. The text now gives that cause, from the model at both operating points, and agrees with the UNSTABLE badge and the never-settling plot. For the buck (stable, low margin) it explains overshoot and ringing (`gainStepText`, `tests/control-lesson.test.ts`).
+- **End-of-run trend on chopped voltages.** The period average summed the samples, counting each PWM edge to a whole sample (or half). That was 1–4 % off (13.71 V for an exact 14.4 V) and the same every period. The average now follows the engine's sample convention (sample i holds (t[i−1], t[i]]) and places edges between samples at the simulator's recorded edge times. It agrees with the motor model's exact mean voltage within 0.2 % (`periodWindow`, `tests/trend-average.test.ts`). The simulation is unchanged.
+
+## Known limitations
+
+- The model limits in the capability matrix above (no hysteresis or core loss, constant MOSFET capacitances, the EV's constant-efficiency drivetrain, no back-EMF load in the Rectifier Lab, a Bode plot at the starting operating point…).
+- Lesson checks are one question per lesson, conceptual. Only those that state a measurable result are confirmed by the simulation.

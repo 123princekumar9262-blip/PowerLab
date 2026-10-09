@@ -97,6 +97,28 @@ export function invStateAt(r: InverterRun, k: number): InvState {
 
 const fmtDeg = (d: number) => `${d.toFixed(1)}°`
 
+/**
+ * The cursor time in the middle of the switching period whose sampled reference angle is nearest 30° (the
+ * middle of sector 1): there T1, T2 and T0 are all non-zero.
+ */
+export function svMidSectorTime(p: { period: number; tc: number }): number {
+  const j = Math.max(0, Math.round(p.period / 12 / p.tc))
+  return (j + 0.5) * p.tc
+}
+
+/**
+ * The dwell times in words. On a sector boundary (the sampled reference exactly on an active vector) one of
+ * T1, T2 is zero: that vector alone (with the zero vectors) synthesises the reference — said, not hidden.
+ */
+export function svDwellText(sv: { sector: number; t1: number; t2: number; t0: number }): string {
+  const ts = sv.t1 + sv.t2 + sv.t0
+  const tiny = 1e-9 * ts
+  const base = `In this switching period T1 = ${formatTime(sv.t1)} (vector V${sv.sector + 1}), T2 = ${formatTime(sv.t2)} (vector V${((sv.sector + 1) % 6) + 1}), T0 = ${formatTime(sv.t0)} split between 000 and 111.`
+  if (sv.t2 <= tiny) return `${base} T2 = 0: the sampled reference lies exactly on V${sv.sector + 1} (0° into the sector), so that vector and the zero vectors alone build it.`
+  if (sv.t1 <= tiny) return `${base} T1 = 0: the sampled reference lies exactly on V${((sv.sector + 1) % 6) + 1}, so that vector and the zero vectors alone build it.`
+  return base
+}
+
 export function invView(st: InvState, r: InverterRun): StateView {
   const p = r.params
   const diode = st.legs.find((l) => l.kind === 'diode')
@@ -194,7 +216,7 @@ export function invWhy(r: InverterRun, st: InvState, m: InverterMeasurements): W
     cards.push({
       id: 'sv',
       question: `Which vectors are applied now (sector ${s.sector + 1})?`,
-      what: `The reference vector is at ${fmtDeg((s.sector * 60) + (s.thetaK * 180) / Math.PI)}, inside sector ${s.sector + 1}. In this switching period: T1 = ${formatTime(s.t1)}, T2 = ${formatTime(s.t2)}, T0 = ${formatTime(s.t0)}.`,
+      what: `The reference vector, sampled at the start of this switching period, is at ${fmtDeg((s.sector * 60) + (s.thetaK * 180) / Math.PI)}, inside sector ${s.sector + 1}. ${svDwellText(s)}`,
       why: 'The inverter can only produce 6 active vectors and 2 zero vectors. Averaged over one switching period, the two vectors next to the reference plus the zero vectors reproduce it exactly (volt-second balance).',
       equation: 'T1 = √3·Ts·|Vref|/Vdc·sin(60° − θ),  T2 = √3·Ts·|Vref|/Vdc·sin θ,  T0 = Ts − T1 − T2',
       physics: `The largest vector the hexagon can hold in every direction has length Vdc/√3: m up to 2/√3 = 1.155, 15.5 % more than sine-triangle PWM (m = ${p.m.toFixed(3)} here).`,
@@ -448,11 +470,13 @@ export function invLessons(kind: InvKind): Array<Lesson<InverterParams, Inverter
         },
         {
           title: 'Dwell times from volt-second balance',
-          at: (r) => r.params.period * (20 / 360),
+          // the reference is sampled once per switching period: land in the period whose sample is nearest the
+          // middle of sector 1 (30°), where both adjacent vectors are used (at 0° or 60° one dwell time is zero)
+          at: (r) => svMidSectorTime(r.params),
           window: (r) => [0, r.params.period / 6],
           channels: ['vaN', 'vbN', 'vcN'],
           look: 'In each switching period: 000 → V1 → V2 → 111 → V2 → V1 → 000.',
-          body: (st) => (st.sv ? `In this switching period T1 = ${formatTime(st.sv.t1)} (first adjacent vector), T2 = ${formatTime(st.sv.t2)} (second), T0 = ${formatTime(st.sv.t0)} split between 000 and 111. Their time-weighted average equals the reference vector.` : ''),
+          body: (st) => (st.sv ? `${svDwellText(st.sv)} Their time-weighted average equals the reference vector, sampled at ${fmtDeg((st.sv.sector * 60) + (st.sv.thetaK * 180) / Math.PI)} at the start of this switching period.` : ''),
         },
         {
           title: 'The zero-sequence: why SVPWM reaches further',

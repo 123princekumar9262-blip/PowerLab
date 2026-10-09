@@ -44,7 +44,7 @@ from a time-domain simulation of the circuit. Nothing is a pre-drawn "expected" 
 
 Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
-**Tests.** 1039 unit tests pass (what each lab models and how it is validated: `docs/LAB-CAPABILITIES.md`):
+**Tests.** 1065 unit tests pass (what each lab models and how it is validated: `docs/LAB-CAPABILITIES.md`):
 
 | Area | Tests |
 |---|---|
@@ -66,10 +66,11 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Exact DC-DC solution bit-identical to its snapshot; `expm` and gate-schedule edges bit-identical to the originals | 37 |
 | "What happens next" is never empty: the next event (an edge on the cursor's sample included), the next cycle, or the trend to the end of the run | 17 |
 | Every topic-lab lesson ends with a check question; the checks that state a result agree with the simulation | 34 |
+| Educational accuracy: DC-DC ripple with ESR, SVPWM dwell boundary, Control "Too much gain" cause, end-of-run period averages | 26 |
 | Every Experiment in the topic labs: a real change, a verdict from the two simulations | 57 |
 | WHY and events stay true away from the defaults (dead time, saturation, steps, peaks, Reverse) | 7 |
 
-**Browser smoke suites.** Ten suites pass (679 checks):
+**Browser smoke suites.** Ten suites pass (691 checks):
 
 | Suite | Checks |
 |---|---|
@@ -79,7 +80,7 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Controlled / compare | 36 |
 | DC-DC | 71 |
 | PWM / inverters | 33 |
-| Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence, Predict cover, lesson checks) | 130 |
+| Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence, Predict cover, lesson checks) | 142 |
 | Shell (Home and how it works, Labs, routes, redirects, Continue, workspace guide, level, search, Back, 390 px) | 85 |
 | Workspace shell (Buck at 1440/1024/820/768/390/375: regions, WHY + Explore, drawers, sheets, sync, Focus, levels) | 109 |
 | Rectifier workspace (six widths, entry points, WHY questions, Explore, Change circuit, levels, Focus, sheets, Compare) | 87 |

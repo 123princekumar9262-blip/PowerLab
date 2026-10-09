@@ -147,11 +147,15 @@ for (const M of MODULES) {
   await page.waitForTimeout(500)
   check(((await page.locator('.lesson-text').innerText()) ?? '').length > 40 && !/NaN|undefined/.test(await page.locator('.lesson-text').innerText()), `${M.tab}: lesson "${M.lesson}" starts with text from the simulation`)
   // the last step asks a check question; one answer, then the right option and why
+  // (only on the last step: the earlier steps show none)
+  check((await page.locator('.lesson-check').count()) === 0, `${M.tab}: no check question before the last step`)
   for (let i = 0; i < 8 && (await page.getByRole('button', { name: 'Next →' }).count()); i++) {
     await page.getByRole('button', { name: 'Next →' }).click()
     await page.waitForTimeout(250)
   }
   check(await page.locator('.lesson-check').isVisible(), `${M.tab}: the lesson ends with a check question`)
+  // nothing gives the answer away before a pick: no verdict, no option marked right
+  check((await page.locator('.lesson-check .exp-verdict').count()) === 0 && (await page.locator('.lesson-check .choice--right').count()) === 0, `${M.tab}: the check reveals nothing before an answer`)
   await page.locator('.lesson-check .choice').first().click()
   check(/Right\.|Not quite/.test(await page.locator('.lesson-check .exp-verdict').innerText()) && (await page.locator('.lesson-check .choice[disabled]').count()) === 3, `${M.tab}: the check is answered once and explained`)
   await page.getByRole('button', { name: '← Lessons' }).click()

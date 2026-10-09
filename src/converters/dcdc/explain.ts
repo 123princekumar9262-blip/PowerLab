@@ -142,10 +142,30 @@ export const CCM_LAW: Record<ConverterKind, string> = {
 }
 
 /**
+ * The ESR part of the output ripple: the jump of the capacitor current times the ESR. In a buck the capacitor
+ * current swings by ΔiL; in a boost or buck-boost it steps by the diode current (≈ iL,max) when the diode turns
+ * on. An estimate from the simulated currents (the two parts do not simply add), 0 without ESR.
+ */
+export function esrRipple(kind: ConverterKind, esr: number, m: { ilPP: number; ilMax: number }): number {
+  return esr * (kind === 'buck' ? m.ilPP : m.ilMax)
+}
+
+/**
+ * What a change of C (or of fs) does to the output ripple, in words that hold for the simulated parameters:
+ * without ESR the ripple is the capacitor's own (∝ 1/C); with ESR the step ESR·ΔiC does not depend on C at all.
+ */
+export function rippleNote(kind: ConverterKind, esr: number, m: { ilPP: number; ilMax: number; voutPP: number }): string {
+  if (!(esr > 0)) return ''
+  const part = esrRipple(kind, esr, m)
+  const share = part / Math.max(m.voutPP, 1e-12)
+  return ` With ESR = ${formatSI(esr, 'Ω')}, part of the ripple is the step ESR·ΔiC ≈ ${formatSI(part, 'V')} (of ${formatSI(m.voutPP, 'V')} peak-to-peak), which no capacitance changes${share > 0.5 ? ' — here it dominates, so a larger C reduces the ripple only a little' : ''}.`
+}
+
+/**
  * WHY cards for the state at the cursor: What → Why → Equation → Physics → What-if. `ripple` holds
  * the simulated ripples (from the measurements) used by the what-if lines.
  */
-export function dcdcWhy(r: ConverterResult, st: DcdcState, ripple: { ilPP: number; voutPP: number }): WhyCard[] {
+export function dcdcWhy(r: ConverterResult, st: DcdcState, ripple: { ilPP: number; voutPP: number; ilMax?: number }): WhyCard[] {
   const p = r.params
   const kind = st.kind
   const cards: WhyCard[] = []
@@ -269,7 +289,10 @@ export function dcdcWhy(r: ConverterResult, st: DcdcState, ripple: { ilPP: numbe
           : `The load takes more current than the converter delivers: the capacitor supplies the difference, iC = ${formatA(st.ic, true)}.`,
     equation: `C·dvC/dt = iC = ${feeds} − iR  ⇒  dvC/dt = ${formatA(st.ic, true)} / ${formatSI(p.c, 'F')} = ${formatSlopeV(st.dvcdt)}`,
     physics: 'The capacitor absorbs the AC part of the current delivered to the output, so the load sees an almost constant voltage. That small up-and-down is the output ripple.',
-    whatIf: `Ripple ∝ 1/C: doubling C would roughly halve the output ripple (now ${formatSI(ripple.voutPP, 'V')} peak-to-peak).`,
+    whatIf:
+      p.esr > 0
+        ? `Doubling C would halve only the capacitor's own part of the output ripple (now ${formatSI(ripple.voutPP, 'V')} peak-to-peak).${rippleNote(kind, p.esr, { ilPP: ripple.ilPP, ilMax: ripple.ilMax ?? ripple.ilPP, voutPP: ripple.voutPP })}`
+        : `Ripple ∝ 1/C (no ESR): doubling C would roughly halve the output ripple (now ${formatSI(ripple.voutPP, 'V')} peak-to-peak).`,
   })
 
   // 4. The gate.
