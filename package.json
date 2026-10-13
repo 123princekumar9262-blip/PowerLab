@@ -2,11 +2,15 @@
   "name": "rectifier-lab",
   "private": true,
   "version": "0.1.0",
-  "description": "Interactive power electronics rectifier lab: a simulation-driven virtual laboratory.",
+  "description": "Power Electronics Lab: interactive simulations of power-electronic circuits and systems for learning.",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/check-bundle-secrets.mjs",
+    "check-secrets": "node scripts/check-bundle-secrets.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,16 +24,29 @@
     "smoke-modules": "node scripts/smoke-modules.mjs",
     "smoke-shell": "node scripts/smoke-shell.mjs",
     "smoke-workspace": "node scripts/smoke-workspace.mjs",
-    "smoke-rectifier-shell": "node scripts/smoke-rectifier-shell.mjs"
+    "smoke-rectifier-shell": "node scripts/smoke-rectifier-shell.mjs",
+    "smoke-machines": "node scripts/smoke-machines.mjs",
+    "smoke-parts": "node scripts/smoke-parts.mjs",
+    "smoke-tutor": "node scripts/smoke-tutor.mjs",
+    "smoke-powersys": "node scripts/smoke-powersys.mjs",
+    "smoke-powersys-three-phase": "node scripts/smoke-powersys-three-phase.mjs",
+    "smoke-powersys-per-unit": "node scripts/smoke-powersys-per-unit.mjs",
+    "smoke-powersys-faults": "node scripts/smoke-powersys-faults.mjs",
+    "smoke-powersys-load-flow": "node scripts/smoke-powersys-load-flow.mjs",
+    "smoke-powersys-stability": "node scripts/smoke-powersys-stability.mjs"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.0",
     "playwright": "^1.62.1",
     "typescript": "~6.0.2",

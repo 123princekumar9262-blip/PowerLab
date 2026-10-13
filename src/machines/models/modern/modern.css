@@ -1,0 +1,37 @@
+/* Modern motors (BLDC, PMSM, SRM, stepper, servo): in-scene chips and mini charts. The 3D canvas is always dark. */
+.mxm-chip {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(160, 175, 195, 0.45);
+  background: rgba(11, 15, 20, 0.86);
+  color: #e8ecf2;
+  font: 600 11.5px/1.35 var(--font-ui, system-ui, sans-serif);
+  white-space: nowrap;
+  text-align: left;
+}
+.mxm-chip b {
+  font-weight: 700;
+}
+.mxm-chip .mxm-dim {
+  color: #9aa6b6;
+  font-weight: 500;
+}
+.mxm-chip .mxm-a {
+  color: #ee86ac;
+}
+.mxm-chip .mxm-b {
+  color: #f0b44a;
+}
+.mxm-chip .mxm-c {
+  color: #7fb2f2;
+}
+.mxm-chip .mxm-on {
+  color: #5fe0b0;
+}
+.mxm-chart {
+  display: block;
+}
+.mxm-chart text {
+  font: 600 9.5px var(--font-ui, system-ui, sans-serif);
+  fill: #c7d0dc;
+}

@@ -1,0 +1,136 @@
+/* Wound-field DC machines: screen-fixed insets over the 3D view (always on the dark viewport background). */
+.dcm-inset {
+  margin: 0;
+  padding: 6px 8px 4px;
+  border: 1px solid rgba(160, 175, 195, 0.35);
+  border-radius: 8px;
+  background: rgba(11, 15, 20, 0.86);
+  color: #dfe6ef;
+  font: 500 11px/1.3 var(--font-ui, system-ui, sans-serif);
+  pointer-events: none;
+}
+.dcm-inset figcaption {
+  margin: 0 0 2px;
+  font-weight: 600;
+  color: #e8edf4;
+}
+.dcm-inset--conn {
+  width: 260px;
+  transform: translateY(-100%);
+}
+.dcm-inset--emf {
+  width: 250px;
+  transform: translateX(-100%);
+}
+.dcm-inset svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dcm-wire {
+  fill: none;
+  stroke: #8f9aab;
+  stroke-width: 1.6;
+}
+.dcm-sym {
+  fill: none;
+  stroke: #dfe6ef;
+  stroke-width: 1.6;
+}
+.dcm-thick {
+  stroke-width: 3;
+}
+.dcm-brush {
+  fill: #9aa4b2;
+}
+.dcm-coil {
+  fill: none;
+  stroke: #d08a45;
+  stroke-width: 1.8;
+}
+.dcm-coil--heavy {
+  stroke: #f0a35e;
+  stroke-width: 3.6;
+}
+.dcm-flow {
+  fill: none;
+  stroke: #2fc28d;
+  stroke-width: 2.6;
+  stroke-dasharray: 5 5;
+}
+.dcm-pm {
+  fill: none;
+  stroke: #fab219;
+  stroke-width: 1.8;
+}
+.dcm-pm-head {
+  fill: #fab219;
+}
+.dcm-t {
+  fill: #dfe6ef;
+  font-size: 10.5px;
+}
+.dcm-b {
+  font-size: 11px;
+  font-weight: 700;
+}
+.dcm-s {
+  font-size: 9px;
+  fill: #b7c1ce;
+}
+.dcm-cur {
+  fill: #5fe0b0;
+  font-weight: 700;
+}
+.dcm-axis {
+  stroke: #6b7686;
+  stroke-width: 1;
+}
+.dcm-coilemf {
+  fill: none;
+  stroke: #d55181;
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+}
+.dcm-brushv {
+  fill: none;
+  stroke: #ee86ac;
+  stroke-width: 2.2;
+}
+.dcm-allv {
+  fill: none;
+  stroke: #e8ecf2;
+  stroke-width: 1.4;
+}
+.dcm-cursor {
+  stroke: #fab219;
+  stroke-width: 1.4;
+}
+.dcm-key {
+  margin: 2px 0 0;
+  font-size: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+.dcm-k1 {
+  color: #d55181;
+}
+.dcm-k2 {
+  color: #ee86ac;
+}
+.dcm-k3 {
+  color: #e8ecf2;
+}
+@media (max-width: 700px) {
+  .dcm-key {
+    display: none;
+  }
+}
+.dcm-stud {
+  display: inline-block;
+  font: 700 10px/1 var(--font-ui, system-ui, sans-serif);
+  color: #f3e3b0;
+  text-shadow: 0 0 3px #000, 0 0 5px #000;
+  white-space: nowrap;
+}
