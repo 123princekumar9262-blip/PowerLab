@@ -1,0 +1,129 @@
+/* Module 1 — Power Grid Explorer: the physical view's objects and the module's panels. */
+
+.ps-phys .ps-struct path,
+.ps-phys path.ps-struct {
+  fill: none;
+  stroke: #6f7b8c;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.ps-phys .ps-struct-thin {
+  stroke-width: 1 !important;
+  opacity: 0.7;
+}
+.ps-phys .ps-insulator {
+  stroke: #c9d2de !important;
+  stroke-width: 2.5 !important;
+}
+.ps-phys .ps-wire--thin {
+  stroke-width: 1.6;
+}
+.ps-phys .ps-tank {
+  fill: #2b3442;
+  stroke: #586477;
+  stroke-width: 1.4;
+}
+.ps-phys .ps-fin {
+  stroke: #3d4757;
+  stroke-width: 2.5;
+}
+.ps-phys .ps-bushing {
+  fill: none;
+  stroke: #c9d2de;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.ps-phys .ps-building {
+  fill: #1f2732;
+  stroke: #4a5566;
+  stroke-width: 1.4;
+}
+.ps-phys .ps-building-band {
+  fill: #2c3644;
+}
+.ps-phys .ps-roof {
+  fill: #2a3240;
+  stroke: #586477;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.ps-phys .ps-window {
+  fill: #121820;
+}
+.ps-phys .ps-window--lit {
+  fill: #e8c46a;
+}
+.ps-phys .is-dead .ps-window--lit {
+  fill: #121820;
+}
+.ps-phys .ps-fence {
+  fill: none;
+  stroke: #4a5566;
+  stroke-dasharray: 3 3;
+}
+.ps-phys .ps-ground {
+  stroke: #2a3441;
+  stroke-width: 1.5;
+}
+.ps-phys .ps-zone-bar {
+  fill: var(--lv);
+}
+.ps-phys .ps-zone-title {
+  font: 650 11.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-phys .ps-zone-value {
+  font: 500 11px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-phys .ps-el.is-selected .ps-building,
+.ps-phys .ps-el.is-selected .ps-tank {
+  stroke: var(--ps-sel);
+}
+.ps-phys .ps-el[role='button']:hover .ps-building,
+.ps-phys .ps-el[role='button']:hover .ps-tank {
+  stroke: #8e9bb0;
+}
+.ps-phys .ps-el:focus-visible .ps-building,
+.ps-phys .ps-el:focus-visible .ps-tank {
+  stroke: var(--accent);
+}
+
+/* explore */
+.ps-inspector {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 10px;
+}
+.ps-inspector h3 {
+  margin: 0;
+}
+.ps-inspector .ps-readouts {
+  grid-template-columns: 1fr 1fr;
+}
+.ps-inspector .ps-readout dd {
+  font-size: 15px;
+}
+.ps-what {
+  color: var(--text-1) !important;
+}
+.ps-cb-state {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.ps-breakers {
+  margin-top: 14px;
+}
+.ps-cb.is-open {
+  border-color: var(--warning);
+  color: var(--text-1);
+}
+
+.ps-practise {
+  max-width: 860px;
+}
+.ps-tour {
+  max-width: 920px;
+}

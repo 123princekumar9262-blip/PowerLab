@@ -1,0 +1,189 @@
+/* Module 7 — Engineer's Challenge */
+
+.ps-ch-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+}
+.ps-ch-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.ps-ch-card:hover {
+  border-color: var(--border-strong);
+}
+.ps-ch-card.on {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.ps-ch-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ps-ch-n {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-ch-card.is-solved .ps-ch-n {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.ps-ch-level {
+  font-size: var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+.ps-ch-title {
+  color: var(--text-1);
+  font-weight: 600;
+  font-size: var(--fs-body);
+}
+.ps-ch-line {
+  font-size: var(--fs-ui);
+}
+.ps-ch-uses {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ps-ch-brief {
+  max-width: 920px;
+}
+.ps-ch-brief h3 {
+  font-size: 18px;
+}
+.ps-ch-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 24px;
+}
+.ps-ch-controls .ps-slider + .ps-slider {
+  margin-top: 0;
+}
+.ps-ch-switch,
+.ps-ch-choice {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.ps-ch-eyebrow {
+  margin: 0 0 6px;
+}
+.ps-ch-verdict {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.ps-ch-verdict h3 {
+  margin: 0;
+}
+.ps-ch-objectives {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.ps-ch-objectives li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--text-2);
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+}
+.ps-ch-objectives li.is-ok .ps-ch-mark {
+  color: var(--good);
+}
+.ps-ch-objectives li.is-bad .ps-ch-mark {
+  color: var(--critical);
+}
+.ps-ch-mark {
+  flex: none;
+  width: 16px;
+  font-weight: 700;
+}
+.ps-ch-detail {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.ps-ch-debrief,
+.ps-ch-hints {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.ps-ch-debrief p,
+.ps-ch-hint {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.55;
+  font-size: var(--fs-ui);
+}
+.ps-ch-hint .eyebrow {
+  display: inline;
+  margin-right: 4px;
+}
+
+/* the method */
+.ps-ch-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.ps-ch-steps li {
+  display: flex;
+  gap: 12px;
+  margin: 0 !important;
+}
+.ps-ch-steps h3 {
+  margin: 0 0 4px;
+}
+.ps-ch-link {
+  font-size: var(--fs-ui);
+}
+.ps-ch-cell {
+  font-family: var(--font-ui) !important;
+  text-align: left !important;
+}
+@media (max-width: 1000px) {
+  .ps-ch-steps {
+    grid-template-columns: 1fr;
+  }
+  .ps-ch-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ps-ch-measure .ps-readouts {
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+}
+
+.ps-ch-plot {
+  max-width: 820px;
+}

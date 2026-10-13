@@ -1,0 +1,43 @@
+import type { PsModuleMeta } from '../../types.ts'
+
+export const meta: PsModuleMeta = {
+  id: 'load-flow',
+  n: 5,
+  title: 'Load Flow & Bus Analysis',
+  short: 'Load Flow',
+  line: 'The bus admittance matrix and Newton–Raphson load flow, iteration by iteration',
+  group: 'Analysis',
+  status: 'ready',
+  learn: [
+    'what a load flow solves, and what is known and unknown at slack, PV and PQ buses',
+    'how Y_bus is assembled from line data, one branch at a time',
+    'how Newton–Raphson corrects the voltages with the Jacobian, and why it converges so much faster than Gauss–Seidel',
+    'how loading, generator reactive limits, shunt capacitors and line outages change the operating point — up to the maximum loadability',
+  ],
+  modes: ['learn', 'explore', 'experiment', 'verify', 'practise'],
+  activities: [
+    { id: 'tour', title: 'Follow a load flow from question to answer', mode: 'learn' },
+    { id: 'ybus', title: 'Build a Y_bus one branch at a time', mode: 'explore' },
+    { id: 'iterate', title: 'Step Newton–Raphson to convergence', mode: 'explore' },
+    { id: 'experiments', title: 'Run three load-flow experiments', mode: 'experiment' },
+    { id: 'verify', title: 'Check the load flow by hand', mode: 'verify' },
+    { id: 'practice', title: 'Answer the practice questions', mode: 'practise' },
+  ],
+  keywords: [
+    'load flow',
+    'power flow',
+    'newton raphson',
+    'gauss seidel',
+    'ybus',
+    'bus admittance',
+    'slack bus',
+    'pv bus',
+    'pq bus',
+    'jacobian',
+    'convergence',
+    'reactive limit',
+    'voltage collapse',
+    'nose curve',
+    'n-1',
+  ],
+}

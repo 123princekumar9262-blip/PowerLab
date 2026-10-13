@@ -1,0 +1,261 @@
+/* Module 3 — Per-Unit System: the zone/impedance diagram and the module's panels (prefix ps-pu-). */
+
+/* ── the diagram ─────────────────────────────────────────────────────────────── */
+.ps-pu-figure {
+  margin: 0;
+}
+.ps-pu-figcap {
+  margin: 2px 8px 4px;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ps-pu-figtitle {
+  margin: 0;
+}
+.ps-pu-dia .ps-pu-band {
+  fill: var(--lv);
+  opacity: 0.055;
+}
+.ps-pu-dia .ps-pu-band-top {
+  fill: var(--lv);
+  opacity: 0.75;
+}
+.ps-pu-dia .ps-pu-zone.is-hl .ps-pu-band,
+.ps-pu-dia .ps-pu-zone.is-ref .ps-pu-band {
+  opacity: 0.13;
+}
+.ps-pu-dia .ps-pu-zone.is-dim .ps-pu-band-top {
+  opacity: 0.3;
+}
+.ps-pu-dia .ps-pu-zone.is-dim text {
+  opacity: 0.55;
+}
+.ps-pu-zone-title {
+  font: 650 12px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-pu-zone-line {
+  font: 500 11px var(--font-mono);
+  fill: var(--text-2);
+}
+.ps-pu-busname {
+  font: 600 11px var(--font-ui);
+  fill: var(--text-3);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+.ps-pu-box {
+  fill: var(--scope-bg);
+  stroke: var(--lv);
+  stroke-width: 2;
+}
+.ps-pu-boxid {
+  font: 650 11px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-pu-ideal {
+  stroke-width: 1.8;
+}
+.ps-pu-val {
+  font: 500 11.5px var(--font-mono);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+.ps-pu-val--muted {
+  fill: var(--text-3);
+}
+.ps-pu-val--tap {
+  fill: var(--warning);
+}
+.ps-pu-arrowhead {
+  fill: var(--lv, var(--text-2));
+}
+.ps-pu-load .ps-pu-arrowhead {
+  fill: var(--lv);
+}
+.ps-pu-el {
+  transition: opacity 0.2s ease;
+}
+.ps-pu-el.is-dim {
+  opacity: 0.3;
+}
+.ps-pu-el.is-ghost {
+  opacity: 0.12;
+}
+.ps-pu-el.is-hl .ps-pu-box {
+  stroke: var(--ps-sel);
+  stroke-width: 2.4;
+}
+.ps-pu-el.is-hl .ps-winding,
+.ps-pu-el.is-hl .ps-wire {
+  filter: brightness(1.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-pu-el {
+    transition: none;
+  }
+}
+
+/* ── panels ──────────────────────────────────────────────────────────────────── */
+.ps-pu-tour {
+  max-width: 980px;
+}
+.ps-pu-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+.ps-pu-actions {
+  margin-top: 12px;
+}
+.ps-pu-inline {
+  font-size: inherit;
+  color: var(--accent);
+}
+.ps-pu-eqline {
+  margin: 12px 0 0 !important;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-2) !important;
+  overflow-wrap: anywhere;
+}
+.ps-pu-bases > * {
+  min-width: 0;
+}
+.ps-pu-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.ps-pu-try {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 !important;
+}
+.ps-pu-try .is-done {
+  color: var(--good);
+}
+.ps-pu-assume-d {
+  margin-top: 8px;
+}
+.ps-pu-assume-d summary {
+  cursor: pointer;
+}
+.ps-pu-assume-d p {
+  margin: 6px 0 0 !important;
+}
+.ps-pu-zones td:first-child {
+  white-space: normal;
+}
+.ps-pu-sw {
+  display: inline-block;
+  vertical-align: middle;
+}
+.ps-pu-more {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.ps-pu-more summary {
+  cursor: pointer;
+  color: var(--text-1);
+  font-size: var(--fs-ui);
+  font-weight: 600;
+}
+.ps-pu-more[open] summary {
+  margin-bottom: 10px;
+}
+.ps-pu-more .ps-eq {
+  margin: 0 0 10px;
+}
+.ps-pu-changed {
+  color: var(--warning) !important;
+}
+.ps-pu-same {
+  color: var(--good) !important;
+}
+.ps-pu-ratios {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+.ps-pu-assume {
+  margin: 8px 0 0;
+}
+.ps-pu-verify .ps-calc {
+  max-width: none;
+}
+.ps-pu-practise {
+  max-width: 860px;
+}
+
+/* ── experiments ─────────────────────────────────────────────────────────────── */
+.ps-pu-exp-list ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-pu-exp-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-pu-exp-item:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ps-pu-exp-item.on {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-pu-exp-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-pu-exp-run {
+  max-width: 1240px;
+}
+@media (max-width: 900px) {
+  .ps-pu-exp-list ol {
+    grid-template-columns: 1fr;
+  }
+}
+.ps-pu-bases > .ps-card + .ps-card {
+  margin-top: 0;
+}
+.ps-pu-tour .ps-readouts {
+  margin: 10px 0 12px;
+  max-width: 640px;
+}

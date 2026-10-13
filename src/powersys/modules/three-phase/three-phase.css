@@ -1,0 +1,290 @@
+/* Module 2 — Three-Phase Power, Phasors & Lines: the module's own drawings and panels. */
+
+.ps-3p-flush {
+  padding: 10px 12px;
+}
+.ps-3p-row {
+  margin-top: 8px;
+}
+.ps-3p-learn .ps-3p-visual {
+  display: grid;
+  gap: 10px;
+}
+.ps-3p-learn .ps-phasors svg {
+  max-width: 380px;
+}
+
+/* rotating phasors */
+.ps-3p-rot {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.ps-3p-rot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ps-3p-grid {
+  stroke: var(--scope-grid);
+  stroke-width: 1;
+}
+.ps-3p-proj {
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+}
+.ps-3p-cursor {
+  stroke: var(--scope-cursor);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+.ps-3p-dot {
+  stroke: var(--scope-bg);
+  stroke-width: 2;
+}
+.ps-3p-rotdir {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+.ps-3p-legend-val {
+  font-family: var(--font-mono);
+  color: var(--text-3);
+  margin-left: 6px;
+  min-width: 64px;
+  display: inline-block;
+}
+.ps-3p-clock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.ps-3p-scrub {
+  flex: 1;
+  display: flex;
+}
+.ps-3p-scrub input {
+  width: 100%;
+}
+.ps-3p-clock-val {
+  font: 12px var(--font-mono);
+  color: var(--text-2);
+  white-space: nowrap;
+  min-width: 170px;
+  text-align: right;
+}
+
+/* sketches */
+.ps-3p-sdgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.ps-3p-sdgrid .ps-phasors svg {
+  max-width: 300px;
+}
+.ps-3p-sketch {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  margin: 6px auto 0;
+}
+.ps-3p-wire {
+  stroke-width: 2;
+  fill: none;
+}
+.ps-3p-z {
+  fill: var(--surface-1);
+  stroke-width: 1.6;
+}
+.ps-3p-node {
+  fill: var(--text-1);
+}
+.ps-3p-sk-label {
+  font: 600 11.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-3p-sk-note {
+  font: 11px var(--font-ui);
+  fill: var(--text-2);
+}
+.ps-3p-sk-val {
+  font: 600 12px var(--font-mono);
+  fill: var(--text-1);
+}
+.ps-3p-sk-in {
+  font: 10px var(--font-mono);
+  fill: var(--text-2);
+}
+.ps-3p-sk-arrow {
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+}
+.ps-3p-sk-head {
+  fill: var(--text-2);
+}
+.ps-3p-sk-line {
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+  fill: none;
+}
+.ps-3p-sk-plate {
+  stroke: var(--text-1);
+  stroke-width: 2.2;
+}
+.ps-3p-sk-box {
+  fill: var(--surface-2);
+  stroke: var(--text-2);
+  stroke-width: 1.4;
+}
+.ps-3p-line {
+  display: block;
+  width: 100%;
+  max-width: 860px;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* power triangle */
+.ps-3p-tri {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 4px auto 0;
+}
+.ps-3p-tri-p {
+  stroke: var(--ps-mv);
+  stroke-width: 2.4;
+}
+.ps-3p-tri-q {
+  stroke: var(--ps-b);
+  stroke-width: 2.4;
+}
+.ps-3p-tri-s {
+  stroke: var(--text-1);
+  stroke-width: 2.4;
+}
+.ps-3p-tri-arc {
+  fill: none;
+  stroke: var(--text-3);
+}
+
+/* line lab */
+.ps-3p-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ps-3p-checks {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-ui);
+  color: var(--text-2);
+}
+.ps-3p-checks li.is-done {
+  color: var(--text-1);
+}
+.ps-3p-checks li.is-done span {
+  color: var(--good);
+}
+.ps-3p .ps-readouts {
+  margin: 0;
+}
+details.ps-card > summary {
+  cursor: pointer;
+}
+details.ps-card[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* experiments, verify */
+.ps-3p-exp-list ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-3p-exp-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-3p-exp-item:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ps-3p-exp-item.on {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-3p-exp-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-3p-exp {
+  max-width: 920px;
+}
+.ps-3p-verify .ps-calc + .ps-calc {
+  margin-top: 0;
+}
+
+@media (max-width: 1100px) {
+  .ps-3p-exp-list ol,
+  .ps-3p-sdgrid {
+    grid-template-columns: 1fr;
+  }
+}
+.ps-3p .ps-slider + p.small {
+  margin-top: 10px;
+}
+.ps-3p .ps-practise {
+  max-width: 860px;
+}
+.ps-3p-cap {
+  margin: 0 0 6px;
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.ps-3p-sketch-text {
+  margin: 8px 4px 2px;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.ps-3p-five .ps-readouts {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}

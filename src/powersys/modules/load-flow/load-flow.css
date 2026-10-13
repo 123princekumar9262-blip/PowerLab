@@ -1,0 +1,556 @@
+/* Module 5 — Load Flow & Bus Analysis (ps-lf- prefix). */
+
+.ps-lf {
+  --ps-lf-line: var(--ps-ehv);
+  --ps-lf-hl: rgba(110, 168, 255, 0.16);
+}
+
+/* ── diagram ───────────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-diagram {
+  display: grid;
+  place-items: center;
+}
+.ps-lf-sld {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+.ps-lf-diagram--learn .ps-lf-sld {
+  max-height: 330px;
+}
+.ps-lf-diagram--saadat .ps-lf-sld {
+  max-height: 380px;
+}
+.ps-lf-diagram--five .ps-lf-sld {
+  max-height: 440px;
+}
+.ps-lf-wire {
+  stroke: var(--ps-lf-line);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.ps-lf-hit {
+  stroke: transparent;
+  stroke-width: 18;
+}
+.ps-lf-line.is-action {
+  cursor: pointer;
+  outline: none;
+}
+.ps-lf-line.is-action:hover .ps-lf-wire {
+  filter: brightness(1.4);
+}
+.ps-lf-line:focus-visible .ps-lf-hit {
+  stroke: rgba(110, 168, 255, 0.3);
+}
+.ps-lf-line.is-out .ps-lf-wire {
+  stroke: var(--ps-dead);
+  stroke-dasharray: 6 6;
+}
+.ps-lf-line.is-pending .ps-lf-wire {
+  stroke: var(--ps-dead);
+  stroke-dasharray: 2 6;
+}
+.ps-lf-line.is-current .ps-lf-hit {
+  stroke: rgba(255, 209, 102, 0.22);
+}
+.ps-lf-line.is-current .ps-lf-wire {
+  stroke: var(--ps-sel);
+  stroke-width: 3.2;
+}
+.ps-lf-flowtri {
+  fill: var(--text-1);
+}
+.ps-lf-arrowhead {
+  fill: var(--text-2);
+}
+.ps-lf-val,
+.ps-lf-tag,
+.ps-lf-vval,
+.ps-lf-busname,
+.ps-lf-type,
+.ps-lf-small {
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.ps-lf-val {
+  font: 500 11.5px var(--font-mono);
+  fill: var(--text-1);
+}
+.ps-lf-val-q {
+  fill: var(--text-3);
+}
+.ps-lf-tag {
+  font: 600 11.5px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-lf-tag.is-out {
+  fill: var(--warning);
+}
+.ps-lf-bar {
+  stroke: var(--text-1);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.ps-lf-bus.is-hl .ps-lf-bar {
+  stroke: var(--accent);
+}
+.ps-lf-bus.is-dim {
+  opacity: 0.35;
+}
+.ps-lf-busname {
+  font: 650 12.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-lf-type {
+  font: 700 10.5px var(--font-ui);
+  letter-spacing: 0.08em;
+  fill: var(--accent);
+}
+.ps-lf-type.is-limited {
+  fill: var(--warning);
+}
+.ps-lf-vval {
+  font: 500 12px var(--font-mono);
+  fill: var(--text-1);
+}
+.ps-lf-small {
+  font: 500 10.5px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-lf-stub {
+  stroke: var(--text-2);
+  stroke-width: 1.8;
+  fill: none;
+}
+.ps-lf-gen circle {
+  fill: var(--scope-bg);
+  stroke: var(--text-2);
+  stroke-width: 1.8;
+}
+.ps-lf-wave {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+}
+
+/* ── explore layout ────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-top {
+  grid-template-columns: minmax(0, 1fr) 330px;
+}
+.ps-lf-side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.ps-lf-side h3 {
+  margin: 0;
+}
+.ps-lf-side .ps-slider + .ps-slider {
+  margin-top: 0;
+}
+.ps-lf-side .ps-readouts {
+  grid-template-columns: 1fr 1fr;
+}
+.ps-lf-side .ps-readout dd {
+  font-size: 15px;
+}
+.ps-lf-linebtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ps-lf-linebtn {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+.ps-lf-linebtn.is-out {
+  border-color: var(--warning);
+  color: var(--text-1);
+}
+.ps-lf-warn {
+  color: var(--warning);
+  margin: 0;
+}
+.ps-lf-casedata {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.ps-lf-casedata .ps-table th,
+.ps-lf-casedata .ps-table td {
+  padding: 4px 5px;
+  font-size: 12px;
+}
+
+/* ── matrices ──────────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-matrix-wrap {
+  position: relative;
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--scope-bg);
+}
+.ps-lf-matrix-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ps-lf-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font: 500 12.5px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  width: auto;
+}
+.ps-lf-matrix th {
+  font: 650 11.5px var(--font-ui);
+  color: var(--text-3);
+  padding: 6px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.ps-lf-matrix tbody th {
+  text-align: left;
+  border-right: 1px solid var(--border);
+}
+.ps-lf-matrix thead th {
+  border-bottom: 1px solid var(--border);
+}
+.ps-lf-corner {
+  font-style: italic;
+}
+.ps-lf-matrix td {
+  padding: 7px 10px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-1);
+  border: 1px solid transparent;
+}
+.ps-lf-matrix td.is-zero {
+  color: var(--text-3);
+  opacity: 0.55;
+}
+.ps-lf-matrix td.is-changed {
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid var(--ps-sel);
+  border-radius: 4px;
+  font-weight: 650;
+}
+.ps-lf-matrix td.is-split,
+.ps-lf-matrix th.is-split {
+  border-left: 1px dashed var(--border-strong);
+}
+.ps-lf-matrix tr.is-split td,
+.ps-lf-matrix tr.is-split th {
+  border-top: 1px dashed var(--border-strong);
+}
+
+/* ── Y_bus builder ─────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.ps-lf-builder .ps-card + .ps-card {
+  margin-top: 0;
+}
+.ps-lf-branches tr.is-waiting td {
+  color: var(--text-3);
+}
+.ps-lf-branches tr.is-current td {
+  background: rgba(255, 209, 102, 0.08);
+}
+.ps-lf-branches tr.is-current td:first-child {
+  box-shadow: inset 3px 0 0 var(--ps-sel);
+}
+.ps-lf-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.ps-lf-nrbar .ps-lf-buttons {
+  margin-top: 0;
+}
+.ps-lf-ycard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.ps-lf-ycard .ps-toolbar {
+  margin-bottom: 0;
+}
+.ps-lf-ycard h3 {
+  margin: 0;
+}
+.ps-lf-explain p {
+  margin: 0 0 6px;
+}
+.ps-lf-steps,
+.ps-lf-list {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  color: var(--text-2);
+  line-height: 1.55;
+  display: grid;
+  gap: 4px;
+}
+.ps-lf-key {
+  margin: 0 !important;
+}
+
+/* ── Newton–Raphson ────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-nrbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+}
+.ps-lf-status {
+  margin: 0 !important;
+  font-size: var(--fs-ui);
+  color: var(--text-1) !important;
+}
+.ps-lf-status.is-done::before {
+  content: '✓ ';
+  color: var(--good);
+}
+.ps-lf-status.is-bad::before {
+  content: '✗ ';
+  color: var(--critical);
+}
+.ps-lf-nrgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.ps-lf-nrgrid .ps-card + .ps-card,
+.ps-lf-gsrow .ps-card + .ps-card {
+  margin-top: 0;
+}
+.ps-lf-nrgrid .ps-table th,
+.ps-lf-nrgrid .ps-table td {
+  padding: 5px 6px;
+}
+.ps-lf-nrgrid .ps-table td.is-unknown {
+  color: var(--text-1);
+  font-weight: 650;
+}
+.ps-lf-nrgrid tr.is-max td {
+  color: var(--text-1);
+}
+.ps-lf-tagmax {
+  display: block;
+  font: 600 10px var(--font-ui);
+  color: var(--warning);
+  letter-spacing: 0.04em;
+}
+.ps-lf-jac summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.ps-lf-jac[open] {
+  display: grid;
+  gap: 10px;
+}
+.ps-lf-jac[open] summary {
+  margin-bottom: 2px;
+}
+.ps-lf-plotrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 12px;
+  align-items: start;
+}
+.ps-lf-history h3 {
+  margin: 0 0 6px;
+}
+.ps-lf-histlist {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  font: 500 12.5px var(--font-mono);
+}
+.ps-lf-histlist li {
+  display: flex;
+  justify-content: space-between;
+}
+.ps-lf-histlist b {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+/* ── Gauss–Seidel, results ─────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-gsrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.ps-lf-gsrow .ps-readouts {
+  grid-template-columns: 1fr 1fr;
+}
+.ps-lf-results .ps-card + .ps-card {
+  margin-top: 0;
+}
+.ps-lf-results .ps-table th,
+.ps-lf-results .ps-table td {
+  padding: 5px 6px;
+}
+.ps-table tr.is-out td {
+  color: var(--text-3);
+}
+.ps-lf-over {
+  color: var(--critical) !important;
+  font-weight: 650;
+}
+
+/* ── learn ─────────────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-tour {
+  max-width: 920px;
+}
+.ps-lf-given {
+  max-width: 520px;
+  margin-top: 6px;
+}
+.ps-lf-given th,
+.ps-lf-given td {
+  font-family: var(--font-ui) !important;
+  text-align: left !important;
+}
+.ps-lf-mini {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin: 8px 0;
+}
+.ps-step-body .ps-lf-matrix-wrap {
+  max-width: 520px;
+  margin: 8px 0;
+}
+
+/* ── experiments ───────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-lf-explist ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-lf-expitem {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-lf-expitem:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ps-lf-expitem.on {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-lf-expn {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-lf-exprun {
+  max-width: 920px;
+}
+.ps-lf-compare {
+  max-width: 920px;
+}
+.ps-lf-noserow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+  align-items: start;
+}
+.ps-lf-practise {
+  max-width: 860px;
+}
+
+@media (max-width: 1180px) {
+  .ps-lf-nrgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ps-lf-explist ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1000px) {
+  .ps-lf-builder,
+  .ps-lf-plotrow,
+  .ps-lf-gsrow,
+  .ps-lf-noserow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* tables with symbols keep their case (j, θ, α must not be upper-cased) */
+.ps-lf .ps-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11.5px;
+}
+.ps-lf-jeq {
+  margin: 0;
+  font: 500 14px var(--font-mono);
+  color: var(--text-1);
+}
+.ps-lf-jform td {
+  font-size: 12.5px;
+}
+.ps-lf-jform td:first-child {
+  font-family: var(--font-mono) !important;
+  white-space: nowrap;
+}
+.ps-lf-jform th,
+.ps-lf-jform td {
+  text-align: left !important;
+}
+.ps-lf-plotcard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .ps-lf-plotcard {
+    grid-template-columns: 1fr;
+  }
+}

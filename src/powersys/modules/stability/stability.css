@@ -1,0 +1,362 @@
+/* Module 6 — Stability & Frequency Control: the power–angle chart, the system diagram and the module's panels. */
+
+.ps-st {
+  --st-pre: var(--ps-c);
+  --st-during: var(--ps-a);
+  --st-post: var(--ps-mv);
+  --st-pm: #c9d2de;
+  --st-acc: rgba(230, 103, 103, 0.24);
+  --st-dec: rgba(47, 179, 127, 0.24);
+}
+
+/* ── power–angle chart ───────────────────────────────────────────────────────────────────────────────────────── */
+.ps-st-c-pre {
+  stroke: var(--st-pre);
+}
+.ps-st-c-during {
+  stroke: var(--st-during);
+}
+.ps-st-c-post {
+  stroke: var(--st-post);
+}
+.ps-st-pm {
+  stroke: var(--st-pm);
+  stroke-width: 1.5;
+}
+.ps-st-trace {
+  fill: none;
+  stroke: var(--ps-sel);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+.ps-st-point {
+  fill: var(--ps-sel);
+  stroke: var(--scope-bg);
+  stroke-width: 2;
+}
+.ps-st-area--acc {
+  fill: var(--st-acc);
+}
+.ps-st-area--dec {
+  fill: var(--st-dec);
+}
+.ps-st-area--spare {
+  fill: rgba(47, 179, 127, 0.08);
+  stroke: rgba(47, 179, 127, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.ps-st-mark {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.8;
+}
+.ps-st-mark--strong {
+  stroke: var(--text-2);
+  stroke-dasharray: 6 3;
+  opacity: 1;
+}
+.ps-st-clabel {
+  font: 600 11px var(--font-ui);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.ps-st-clabel--pre {
+  fill: var(--st-pre);
+}
+.ps-st-clabel--during {
+  fill: var(--st-during);
+}
+.ps-st-clabel--post {
+  fill: var(--st-post);
+}
+.ps-st-clabel--pm {
+  fill: var(--st-pm);
+}
+.ps-st-alabel {
+  font: 700 13px var(--font-ui);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+.ps-st .ps-plot-note {
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+.ps-st-key-pre {
+  background: var(--st-pre);
+}
+.ps-st-key-during {
+  background: repeating-linear-gradient(90deg, var(--st-during) 0 5px, transparent 5px 8px);
+}
+.ps-st-key-post {
+  background: var(--st-post);
+}
+.ps-st-key-pm {
+  background: var(--st-pm);
+}
+.ps-st-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ps-st-swatch.ps-st-area--acc {
+  background: rgba(230, 103, 103, 0.45);
+}
+.ps-st-swatch.ps-st-area--dec {
+  background: rgba(47, 179, 127, 0.45);
+}
+.ps-st-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ps-sel);
+}
+
+/* ── the system diagram ──────────────────────────────────────────────────────────────────────────────────────── */
+.ps-st-sld {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ps-st-sld-wire {
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.ps-st-sld-wire.is-dead,
+.ps-st-sld-x.is-dead {
+  stroke: var(--ps-dead);
+  stroke-dasharray: 3 3;
+}
+.ps-st-sld-bus {
+  stroke: var(--text-1);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.ps-st-sld-bus--inf {
+  stroke-width: 6;
+}
+.ps-st-sld-gen {
+  fill: var(--surface-2);
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.ps-st-sld-wave {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 1.4;
+}
+.ps-st-sld-x {
+  fill: var(--surface-2);
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+}
+.ps-st-sld-cb {
+  fill: var(--text-2);
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+}
+.ps-st-sld-cb.is-open {
+  fill: var(--scope-bg);
+  stroke: var(--warning);
+}
+.ps-st-sld-label {
+  font: 600 10.5px var(--font-ui);
+  fill: var(--text-2);
+}
+.ps-st-sld-val {
+  font: 500 10.5px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-st-sld-fault path {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ps-st-sld-fault.is-on path {
+  stroke: var(--ps-fault);
+}
+.ps-st-sld-fault.is-on text {
+  fill: var(--ps-fault);
+}
+.ps-st-sld-fault.is-armed path {
+  stroke: var(--ps-fault);
+  opacity: 0.45;
+}
+.ps-st-sld-fault.is-cleared path {
+  stroke: var(--text-3);
+  stroke-dasharray: 2 2;
+}
+
+/* ── layout ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+.ps-st-learn {
+  align-items: start;
+}
+.ps-st-figure {
+  min-width: 0;
+}
+.ps-st-tour {
+  position: sticky;
+  top: 16px;
+}
+.ps-st-tour .ps-eq {
+  margin: 8px 0;
+}
+.ps-st-controls {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.ps-st-controls .seg--full {
+  width: 100%;
+}
+.ps-st-field {
+  display: grid;
+  gap: 6px;
+}
+.ps-st-field-label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.ps-st-controls .text-btn {
+  justify-self: start;
+}
+.ps-st-transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ps-st-transport .btn {
+  min-width: 92px;
+}
+.ps-st-scrub {
+  flex: 1 1 220px;
+  display: flex;
+}
+.ps-st-scrub input {
+  width: 100%;
+}
+.ps-st-now {
+  font: 500 var(--fs-small) var(--font-mono);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  flex: 1 1 100%;
+}
+.ps-st-figure + .ps-card .ps-step-body p,
+.ps-st-tour .ps-step-body p {
+  line-height: 1.55;
+}
+.ps-st-more > summary,
+.ps-st-more-inline > summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-ui);
+}
+.ps-st-more[open] > summary {
+  margin-bottom: 10px;
+}
+.ps-st-more-inline {
+  display: grid;
+  gap: 10px;
+}
+.ps-st-more-inline[open] > summary {
+  margin-bottom: 4px;
+}
+.ps-st .ps-readouts {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.ps-st-figure .ps-st-sld {
+  margin: 0 auto;
+}
+
+@media (max-width: 1399px) {
+  .ps-st-results .ps-readouts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* experiments */
+.ps-st-exp-list ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-st-exp-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-st-exp-item:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ps-st-exp-item.on {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-st-exp-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ps-st-exp-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-st-exp-kind {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.ps-st-exp-run {
+  max-width: 920px;
+}
+.ps-st-compare {
+  align-items: start;
+}
+.ps-st-practise,
+.ps-st-verify {
+  max-width: 920px;
+}
+@media (max-width: 900px) {
+  .ps-st-exp-list ol {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,426 @@
+/* Module 4 — Faults & Protection: drawings, tables and panels (ps-ft- prefix). */
+
+.ps-ft {
+  --ps-ft-live: var(--text-1);
+  --ps-ft-dim: #3a4656;
+}
+
+/* the network during a fault */
+.ps-ft-sld .ps-sld {
+  max-height: 300px;
+}
+.ps-ft-v {
+  font: 500 11px var(--font-mono);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+.ps-ft-ph--a {
+  fill: var(--ps-a);
+  color: var(--ps-a);
+}
+.ps-ft-ph--b {
+  fill: var(--ps-b);
+  color: var(--ps-b);
+}
+.ps-ft-ph--c {
+  fill: var(--ps-c);
+  color: var(--ps-c);
+}
+.ps-ft-i {
+  font: 600 11px var(--font-mono);
+  fill: #ffb199;
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+.ps-ft-i.is-zero {
+  fill: var(--text-3);
+  font-weight: 500;
+}
+
+/* sequence networks */
+.ps-ft-seq,
+.ps-ft-ic {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ps-ft-seq-bus {
+  font: 600 11px var(--font-ui);
+  fill: var(--text-2);
+}
+.ps-ft-seq-title {
+  font: 650 12px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-ft-seq-zth {
+  font: 500 11px var(--font-mono);
+  fill: var(--text-2);
+}
+.ps-ft .ps-phasors svg {
+  max-width: 270px;
+}
+.ps-ft-phgrid .ps-phasors svg {
+  max-width: 230px;
+}
+.ps-ft-phrow .ps-phasors svg {
+  max-width: 220px;
+}
+.ps-ft-seq-ref {
+  stroke: var(--scope-zero);
+  stroke-width: 2;
+}
+.ps-ft-seq-wire {
+  fill: none;
+  stroke: var(--ps-ft-dim);
+  stroke-width: 1.8;
+}
+.ps-ft-seq-wire.is-dim {
+  stroke-dasharray: 3 4;
+}
+.ps-ft-seq-gap {
+  stroke: var(--text-3);
+  stroke-width: 1.6;
+}
+.ps-ft-seq-box {
+  fill: var(--scope-bg);
+  stroke: var(--ps-ft-dim);
+  stroke-width: 1.4;
+}
+.ps-ft-seq-emf {
+  fill: var(--scope-bg);
+  stroke: var(--ps-ft-dim);
+  stroke-width: 1.4;
+}
+.ps-ft-seq-z {
+  font: 500 10.5px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-ft-seq-tag {
+  font: 600 10.5px var(--font-ui);
+  fill: var(--text-3);
+}
+.ps-ft-seq-i {
+  font: 500 10.5px var(--font-mono);
+  fill: var(--text-3);
+}
+.ps-ft-seq-note {
+  font: 10.5px var(--font-ui);
+  fill: var(--text-3);
+}
+.ps-ft-seq .is-live .ps-ft-seq-wire,
+.ps-ft-seq .is-live .ps-ft-seq-box,
+.ps-ft-seq .is-live .ps-ft-seq-emf {
+  stroke: var(--ps-ft-live);
+}
+.ps-ft-seq .is-live .ps-ft-seq-z,
+.ps-ft-seq .is-live .ps-ft-seq-tag {
+  fill: var(--text-1);
+}
+.ps-ft-seq .is-live .ps-ft-seq-i {
+  fill: var(--ps-fault);
+  font-weight: 600;
+}
+.ps-ft-seq-node {
+  fill: var(--text-2);
+}
+.ps-ft-seq-node.is-float {
+  fill: var(--scope-bg);
+  stroke: var(--text-3);
+  stroke-width: 1.4;
+}
+.ps-ft-seq-node.is-fault {
+  fill: var(--ps-fault);
+  stroke: none;
+}
+.ps-ft-seq-f {
+  font: 650 11.5px var(--font-ui);
+  fill: var(--ps-fault);
+}
+.ps-ft-seq-row + .ps-ft-seq-row .ps-ft-seq-title {
+  fill: var(--text-1);
+}
+
+/* how the sequence networks connect */
+.ps-ft-icwrap {
+  display: flex;
+  justify-content: center;
+}
+.ps-ft-icwrap .ps-ft-ic {
+  max-width: 620px;
+}
+.ps-ft-ic-box {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.4;
+}
+.ps-ft-ic .is-dim {
+  opacity: 0.4;
+}
+.ps-ft-ic-title {
+  font: 650 11.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-ft-ic-z {
+  font: 500 10.5px var(--font-mono);
+  fill: var(--text-2);
+}
+.ps-ft-ic-i {
+  font: 600 10.5px var(--font-mono);
+  fill: var(--ps-fault);
+}
+.ps-ft-ic-term {
+  fill: var(--text-1);
+}
+.ps-ft-ic-lab {
+  font: 600 10.5px var(--font-ui);
+  fill: var(--text-2);
+}
+.ps-ft-ic-zf {
+  fill: var(--scope-bg);
+  stroke: var(--ps-fault);
+  stroke-width: 1.4;
+}
+.ps-ft-ic-wire {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.ps-ft-ic-note {
+  font: 11px var(--font-ui);
+  fill: var(--text-3);
+}
+
+/* log–log plot */
+.ps-ft-grid-minor {
+  stroke: var(--scope-grid);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.ps-ft-tick-minor {
+  opacity: 0.7;
+}
+.ps-ft-mark {
+  stroke: var(--scope-bg);
+  stroke-width: 2;
+}
+.ps-ft-mark-label {
+  font: 600 11px var(--font-mono);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+
+/* tables */
+.ps-ft-table td,
+.ps-ft-table th {
+  padding: 5px 8px;
+}
+.ps-ft-table tr.is-changed td {
+  background: var(--surface-2);
+}
+.ps-ft-zbus td.ps-ft-diag {
+  color: var(--text-1);
+  background: rgba(110, 168, 255, 0.08);
+}
+.ps-ft-cap {
+  caption-side: top;
+  text-align: left;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+  padding: 0 0 6px;
+}
+.ps-ft-tables {
+  align-items: start;
+}
+.ps-ft-ok {
+  color: var(--good) !important;
+}
+.ps-ft-bad {
+  color: var(--critical) !important;
+}
+.ps-ft-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: rgba(255, 90, 61, 0.16);
+  border: 1px solid rgba(255, 90, 61, 0.45);
+  font-family: var(--font-ui);
+}
+
+/* panels */
+.ps-ft .ps-more summary,
+.ps-ft-details summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-ui);
+}
+.ps-ft-details summary {
+  font-size: var(--fs-heading);
+  font-weight: 650;
+  color: var(--text-1);
+}
+.ps-ft .ps-more {
+  margin-top: 6px;
+}
+.ps-ft .ps-more p,
+.ps-ft .ps-more .table-wrap {
+  margin: 8px 0 0;
+}
+.ps-ft-earth {
+  margin-top: 10px;
+}
+.ps-ft-earth p {
+  margin: 0 0 4px;
+}
+.ps-ft-earth .text-btn {
+  justify-self: start;
+}
+.ps-ft-note {
+  margin: -4px 0 0;
+}
+.ps-ft-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: 0;
+}
+.ps-ft .ps-card .ps-seg + .ps-slider {
+  margin-top: 10px;
+}
+.ps-ft-tour {
+  max-width: 980px;
+}
+.ps-ft-tour .ps-eq,
+.ps-ft-tour .table-wrap {
+  margin: 8px 0 10px;
+}
+.ps-ft-practise {
+  max-width: 860px;
+}
+
+/* phasor panels */
+.ps-ft-phrow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.ps-ft-phgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.ps-ft-phcard {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+.ps-ft-phtitle {
+  margin: 0;
+  font-size: var(--fs-ui);
+  font-weight: 650;
+  color: var(--text-1);
+}
+.ps-ft-phnote {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+.ps-ft-recon {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.ps-ft-phasorctl {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ps-ft-phname {
+  margin: 0 0 4px !important;
+  font-weight: 650;
+  font-size: var(--fs-ui);
+}
+.ps-ft-phname.ps-ft-ph--a {
+  color: var(--ps-a) !important;
+}
+.ps-ft-phname.ps-ft-ph--b {
+  color: var(--ps-b) !important;
+}
+.ps-ft-phname.ps-ft-ph--c {
+  color: var(--ps-c) !important;
+}
+.ps-ft .ps-phasors .small {
+  display: block;
+  margin-top: 2px;
+}
+
+/* experiments */
+.ps-ft-exp-list ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.ps-ft-exp-item {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-ft-exp-item:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ps-ft-exp-item.on {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-ft-exp-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 650;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.ps-ft-exp-run {
+  max-width: 920px;
+}
+
+@media (max-width: 1100px) {
+  .ps-ft-phrow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .ps-ft-exp-list ol,
+  .ps-ft-phgrid,
+  .ps-ft-recon {
+    grid-template-columns: 1fr;
+  }
+}

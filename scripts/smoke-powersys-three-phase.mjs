@@ -1,0 +1,255 @@
+/**
+ * Power Systems · Module 2 — Three-Phase Power, Phasors & Lines in the browser: every mode (Learn tour, the four
+ * Explore labs, experiments, the hand checks and practice), key computed numbers, activities, no console errors,
+ * no horizontal overflow, the animation (and its reduced-motion behaviour).
+ * Run with the dev server on 5199: node scripts/smoke-powersys-three-phase.mjs
+ */
+import { mkdirSync } from 'node:fs'
+import { chromium } from 'playwright'
+
+const OUT = 'scripts/out/'
+mkdirSync(OUT, { recursive: true })
+const errors = []
+const failures = []
+const check = (cond, msg) => {
+  console.log(`  ${cond ? '✓' : '✗'} ${msg}`)
+  if (!cond) failures.push(msg)
+}
+const URL = process.env.LAB_URL ?? 'http://localhost:5199/'
+const MOD = '#/subjects/power-systems/three-phase'
+const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+page.on('pageerror', (e) => errors.push(String(e)))
+const hash = () => page.evaluate(() => location.hash)
+const wait = (ms = 400) => page.waitForTimeout(ms)
+const go = async (h) => {
+  await page.goto(URL + h)
+  await wait(800)
+}
+const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+const text = (sel) => page.locator(sel).first().innerText()
+const acts = async () => (await text('.ps-acts summary')).replace(/\s+/g, ' ')
+const lab = async (name) => {
+  await page.locator('.ps-panel').getByRole('radio', { name, exact: true }).first().click()
+  await wait()
+}
+const setRange = async (sliderText, value) => {
+  const input = page.locator('.ps-slider', { hasText: sliderText }).locator('input')
+  await input.fill(String(value))
+  await wait(250)
+}
+
+await page.goto(URL)
+await page.evaluate(() => localStorage.clear())
+
+// ── page ─────────────────────────────────────────────────────────────────────
+console.log('── Module page')
+await go(MOD)
+check((await text('main h1')) === 'Three-Phase Power, Phasors & Lines', 'the module opens (status ready)')
+check((await page.getByRole('tab').allInnerTexts()).join('|') === 'Learn|Explore|Experiment|Verify|Practise', 'all five modes')
+check(/0 of 6/.test(await acts()), 'six activities, none done')
+
+// ── Learn ────────────────────────────────────────────────────────────────────
+console.log('── Learn')
+check(/Step 1 of 8/i.test(await text('.ps-stepper')), 'the tour has eight steps')
+check((await page.locator('.ps-3p-rot svg').count()) === 1, 'step 1 shows the rotating phasors beside their waveforms')
+const t0 = await text('.ps-3p-clock-val')
+await wait(500)
+const t1 = await text('.ps-3p-clock-val')
+check(t0 !== t1, `the phasors rotate while playing (${t0} → ${t1})`)
+await page.locator('.ps-3p-clock').getByRole('button', { name: 'Pause' }).click()
+const t2 = await text('.ps-3p-clock-val')
+await wait(400)
+check(t2 === (await text('.ps-3p-clock-val')), 'Pause stops them')
+check(/230\.9 V/.test(await text('.ps-step-body')), 'phase voltage 230.9 V (from 400 V / √3)')
+await page.getByRole('button', { name: 'Next →' }).click()
+await wait(200)
+check(/= 0\.000 V/.test(await text('.ps-step-body')), 'a balanced set sums to 0.000 V')
+await page.getByRole('button', { name: 'Next →' }).click()
+await wait(200)
+check(/400\.0 V/.test(await text('.ps-step-body')) && /30\.0°/.test(await text('.ps-step-body')), 'star: V_ab = 400.0 V at 30.0°')
+await page.getByRole('button', { name: 'Next →' }).click()
+await wait(200)
+check(/34\.64 A/.test(await text('.ps-step-body')), 'delta: line current 34.64 A (√3 × 20.00 A)')
+await page.getByRole('button', { name: 'Next →' }).click()
+await wait(200)
+check(/6\.40 kW/.test(await text('.ps-step-body')), 'three-phase power: a constant 6.40 kW')
+for (let k = 0; k < 3; k++) {
+  await page.getByRole('button', { name: 'Next →' }).click()
+  await wait(200)
+}
+check(/How much power can a line carry/.test(await text('.ps-step-title')), 'the tour ends with the power–angle curve')
+check(/1 of 6/.test(await acts()), 'finishing the tour completes an activity')
+check(await noOverflow(), 'no horizontal overflow (Learn)')
+await page.screenshot({ path: OUT + 'ps3-learn.png', fullPage: true })
+await page.getByRole('button', { name: /Explore the labs yourself/ }).click()
+await wait()
+check((await hash()) === MOD + '?mode=explore', 'the tour leads on to Explore')
+
+// ── Explore: phasors ─────────────────────────────────────────────────────────
+console.log('── Explore · Phasors')
+check(/0\.00\s*V/.test(await text('.ps-readouts')), 'balanced: |V_a + V_b + V_c| = 0.00 V')
+await setRange('Magnitude of V_b', 80)
+check(/46\.19\s*V/.test(await text('.ps-readouts')), 'V_b at 80 %: the sum is 46.19 V (0.2 × 230.94)')
+await setRange('Angle error of V_b', 20)
+check(!/0\.00\s*V/.test(await text('.ps-readouts')), 'an angle error also leaves a sum')
+await page.getByRole('button', { name: 'Balance again' }).click()
+await wait()
+check(/0\.00\s*V/.test(await text('.ps-readouts')), 'Balance again restores zero')
+check(await noOverflow(), 'no horizontal overflow (Phasors)')
+await page.screenshot({ path: OUT + 'ps3-phasors.png', fullPage: true })
+
+// ── Explore: star & delta ────────────────────────────────────────────────────
+console.log('── Explore · Star & delta')
+await lab('Star & delta')
+let ro = await text('.ps-readouts')
+check(/230\.9\s*V/.test(ro) && /400\.0\s*V/.test(ro) && /11\.55\s*A/.test(ro), 'star: 230.9 V phase, 400.0 V line, 11.55 A')
+check(/1\.732/.test(ro) && /30\.0/.test(ro), 'V_L / V_ph = 1.732, leading by 30.0°')
+check((await page.locator('.ps-phasors svg').getAttribute('aria-label')).includes('V_ab 400.000 at 30.0 degrees'), 'the phasor diagram constructs V_ab = 400 V ∠ 30°')
+await page.locator('.ps-card', { hasText: 'The load' }).getByRole('radio', { name: 'Delta (Δ)' }).click()
+await wait()
+ro = await text('.ps-readouts')
+check(/34\.64\s*A/.test(ro) && /20\.00\s*A/.test(ro), 'delta: 20.00 A per branch, 34.64 A per line')
+check((await page.locator('.ps-phasors svg').getAttribute('aria-label')).includes('I_a 34.641 at −36.9 degrees'), 'I_a = 34.64 A ∠ −36.9° (30° behind I_ab)')
+check(/2 of 6/.test(await acts()), 'trying both connections completes an activity')
+check(await noOverflow(), 'no horizontal overflow (Star & delta)')
+await page.screenshot({ path: OUT + 'ps3-star-delta.png', fullPage: true })
+
+// ── Explore: power ───────────────────────────────────────────────────────────
+console.log('── Explore · Power')
+await lab('Power')
+await page.locator('.ps-card', { hasText: 'The load' }).getByRole('radio', { name: 'Star (Y)' }).click()
+await wait()
+ro = await text('.ps-readouts')
+check(/6\.400\s*kW/.test(ro) && /4\.800\s*kvar/.test(ro) && /8\.000\s*kVA/.test(ro) && /0\.800/.test(ro), 'P 6.400 kW, Q 4.800 kvar, S 8.000 kVA, pf 0.800')
+check(/= 6400\.0 W[\s\S]*= 6400\.0 W/.test(await text('.ps-eq')), '√3·V_L·I_L·cos φ = 3·V_ph·I_ph·cos φ = 6400.0 W')
+check(/less than 10⁻⁶ W/.test(await page.locator('.ps-panel').innerText()), 'the total instantaneous power is constant')
+await page.getByRole('radio', { name: 'Three-phase vs single-phase' }).click()
+await wait()
+check(/single-phase/.test(await text('.ps-plot-legend')), 'single-phase comparison drawn')
+check(await noOverflow(), 'no horizontal overflow (Power)')
+await page.screenshot({ path: OUT + 'ps3-power.png', fullPage: true })
+
+// ── Explore: line ────────────────────────────────────────────────────────────
+console.log('── Explore · Transmission line')
+await lab('Transmission line')
+ro = (await page.locator('.ps-readouts').allInnerTexts()).join(' ')
+check(/431\.0\s*kV/.test(ro), 'exact 300 km, 400 kV line at 400 MW, pf 0.95: V_s = 431.0 kV')
+check(/521\.1\s*MW/.test(ro) && /307\.1\s*Ω/.test(ro), 'Z_c = 307.1 Ω, SIL = 521.1 MW')
+check(/1\.0543/.test(ro), 'no-load rise 1.0543 (Ferranti)')
+const card = page.locator('.ps-card', { hasText: 'The load at the receiving end' })
+await card.getByRole('button', { name: 'No load', exact: true }).click()
+await wait()
+check(/379\.4\s*kV/.test(await text('.ps-readouts')), 'no load: the sending end needs only 379.4 kV')
+await card.getByRole('button', { name: 'SIL', exact: true }).click()
+await wait()
+await card.getByRole('button', { name: '1.5 × SIL', exact: true }).click()
+await wait()
+check(/3 of 6/.test(await acts()), 'no load, SIL and heavy seen: the line activity is done')
+check((await page.locator('.ps-3p-checks li.is-done').count()) === 3, 'the checklist ticks all three')
+await page.getByRole('radio', { name: 'Power–angle curve' }).click()
+await wait()
+check(/max 1492 MW at/.test(await text('.ps-plot')), 'power–angle curve: exact maximum 1492 MW')
+await page.locator('.ps-card', { hasText: 'The line' }).getByRole('radio', { name: 'Short' }).click()
+await wait()
+check(/Series impedance only/.test(await page.locator('.ps-panel').innerText()), 'switching to the short-line model')
+await page.locator('summary', { hasText: 'Compare the three models' }).click()
+await wait()
+check((await page.locator('.ps-table tbody tr').count()) === 6, 'the three models compared in a table')
+check(await noOverflow(), 'no horizontal overflow (Line)')
+await page.screenshot({ path: OUT + 'ps3-line.png', fullPage: true })
+
+// ── Experiment ───────────────────────────────────────────────────────────────
+console.log('── Experiment')
+await page.getByRole('tab', { name: 'Experiment' }).click()
+await wait()
+check((await page.locator('.ps-3p-exp-item').count()) === 6, 'six experiments')
+check((await page.locator('.ps-panel .ps-table').count()) === 0, 'no answer before a prediction')
+await page.locator('.ps-option', { hasText: 'A sine wave about 20 %' }).click()
+await wait()
+check(/Your prediction was right/.test(await text('.ps-predict')), 'unbalance: the prediction is judged from the computation')
+check(/46\.00 V/.test(await text('.ps-table')), 'before/after: |ΣV| 0 → 46.00 V')
+await page.locator('.ps-3p-exp-item', { hasText: 'Reconnect a star load' }).click()
+await wait()
+await page.locator('.ps-option', { hasText: 'three times' }).click()
+await wait()
+check(/6\.40 kW\s*19\.20 kW/.test(await text('.ps-table')), 'star → delta: 6.40 → 19.20 kW')
+await page.locator('.ps-3p-exp-item', { hasText: 'surge impedance' }).click()
+await wait()
+await page.locator('.ps-option', { hasText: 'almost the same' }).click()
+await wait()
+check(/Your prediction was right/.test(await text('.ps-predict')) && /428\.91 kV\s*400\.00 kV/.test(await text('.ps-table')), 'SIL: flat profile; the lighter load rises to 428.91 kV')
+check(/4 of 6/.test(await acts()), 'three experiments complete the activity')
+check(await noOverflow(), 'no horizontal overflow (Experiment)')
+await page.screenshot({ path: OUT + 'ps3-experiment.png', fullPage: true })
+
+// ── Verify ───────────────────────────────────────────────────────────────────
+console.log('── Verify')
+await page.getByRole('tab', { name: 'Verify' }).click()
+await wait()
+check((await page.locator('.ps-check--ok').count()) === 6 && (await page.locator('.ps-check--bad').count()) === 0, 'all six hand checks agree')
+check(/1\.000000000 [−+] j0\.000000000/.test(await page.locator('.ps-panel').innerText()), 'AD − BC = 1 shown')
+const nums = page.locator('.ps-num-answer')
+await nums.nth(0).locator('input').fill('11.55')
+await nums.nth(0).getByRole('button', { name: 'Check' }).click()
+await nums.nth(1).locator('input').fill('521.1')
+await nums.nth(1).getByRole('button', { name: 'Check' }).click()
+await wait()
+check(/2 of 2 answered correctly/.test(await text('.ps-quiz')), 'the student’s own calculations are checked')
+check(/5 of 6/.test(await acts()), 'Verify activity done')
+check(await noOverflow(), 'no horizontal overflow (Verify)')
+await page.screenshot({ path: OUT + 'ps3-verify.png', fullPage: true })
+
+// ── Practise ─────────────────────────────────────────────────────────────────
+console.log('── Practise')
+await page.getByRole('tab', { name: 'Practise' }).click()
+await wait()
+check((await page.locator('.ps-quiz-list > li').count()) === 8, 'eight practice questions')
+const q = (t) => page.locator('.ps-q', { hasText: t })
+const num = async (t, v) => {
+  await q(t).locator('input').fill(String(v))
+  await q(t).getByRole('button', { name: 'Check' }).click()
+  await wait(120)
+}
+await num('230 V between each line', 398.4)
+await q('how is the line voltage V_ab placed').locator('.ps-option', { hasText: 'It leads V_a by 30°' }).click()
+await num('Each branch of a balanced delta', 17.32)
+await num('34.64 A per line', 19.2)
+await q('total instantaneous power').locator('.ps-option', { hasText: 'It stays constant' }).click()
+await num('What is its surge impedance loading', 521.1)
+await num('far end open', 421.7)
+await q('1.5 times its surge').locator('.ps-option', { hasText: 'It absorbs reactive power' }).click()
+await wait()
+check(/8 of 8 answered correctly/.test(await text('.ps-quiz')), 'all eight answered from the model’s numbers')
+check(/6 of 6/.test(await acts()), 'every activity complete')
+check(await noOverflow(), 'no horizontal overflow (Practise)')
+await page.screenshot({ path: OUT + 'ps3-practise.png', fullPage: true })
+
+// ── 1280 wide, reduced motion ────────────────────────────────────────────────
+console.log('── 1280 px and reduced motion')
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' })
+const p2 = await ctx.newPage()
+p2.on('pageerror', (e) => errors.push(String(e)))
+for (const m of ['', '?mode=explore', '?mode=experiment', '?mode=verify', '?mode=practise']) {
+  await p2.goto(URL + MOD + m)
+  await p2.waitForTimeout(700)
+  check(await p2.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `1280 px: no horizontal overflow (${m || 'learn'})`)
+}
+await p2.goto(URL + MOD)
+await p2.waitForTimeout(700)
+check((await p2.locator('.ps-3p-clock').getByRole('button', { name: 'Play' }).count()) === 1, 'reduced motion: the phasors start paused')
+const r0 = await p2.locator('.ps-3p-clock-val').innerText()
+await p2.waitForTimeout(500)
+check(r0 === (await p2.locator('.ps-3p-clock-val').innerText()), 'reduced motion: nothing moves until Play')
+await p2.goto(URL + MOD + '?mode=explore')
+await p2.waitForTimeout(600)
+await p2.locator('.ps-panel').getByRole('radio', { name: 'Transmission line', exact: true }).click()
+await p2.waitForTimeout(400)
+await p2.screenshot({ path: OUT + 'ps3-line-1280.png', fullPage: true })
+await ctx.close()
+
+check(errors.length === 0, `no console errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`)
+await browser.close()
+console.log(failures.length ? `\n${failures.length} FAILED` : '\nALL PASSED')
+process.exit(failures.length ? 1 : 0)
