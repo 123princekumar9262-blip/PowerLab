@@ -4,17 +4,22 @@ import { MODE_ORDER } from '../catalogue/catalogue.ts'
 
 /**
  * A small hash router (no dependency). Routes:
- *   #/home  #/labs  #/labs/:lab  #/labs/:lab/:topic  #/labs/:lab/:topic/:mode  (+ ?query)
- *   #/engineering  #/engineering/:area  #/progress  #/settings
+ *   #/home (the Subject Library)  #/subjects/:subject  #/subjects/:subject/:topic (+ ?mode= on a Power Systems module)
+ *   #/labs  #/labs/:lab  #/labs/:lab/:topic  #/labs/:lab/:topic/:mode  (+ ?query)
+ *   #/machines  #/machines/:id  #/machines/compare  #/machines/checks
+ *   #/engineering  #/engineering/:area  #/guide  #/guide/:lab  #/guide/:lab/:page  #/progress  #/settings
  * Legacy module hashes (#dcdc, #engineering …) redirect to their new homes. Navigation pushes a history
  * entry (Back works); redirects and in-workspace selection updates replace it.
  */
 export type Route =
   | { page: 'home' }
+  | { page: 'subject'; subject: string; topic: string | null; query: Record<string, string> }
   | { page: 'labs' }
   | { page: 'lab'; lab: string; query: Record<string, string> }
   | { page: 'workspace'; lab: string; topic: string; mode: ModeId; query: Record<string, string> }
   | { page: 'engineering'; area: string | null }
+  | { page: 'guide'; lab: string | null; section: string | null }
+  | { page: 'machines'; sub: string | null; query: Record<string, string> }
   | { page: 'progress' }
   | { page: 'settings' }
   | { page: 'notfound'; path: string }
@@ -50,6 +55,8 @@ function parseQuery(q: string): Record<string, string> {
 export function redirectFor(hash: string): string | null {
   const h = hash.replace(/^#/, '')
   if (h === '' || h === '/') return '#/home'
+  // the Subject Library is Home
+  if (h === '/subjects' || h === '/subjects/') return '#/home'
   if (!h.startsWith('/')) {
     const key = h.split(/[/?]/)[0]
     return LEGACY[key] ?? null
@@ -64,12 +71,15 @@ export function parseRoute(hash: string): Route {
   const seg = path.split('/').filter(Boolean)
   const [a, b, c, d] = seg
   if (a === 'home' && seg.length === 1) return { page: 'home' }
+  if (a === 'subjects' && b && seg.length <= 3) return { page: 'subject', subject: b, topic: c ?? null, query }
   if (a === 'labs') {
     if (!b) return { page: 'labs' }
     if (!c) return { page: 'lab', lab: b, query }
     if (seg.length <= 4 && (!d || isMode(d))) return { page: 'workspace', lab: b, topic: c, mode: (d as ModeId | undefined) ?? 'explore', query }
   }
   if (a === 'engineering' && seg.length <= 2) return { page: 'engineering', area: b ?? null }
+  if (a === 'machines' && seg.length <= 2) return { page: 'machines', sub: b ?? null, query }
+  if (a === 'guide' && seg.length <= 3) return { page: 'guide', lab: b ?? null, section: c ?? null }
   if (a === 'progress' && seg.length === 1) return { page: 'progress' }
   if (a === 'settings' && seg.length === 1) return { page: 'settings' }
   return { page: 'notfound', path: raw }
@@ -82,10 +92,13 @@ const qs = (query?: Record<string, string>) => {
 
 export const href = {
   home: () => '#/home',
+  subject: (subject: string, topic?: string, query?: Record<string, string>) => `#/subjects/${subject}${topic ? `/${topic}` : ''}${qs(query)}`,
   labs: () => '#/labs',
   lab: (lab: string) => `#/labs/${lab}`,
   workspace: (lab: string, topic: string, mode: ModeId = 'explore', query?: Record<string, string>) => `#/labs/${lab}/${topic}${mode === 'explore' ? '' : `/${mode}`}${qs(query)}`,
   engineering: (area?: string) => (area ? `#/engineering/${area}` : '#/engineering'),
+  machines: (sub?: string, query?: Record<string, string>) => `#/machines${sub ? `/${sub}` : ''}${qs(query)}`,
+  guide: (lab?: string, section?: string) => (lab ? `#/guide/${lab}${section ? `/${section}` : ''}` : '#/guide'),
   progress: () => '#/progress',
   settings: () => '#/settings',
 }
@@ -94,6 +107,8 @@ export function buildHash(r: Route): string {
   switch (r.page) {
     case 'home':
       return href.home()
+    case 'subject':
+      return href.subject(r.subject, r.topic ?? undefined, r.query)
     case 'labs':
       return href.labs()
     case 'lab':
@@ -102,6 +117,10 @@ export function buildHash(r: Route): string {
       return href.workspace(r.lab, r.topic, r.mode, r.query)
     case 'engineering':
       return href.engineering(r.area ?? undefined)
+    case 'machines':
+      return href.machines(r.sub ?? undefined, r.query)
+    case 'guide':
+      return href.guide(r.lab ?? undefined, r.section ?? undefined)
     case 'progress':
       return href.progress()
     case 'settings':

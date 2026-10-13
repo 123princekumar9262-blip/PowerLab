@@ -61,3 +61,41 @@ export function reloadPrefs(): void {
   current = read()
   listeners.forEach((l) => l())
 }
+
+// ── First visit of a lab: the essentials ────────────────────────────────────
+/**
+ * A lab opened for the first time shows its essentials only (two readings, the main waveforms); everything
+ * else is one click away ("Show everything"). The setting lives in Help & settings; the labs already seen
+ * are remembered in this browser.
+ */
+const ESSENTIALS_KEY = 'pel.essentials'
+const SEEN_KEY = 'pel.labs-seen'
+/** A stored value as it is (loadJSON merges objects into its fallback: not for a string or a list). */
+function readRaw(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : undefined
+  } catch {
+    return undefined
+  }
+}
+const seenLabs = (): string[] => {
+  const v = readRaw(SEEN_KEY)
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+export function essentialsEnabled(): boolean {
+  return readRaw(ESSENTIALS_KEY) !== 'off'
+}
+export function setEssentialsEnabled(on: boolean): void {
+  saveJSON(ESSENTIALS_KEY, on ? 'on' : 'off')
+}
+/** Is this the first visit of the lab, and are essentials wanted? (read only: render-safe) */
+export function isFirstVisit(lab: string): boolean {
+  return essentialsEnabled() && !seenLabs().includes(lab)
+}
+/** Remember the lab as seen (its next visit shows the full workspace). */
+export function markSeen(lab: string): void {
+  const list = seenLabs()
+  if (!list.includes(lab)) saveJSON(SEEN_KEY, [...list, lab])
+}

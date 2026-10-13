@@ -22,6 +22,40 @@ export function Crumbs({ items }: { items: Array<{ label: string; href?: string 
   )
 }
 
+/** One step of a learning path: what to do, an optional line (e.g. progress), where it opens. */
+export interface PathStep {
+  title: string
+  meta?: string
+  href: string
+  done?: boolean
+}
+/** A suggested order of activities — only the ones that exist; every step stays open to visit at any time. */
+export function LearningPath({ id, title, steps }: { id: string; title: string; steps: PathStep[] }) {
+  if (steps.length < 2) return null
+  return (
+    <section className="topic-section learning-path" aria-labelledby={id}>
+      <h2 id={id} className="group-title">
+        {title}
+      </h2>
+      <ol className="path-steps">
+        {steps.map((s, k) => (
+          <li key={s.title}>
+            <a className={`path-step ${s.done ? 'is-done' : ''}`} href={s.href}>
+              <span className="path-n" aria-hidden="true">
+                {s.done ? '✓' : k + 1}
+              </span>
+              <span className="path-text">
+                <span className="path-title">{s.title}</span>
+                {s.meta && <span className="path-meta">{s.meta}</span>}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
 /** A lab as a compact card: glyph, title, one line, status — the whole card is the link. */
 export function LabCard({ lab, detail, compact }: { lab: Lab; detail?: ReactNode; compact?: boolean }) {
   return (
@@ -47,10 +81,13 @@ export function PageHead({ eyebrow, title, lead, side }: { eyebrow?: string; tit
     <header className="page-head">
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1 tabIndex={-1}>{title}</h1>
+        {/* a status sits beside the title it describes, not at the far edge of the page */}
+        <div className="page-title-row">
+          <h1 tabIndex={-1}>{title}</h1>
+          {side}
+        </div>
         {lead && <p className="page-lead">{lead}</p>}
       </div>
-      {side}
     </header>
   )
 }

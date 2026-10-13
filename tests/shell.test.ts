@@ -17,6 +17,7 @@ import * as drives from '../src/workspaces/drives.tsx'
 import * as thermal from '../src/workspaces/thermal.tsx'
 import * as ev from '../src/workspaces/ev.tsx'
 import type { AnyTopic } from '../src/lab/types.ts'
+import { PRACTICE_LOADERS } from '../src/practice/index.ts'
 
 // Node has no localStorage: a minimal in-memory one (the stores read it through the guarded helpers)
 if (!('localStorage' in globalThis)) {
@@ -116,7 +117,7 @@ describe('catalogue honesty', () => {
         if (lab.id !== 'rectifiers') expect(SHELL_TOPICS[lab.id]?.[t.id]).toBeUndefined()
       }
     for (const a of ENGINEERING) {
-      if (a.status === 'ready') expect(a.opens).toBeDefined()
+      if (a.status === 'ready') expect(a.opens !== undefined || a.id in PRACTICE_LOADERS, a.id).toBe(true)
       else expect(a.opens).toBeUndefined()
     }
   })
@@ -148,9 +149,18 @@ describe('search', () => {
   it('one result per destination; coming-soon results lead to the landing page; nothing outside the app', () => {
     const r = search('freewheeling')
     expect(new Set(r.map((x) => x.hash)).size).toBe(r.length)
+    // a READY topic leads into its workspace (Ćuk became ready)
     const cuk = search('cuk')[0]
-    expect(cuk.status).toBe('coming-soon')
-    expect(cuk.hash).toBe('#/labs/dc-dc')
+    expect(cuk.status).toBe('ready')
+    expect(cuk.hash).toBe('#/labs/dc-dc/cuk')
+    // every coming-soon topic still in the catalogue (possibly none) leads to its lab's landing page
+    const soon = LABS.flatMap((l) => l.topics.filter((t) => t.status === 'coming-soon').map((t) => ({ lab: l.id, t })))
+    for (const { lab, t } of soon) {
+      const hit = search(t.title, 50).find((x) => x.title === t.title && x.context.startsWith(labById(lab)!.title))
+      expect(hit, `${lab}/${t.id}`).toBeDefined()
+      expect(hit!.status).toBe('coming-soon')
+      expect(hit!.hash).toBe(`#/labs/${lab}`)
+    }
     expect(search('weather in paris')).toEqual([])
   })
 })

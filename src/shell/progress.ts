@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { labsByPath, type Lab, type ModeId } from '../catalogue/catalogue.ts'
 import { loadJSON, saveJSON } from '../utils/storage.ts'
+import { clearPsProgress } from '../powersys/progress.ts'
 
 /**
  * Where the student has been — the simplest persistence that works: localStorage on this device, no
@@ -59,10 +60,21 @@ export function recordActivity(a: Omit<Activity, 'at'>): void {
   emit()
 }
 
+/** Everything "Reset progress" forgets (Home, Progress and Practice read these). */
+const PROGRESS_KEYS = ['rectifier-lab.challenges', 'rectifier-lab.predict', 'pel.practice.fault', 'pel.practice.design', 'pel.practice.interview', 'pel.labs-seen', 'pel.machines.recent', 'pel.machines.checks']
+
 export function clearProgress(): void {
   current = EMPTY
   saveJSON(KEY, current)
   saveJSON(RECTIFIER_LESSONS_KEY, { done: [] })
+  for (const k of PROGRESS_KEYS) {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      /* storage blocked: nothing stored */
+    }
+  }
+  clearPsProgress()
   emit()
 }
 
