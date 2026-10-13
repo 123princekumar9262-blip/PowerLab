@@ -83,3 +83,30 @@ Status words:
 
 - The model limits in the capability matrix above (no hysteresis or core loss, constant MOSFET capacitances, the EV's constant-efficiency drivetrain, no back-EMF load in the Rectifier Lab, a Bode plot at the starting operating point…).
 - Lesson checks are one question per lesson, conceptual. Only those that state a measurable result are confirmed by the simulation.
+
+## Added 2026-10-11: the twenty former "coming soon" items
+
+Every one is a simulation with an independent theory (the exact solution of the same model, `exactPwl` or a
+hand-written mode-by-mode solution, plus textbook relations with their stated assumptions), lessons with check
+questions, experiments and predictions judged by the simulation, and its own test file.
+
+| Lab · topic | Model | Validation (simulation vs theory) | Not modelled / limits |
+|---|---|---|---|
+| DC-DC · Ćuk, SEPIC, Zeta | Netlist on the generic engine: Q1, D1, L1/L2 with DCR, C1, C with ESR; CCM and DCM | Exact theory: averages ≤ 1e-3, ripples ≤ 1.4e-3, timing ≤ 1.1e-4; D/(1−D) relations, VC1, ΔiL, DCM D/√Ke within 1 % | No body diode on Q1 (reverse-current case marked "not compared"); start-up window capped at 150 periods |
+| DC-DC · Bidirectional | Half-bridge with antiparallel diodes, dead time, battery Eb + Rb; buck or boost direction | Averages ≤ 1.3e-3 both directions; VLV = D·VHV, IL, ΔiL | No DCM (current reverses); duty is feed-forward, no current loop |
+| PWM · Multiple pulse | p equal pulses per half-cycle from a comparator, full-bridge output | Textbook Bn sum, Vrms = Vdc·√M, THD on 39 sets: error ~1e-13 | Modulator only (no load) |
+| Inverters · 120° conduction | Gated IGBTs + diodes, star R / RL load, floating leg decided by the circuit; 180° option | Exact interval solution: ≤ 5e-4; R-load staircase V1 = √3·Vdc/π, THD 31.1 % | R-L textbook rows "not applicable" (stated) |
+| Devices · Diode | Charge-control recovery (Lauritzen–Ma), Shockley I–V, clamped inductive commutation | Exact: ~1e-7; closed form for constant slope < 2e-3 | No capacitances (no ringing), 25 °C, no forward recovery |
+| Devices · SCR | Stored-charge triggering, latching IL, holding IH, turn-off time tq, forced commutation | Exact: ~1e-5; td, latching pulse, tq closed forms < 1e-4 | IL is a behavioural threshold; no dv/dt, di/dt limits |
+| Devices · IGBT | MOSFET gate/channel + hole current with lifetime τ (the tail), VCE(sat) = V0 + r·I | Exact: ≤ 6e-4; tail charge/energy ~2e-6 | Constant capacitances; ideal freewheeling diode |
+| Devices · SiC MOSFET | The MOSFET model with SiC values; Ron(Tj, Vdrv) (assumed model, labelled) | As MOSFET + Qg, vDS(on) ≤ 6e-4 | Body diode in text only |
+| Devices · GaN HEMT | Half-bridge, no body diode, reverse conduction vSD = Vth − Voff + Ron·I | Exact ≤ 1.7e-3; vSD ~1e-11 | No stray inductance, no dynamic Ron |
+| Magnetics · Transformer | T-equivalent referred to the primary, two-slope B–H core, square or sine drive, DC offset | Exact ≤ 1e-4 (sat. ~1e-5); V2/V1, îm, ΔB, phasor solution ≤ 0.2 % | No core loss, no winding capacitance |
+| Drives · BLDC | Trapezoidal EMF, Hall six-step, PWM chopping, exact diode states, RK4 + event bisection | Exact sector solution: speed ≤ 0.03 % (six-step); textbook speed 6–15 % high (explained) | Ideal Halls, open-loop duty, ideal switches |
+| Drives · PMSM | d–q model, FOC with current/speed PI, current limit, field weakening; averaged inverter (stated) | Exact (matrix exponential) dynamics < 0.1 %; steady d–q ≤ 0.5 % | No switching ripple, continuous-time controllers |
+| Drives · Induction motor | αβ flux model, DOL or V/f, RK4 | Equivalent circuit at settled points ~1e-6; breakdown and start criteria confirmed | Sinusoidal supply (no inverter switching), no iron loss/saturation |
+| EV · Battery & BMS | Series cells, OCV(SOC) + R0 + RC pairs, spread, coulomb counting, cut-off, CC-CV, passive balancing | Exact solution: SOC < 1e-6, events within 1e-5 s | No temperature/ageing/hysteresis; bleed current large (stated) |
+| EV · DC-DC stage | Synchronous SiC boost, dead time, duty found by the simulation, switching loss post-processed | Exact PWL model ~1e-5; textbook 2–5 % | No core loss, gate drive or recovery |
+| Practice · Fault, Design, Interview | Real rectifier / DC-DC / topic simulations | tests/practice.test.ts: every answer judged by the simulation | Rectifier links cannot carry R, C, Vrms |
+
+The Lab guide (52 pages, `src/guide/`) quotes only values confirmed by `tests/guide.test.ts`.

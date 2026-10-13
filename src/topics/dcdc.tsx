@@ -12,6 +12,7 @@ import { BUCK_LIMITS, DCDC_DEFAULTS, resolveConverter } from '../converters/para
 import type { ConverterKind, ConverterParams, ConverterResult } from '../converters/types.ts'
 import type { AnalysisCategory, ChannelMeta, Experiment, InspectInfo, Lesson, MeasureLabel, ParamSpec, PredictTask, StateRow, Topic } from '../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
+import { dcdcReadings } from './readings.ts'
 
 /**
  * Converter channels. Colour follows the ENTITY: switch Q1 blue, diode D1 green, inductor red,
@@ -183,6 +184,7 @@ export function dcdcTopic(kind: ConverterKind): Topic<ConverterParams, Converter
     lessons,
     experiments: (kind === 'buck' ? BUCK_EXPERIMENTS : dcdcExperiments(kind)) as unknown as Array<Experiment<ConverterParams, DcdcMeasurements>>,
     predictions: (seed) => (kind === 'buck' ? buckPredictions(seed) : dcdcPredictTasks(kind, seed)),
+    readings: dcdcReadings(kind),
     measureLabels: DCDC_MEASURE_LABELS,
   }
 }

@@ -4,14 +4,17 @@ import { MeasureTable, Numerics } from '../components/lab/Analyze.tsx'
 import { ExperimentPanel, LearnPanel, PredictPanel } from '../components/lab/Modes.tsx'
 import { StateCard } from '../components/lab/Panels.tsx'
 import type { AnyTopic, CompareResult, InspectInfo } from '../lab/types.ts'
-import type { Level } from '../shell/prefs.ts'
+import { isFirstVisit, markSeen, type Level } from '../shell/prefs.ts'
 import { href } from '../shell/router.ts'
+import { subjectOf } from '../catalogue/subjects.ts'
 import { formatSI, formatTime } from '../utils/format.ts'
 import type { WorkspaceProps } from '../workspaces/types.ts'
 import type { AnalysisCategory, AnalysisRow, ComponentInspection, WhyQuestion, WorkspaceEvent } from './contract.ts'
 import { categoryRows, CircuitView, ParameterPanel, WaveformPanel } from './panels.tsx'
 import { useTopicWorkspace, type WorkspaceModel, type WsMode } from './useTopicWorkspace.ts'
-import { AnalyzeView, EnergyView, EventsView, InspectorView, StatusLine, WhyView } from './views.tsx'
+import { AnalyzeView, EnergyView, EventsView, InspectorView, StatusLine, SymbolsView, WhyView } from './views.tsx'
+import { GLOSSARY } from '../lab/glossary.ts'
+import { AskPanel } from '../assist/AskPanel.tsx'
 import { WorkspaceBoot, WorkspaceShell, type ExploreItem, type ShellPanel } from './WorkspaceShell.tsx'
 import '../styles/workspace.css'
 
@@ -44,7 +47,8 @@ const compareRow = (r: CompareResult['rows'][number], label?: string): AnalysisR
   label: label ?? r.label,
   simulation: fmtRow(r.unit, r.sim),
   theory: fmtRow(r.unit, r.exact),
-  error: r.absolute ? formatSI(r.error, r.unit) : `${(r.error * 100).toFixed(3)} %`,
+  // an absolute difference of a ratio shown in % is in percentage points (not an SI-prefixed "µ%")
+  error: r.absolute ? (r.unit === '%' ? `${(r.error * 100).toPrecision(3)} %` : formatSI(r.error, r.unit)) : `${(r.error * 100).toFixed(3)} %`,
   // an EXPECTED difference (the exact theory omits something the simulation includes) is explained, not checked
   pass: r.expected ? null : r.pass,
   note: r.expected,
@@ -142,8 +146,23 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
     )
     const [open, setOpen] = useState<string | null>(null)
     const [part, setPart] = useState<string | null>(null)
-    const [showPath, setShowPath] = useState(false)
+    // the current flows on the circuit from the start (Explore → "Show current path" turns it off)
+    const [showPath, setShowPath] = useState(true)
     const [focus, setFocus] = useState(false)
+    // a lab's first visit: the essentials (two readings, the main waveforms) until "Show everything"
+    const [essentials, setEssentials] = useState(() => isFirstVisit(lab.id))
+    const primary = topic.primaryChannels ?? topic.defaultChannels.slice(0, 2)
+    useEffect(() => {
+      markSeen(lab.id)
+      // a lesson sets its own channels (and essentials never override what a lesson shows)
+      if (!essentials || (w.mode === 'learn' && w.lessons.lesson)) return
+      const main = topic.defaultChannels.filter((c) => primary.includes(c))
+      w.setChannels(main.length ? main : primary)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const showAll = () => {
+      setEssentials(false)
+      w.setChannels(topic.defaultChannels)
+    }
     // Predict: until the student checks the answer, nothing on screen may give it away (values, waveforms, WHY)
     const [predictOpen, setPredictOpen] = useState(true)
     const covered = w.mode === 'predict' && predictOpen
@@ -174,13 +193,16 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
       render: () => <WhyView questions={whyQuestions(w)} next={w.nextC} onGoTo={w.goToEventTime} detailed={w.level === 'engineer'} />,
     }
     const explore: ExploreItem[] = [
-      { id: 'path', label: 'Show current path', icon: '⇢', kind: 'toggle', pressed: showPath, run: () => setShowPath(!showPath) },
-      { id: 'inspect', label: 'Inspect a component', icon: '⌕', kind: 'panel', target: 'inspect' },
-      { id: 'state', label: 'State details', icon: '◉', kind: 'panel', target: 'state' },
-      ...(topic.energyModel || topic.energy ? [{ id: 'energy', label: topic.energyLabel ?? 'Energy', icon: topic.energyLabel ? '∿' : '⚡', kind: 'panel' as const, target: 'energy', secondary: true }] : []),
-      { id: 'events', label: 'Switching events', icon: '◆', kind: 'panel', target: 'events', secondary: true },
-      { id: 'analyze', label: 'Measurements & theory', icon: '▤', kind: 'panel', target: 'analyze', secondary: true },
-      ...(w.mode === 'explore' ? [{ id: 'learn', label: 'Lessons', icon: '✎', kind: 'panel' as const, target: 'learn', secondary: true }] : []),
+      { id: 'path', label: 'Show current path', icon: '⇢', kind: 'toggle', pressed: showPath, run: () => setShowPath(!showPath), hint: 'Moving dashes show where the current flows now, and in which direction' },
+      { id: 'inspect', label: 'Inspect a component', icon: '⌕', kind: 'panel', target: 'inspect', hint: 'Pick a part (or click it on the circuit): its voltage, current and role now' },
+      { id: 'state', label: 'State details', icon: '◉', kind: 'panel', target: 'state', hint: 'Every switch, diode and value at the cursor instant' },
+      ...(topic.energyModel || topic.energy
+        ? [{ id: 'energy', label: topic.energyLabel ?? 'Energy', icon: topic.energyLabel ? '∿' : '⚡︎', kind: 'panel' as const, target: 'energy', secondary: true, hint: topic.energyModel ? 'Where the power goes at this instant, and the energy stored' : 'A view of this run computed from the simulation' }]
+        : []),
+      { id: 'events', label: 'Switching events', icon: '◆', kind: 'panel', target: 'events', secondary: true, hint: 'Every turn-on and turn-off found in the run; click one to jump to it' },
+      { id: 'analyze', label: 'Measurements & theory', icon: '▤', kind: 'panel', target: 'analyze', secondary: true, hint: 'Measured values, compared with the textbook theory' },
+      { id: 'symbols', label: 'Symbols used here', icon: '§', kind: 'panel', target: 'symbols', secondary: true, hint: 'What every letter on this page means (GH, iL, D …)' },
+      ...(w.mode === 'explore' ? [{ id: 'learn', label: 'Lessons', icon: '✎', kind: 'panel' as const, target: 'learn', secondary: true, hint: 'Short guided lessons on this circuit' }] : []),
     ]
     const panels: Record<string, ShellPanel> = {
       state: {
@@ -236,8 +258,54 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
         },
       },
       analyze: { title: 'Measurements & theory', eyebrow: 'SIMULATION vs THEORY', wide: true, render: () => <AnalyzeView categories={topicAnalysis(topic, w, cmp(), w.level)} level={w.level} /> },
+      symbols: {
+        title: 'Symbols used here',
+        eyebrow: lab.title,
+        render: () => (
+          <SymbolsView
+            sections={[
+              { title: 'On the circuit and in the texts', rows: GLOSSARY[lab.id] ?? [] },
+              { title: 'Waveforms', rows: Object.values(topic.channels).map((c) => [c.label, c.unit ? c.name + ' [' + c.unit + ']' : c.name] as [string, string]) },
+              { title: 'Parameters', rows: [...topic.basic, ...topic.advanced].map((sp) => (sp.kind === 'number' ? [sp.label, sp.unit ? 'set in ' + sp.unit : 'a number'] : [sp.label, sp.options.map((o) => o.label).join(' / ')]) as [string, string]) },
+            ]}
+          />
+        ),
+      },
       learn: { title: 'Lessons', eyebrow: 'Learn', render: () => <LearnPanel topic={topic} lesson={null} step={0} body={null} onStart={(id) => (setOpen(null), w.lessons.start(id))} onStep={() => {}} onExit={() => {}} /> },
     }
+
+    // ── Ask a doubt: the question goes with what the simulation shows now ──
+    const askContext = () => {
+      const P = w.params as Record<string, unknown>
+      const fmtNum = (v: number) => (Math.abs(v) >= 1e4 || (Math.abs(v) < 1e-2 && v !== 0) ? v.toExponential(3) : String(+v.toPrecision(4)))
+      const params = [...topic.basic, ...topic.advanced]
+        .filter((sp) => !sp.when || sp.when(w.params))
+        .map((sp) =>
+          sp.kind === 'number' ? `${sp.label} = ${fmtNum((P[sp.key] as number) / (sp.scale ?? 1))} ${sp.unit}` : `${sp.label} = ${sp.options.find((o) => o.value === P[sp.key])?.label ?? String(P[sp.key])}`,
+        )
+      const rd = topic.readings ? topic.readings(w.m, w.result).map((x) => `${x.label}: ${x.value} ${x.unit}${x.note ? ` (${x.note})` : ''}`) : []
+      const pth = topic.path ? topic.path(w.st, w.result).text : w.view.path
+      return [
+        `Lab: ${lab.title} › ${fullName(entry)}. Mode: ${w.mode}.`,
+        `Parameters: ${params.join('; ')}.`,
+        rd.length ? `Readings of the run: ${rd.join('; ')}.` : '',
+        `At the cursor (t = ${formatTime(w.result.time[w.k])}): ${w.status.headline}${w.status.facts.length ? ` — ${w.status.facts.join('; ')}` : ''}.`,
+        pth ? `Current path now: ${pth}.` : '',
+        `State: ${w.view.rows.map((r) => `${r.k} ${r.v}`).join('; ')}.`,
+        w.next ? `What happens next: ${w.next}` : '',
+        `WHY at the cursor: ${w.cards
+          .slice(0, 3)
+          .map((c) => `${c.question} → ${c.what} ${c.why}`)
+          .join(' | ')}`,
+        `Summary: ${topic.summary(w.result, w.m)}`,
+        `Symbols: ${(GLOSSARY[lab.id] ?? []).map(([a, b]) => `${a} = ${b}`).join('; ')}; waveforms: ${Object.values(topic.channels)
+          .map((c) => `${c.label} = ${c.name}`)
+          .join('; ')}.`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    }
+    const ask: ShellPanel = { title: 'Ask a doubt', eyebrow: `${fullName(entry)} · live`, render: () => <AskPanel id={`${lab.id}/${topicId}`} context={askContext} /> }
 
     const siblings = lab.topics
       .filter((t) => t.status === 'ready' && !t.opens)
@@ -248,6 +316,7 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
         header={{
           back: { href: href.lab(lab.id), label: lab.title },
           lab: lab.title,
+          subject: subjectOf(lab.id),
           title: fullName(entry),
           siblings,
           ...workspaceModes(modesOf(lab).filter(isWsMode)),
@@ -273,6 +342,7 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
         status={covered ? <p className="wp-status-line muted">The state is covered until you check your prediction.</p> : <StatusLine status={w.status} time={`t = ${formatTime(w.result.time[w.k])}`} path={path} onOpen={() => setOpen(open === 'state' ? null : 'state')} busy={w.pending && w.result.diagnostics.computeMs > SLOW_MS} />}
         waveform={covered ? <p className="wp-covered wp-covered--wave">Waveforms are covered until you check your prediction — then the simulation answers it.</p> : <WaveformPanel w={w} focus={focus} compact={false} />}
         why={covered ? null : why}
+        ask={covered ? null : ask}
         explore={covered ? [] : explore}
         panels={panels}
         open={open}
@@ -281,6 +351,10 @@ export function topicShell(labId: string, topics: Record<string, AnyTopic>) {
         focus={focus}
         onFocus={setFocus}
         runId={w.runId}
+        readings={topic.readings ? (covered ? null : topic.readings(w.m, w.result)) : undefined}
+        essentials={essentials}
+        onShowAll={showAll}
+        busy={w.pending && w.result.diagnostics.computeMs > SLOW_MS}
       />
     )
   }

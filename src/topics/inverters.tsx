@@ -7,6 +7,7 @@ import { inverterModel, legDevices } from '../converters/inverter/model.ts'
 import { INVERTER_LIMITS as L, type InverterParams } from '../converters/inverter/modulation.ts'
 import type { ChannelMeta, ParamSpec, Topic } from '../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
+import { inverterReadings } from './readings.ts'
 
 const BASE: InverterParams = {
   topology: 'full',
@@ -275,6 +276,7 @@ export function inverterTopic(kind: InvKind): Topic<InverterParams, InverterRun,
     lessons: invLessons(kind),
     experiments: invExperiments(kind),
     predictions: (seed) => invPredictions(kind, seed),
+    readings: inverterReadings,
     measureLabels: {
       v1: { label: 'Output fundamental (peak)', fmt: (v) => formatV(v, false) },
       v3: { label: '3rd harmonic of the output', fmt: (v) => formatV(v, false) },

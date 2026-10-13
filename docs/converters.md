@@ -33,7 +33,7 @@ All 426 rectifier tests and the four rectifier browser suites still pass.
 - `compare` and the theory view;
 - lessons, experiments and predictions.
 
-The shell (`components/lab/LabShell.tsx`) supplies the same layout, modes and progressive
+The universal workspace shell (`workspace/TopicShell.tsx` around `workspace/WorkspaceShell.tsx`) supplies the same layout, modes and progressive
 disclosure for all of them. It never computes a physical value.
 
 ## 2. The engine (`converters/engine.ts`)

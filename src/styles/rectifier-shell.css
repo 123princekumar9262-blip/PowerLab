@@ -19,16 +19,120 @@
   padding-left: 0;
   padding-right: 0;
 }
+/* ── Parameters: the same headings, fields and choices as the other labs' parameter panels ──
+   (`.group-title` is also a page heading in shell.css: here it is set explicitly, so it is the panel's own) */
+.ws .ws-params .params {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.ws .params .section-head {
+  margin-bottom: 8px;
+}
+.ws .params .param-group {
+  border-top: 0;
+  padding: 0;
+}
+.ws .params .param-group.advanced {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+/* a mode's heading row ("All lessons") keeps its button on one line in a 300 px panel */
+.ws .mode-head > .text-btn {
+  flex: none;
+  white-space: nowrap;
+}
+/* the advanced groups are grids: one column exactly the panel's width (an auto track grew ~9 px past it,
+   so these fields stood out to the right of the basic ones) */
+.ws .params .adv-group {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ws .params h3.group-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-caption);
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.ws .params details.advanced > summary.group-title {
+  margin: 0 0 8px;
+  font-size: var(--fs-ui);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-2);
+}
+.ws .params .field {
+  margin-bottom: 10px;
+}
+.ws .params .field-label {
+  font-size: var(--fs-ui);
+  font-weight: 400;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.ws .params .field-hint {
+  font-size: var(--fs-small);
+}
+.ws .params .num-input {
+  width: 96px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.ws .params .num-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.ws .params .num-input--bad {
+  border-color: var(--warning);
+}
+.ws .params .num-input input {
+  font-size: var(--fs-ui);
+  padding: 4px 6px;
+}
+.ws .params .num-input .unit {
+  font-size: var(--fs-small);
+}
+/* three choices share a 230 px column: tighter side padding keeps each on one line where it fits */
+.ws .params .seg--full button {
+  padding: 5px 4px;
+  line-height: 1.25;
+}
 .rx-circuit-choice {
   display: grid;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .rx-load {
   flex-wrap: wrap;
+  gap: 4px;
 }
-.rx-load .pick {
-  padding: 5px 11px;
+.rx-load .picker-label {
+  font-size: var(--fs-ui);
+  color: var(--text-2);
+  margin-right: 6px;
+}
+/* the load choice looks like the other labs' segmented choices, not like pills */
+.ws .rx-load .pick {
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.ws .rx-load .pick:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.ws .rx-load .pick.on,
+.ws .rx-load .pick.on:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text-1);
+  font-weight: 650;
 }
 .rx-circuit-choice .fw-toggle {
   justify-self: start;
@@ -54,5 +158,60 @@
   scrollbar-width: thin;
 }
 .ws--phone .rx-circuit .circuit-wrap {
-  min-width: 560px;
+  /* 720 px keeps the smallest labels near 8 px (6 px at 560); the card scrolls sideways, never the page */
+  min-width: 720px;
+}
+
+/* The shell's region title ("1 Parameters") names the panel: the panel's own heading stays for screen readers,
+   and its Defaults button moves up beside the title (a challenge's lock note stays in its own row). */
+.ws-params .params > .section-head > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ws-params .params > .section-head:has(> .text-btn) {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  margin: 0;
+}
+
+/* three-phase, Engineer: each device's reading at the cursor, under the schematic */
+.rx-devices {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--fs-small);
+}
+.rx-devices li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.rx-devices li b {
+  color: var(--text-2);
+  font-family: var(--font-ui);
+}
+.rx-devices li.is-on {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--border));
+  color: var(--good);
+}
+.rx-gate {
+  font-family: var(--font-ui);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  color: var(--warning);
 }

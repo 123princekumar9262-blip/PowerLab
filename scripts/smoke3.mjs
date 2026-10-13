@@ -4,6 +4,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const OUT = 'scripts/out/'
 mkdirSync(OUT, { recursive: true })
@@ -14,7 +15,7 @@ const check = (cond, msg) => {
   if (!cond) failures.push(msg)
 }
 
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -33,7 +34,7 @@ const explore = async (name) => {
 }
 const menuItems = async () => {
   await page.locator('.ws-explore-btn').click()
-  const items = await page.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  const items = await page.locator('.ws-explore-menu [role^=menuitem] .ws-menu-name').allInnerTexts()
   await page.keyboard.press('Escape')
   return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
 }
@@ -93,6 +94,8 @@ check((await page.locator('.legend .chip').count()) === 5, 'only the five essent
 
 // Angle view (one primary view at a time) drives the master cursor
 await view('Angle view').click()
+// the clicks below use page coordinates: bring the whole angle view into the viewport first
+await page.locator('.angle-svg').scrollIntoViewIfNeeded()
 const av = await page.locator('.angle-svg').boundingBox()
 const xAtDeg = (d) => av.x + (av.width * (44 + (d / 360) * (720 - 56))) / 720
 await page.mouse.click(xAtDeg(60), av.y + 40)

@@ -21,7 +21,7 @@ export type RightTab = 'mode' | 'state' | 'why' | 'learn' | 'energy'
 /** The primary visualization under the circuit (only one at a time). */
 export type ScopeView = 'waveforms' | 'angle' | 'events' | 'compare'
 /** On-demand detail panels (drawers / bottom sheets). */
-export type DrawerKind = 'path' | 'why' | 'energy' | 'measure' | 'theory' | 'inspect' | 'event' | 'events' | 'state' | 'learn'
+export type DrawerKind = 'path' | 'why' | 'energy' | 'measure' | 'theory' | 'inspect' | 'event' | 'events' | 'state' | 'learn' | 'ask' | 'symbols'
 export interface Drawer {
   kind: DrawerKind
   /** Inspect: the component clicked (e.g. 'D1', 'R', 'phase-a'). */

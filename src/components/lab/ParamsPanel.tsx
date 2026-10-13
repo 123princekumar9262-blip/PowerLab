@@ -23,13 +23,27 @@ export function Field(props: {
   const fromPos = (x: number) => (log ? Math.exp(Math.log(min) + x * (Math.log(max) - Math.log(min))) : min + x * (max - min))
   const show = (v: number) => String(+(v / scale).toPrecision(4))
   const [text, setText] = useState(show(value))
-  useEffect(() => setText(show(value)), [value, scale]) // eslint-disable-line react-hooks/exhaustive-deps
+  // "Limited to …" after a typed value outside the range — for as long as the field shows that clamped value
+  const [limited, setLimited] = useState<{ at: number; text: string } | null>(null)
+  useEffect(() => {
+    setText(show(value))
+    setLimited((l) => (l && l.at === value ? l : null))
+  }, [value, scale]) // eslint-disable-line react-hooks/exhaustive-deps
   const clampV = (v: number) => Math.min(max, Math.max(min, v))
   const snap = (v: number) => (props.step ? Math.round(v / scale / props.step) * props.step * scale : +v.toPrecision(3))
   const commit = () => {
     const v = parseFloat(text) * scale
-    if (Number.isFinite(v)) props.onChange(clampV(v))
-    else setText(show(value))
+    if (!Number.isFinite(v)) {
+      setText(show(value))
+      setLimited(null)
+      return
+    }
+    const c = clampV(v)
+    props.onChange(c)
+    // the field always shows the value the simulation uses (also when it equals the previous one, so no
+    // re-render would correct a second out-of-range entry)
+    setText(show(c))
+    setLimited(c !== v ? { at: c, text: `Limited to ${show(c)}${props.unit ? ` ${props.unit}` : ''} (allowed ${show(min)}–${show(max)}${props.unit ? ` ${props.unit}` : ''})` } : null)
   }
   return (
     <div className="pfield">
@@ -54,13 +68,21 @@ export function Field(props: {
             value={text}
             disabled={props.disabled}
             inputMode="decimal"
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value)
+              setLimited(null)
+            }}
             onBlur={commit}
             onKeyDown={(e) => e.key === 'Enter' && commit()}
           />
           <span className="pfield-unit">{props.unit}</span>
         </span>
       </div>
+      {limited && (
+        <span className="pfield-limited" role="status">
+          {limited.text}
+        </span>
+      )}
     </div>
   )
 }

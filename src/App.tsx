@@ -26,6 +26,7 @@ import { circuitIdOf, initialLabState, labReducer, RECOMMENDED_CYCLES, type AppM
 import { LESSONS } from './learning/lessons.ts'
 import type { LabParams, LoadType, RectifierTopology } from './types/simulation.ts'
 import { rememberParams, type CarryReport } from './workspace/carry.ts'
+import { carriedValuesHold } from './rectifier/carry.ts'
 import { CarryNotice } from './workspace/views.tsx'
 import { stepTarget } from './state/stepping.ts'
 import { usePlayback } from './state/usePlayback.ts'
@@ -95,9 +96,18 @@ const MODE_LABEL = { lab: 'Explore', learn: 'Lesson', experiment: 'Experiment', 
  */
 export function App({ initial, onActivity, carryReport }: { initial?: RectifierInitial; onActivity?: (a: RectifierActivity) => void; carryReport?: CarryReport | null } = {}) {
   const [state, dispatch] = useReducer(labReducer, initial, initialState)
-  // the lab's last values, for "Change circuit" (kept where the next circuit uses them)
-  useEffect(() => rememberParams('rectifiers', state.params), [state.params])
+  // The lab's last values, for "Change circuit" (kept where the next circuit uses them) — the student's own:
+  // remembered in Explore and Experiment, where the student sets up the circuit. A lesson, challenge, prediction
+  // or puzzle loads its own (sometimes random) circuit; those values are not passed on as the student's. (The
+  // circuit is locked during those activities; switching back to Explore makes what is on the bench theirs.)
+  useEffect(() => {
+    if (state.mode === 'lab' || state.mode === 'experiment') rememberParams('rectifiers', state.params)
+  }, [state.params, state.mode])
   const [noticeOpen, setNoticeOpen] = useState(true)
+  // The notice describes the circuit as it opened: shown only while it still does, and never over Compare
+  // (which runs its own pair of circuits).
+  const [openedWith] = useState(() => state.params)
+  const noticeTrue = state.mode !== 'compare' && carriedValuesHold(state.params, openedWith)
   const circuitId = circuitIdOf(state)
 
   // ── Simulation: the single source of truth. Re-runs whenever parameters change. ──
@@ -429,7 +439,7 @@ export function App({ initial, onActivity, carryReport }: { initial?: RectifierI
         onPreset={setPreset}
         onToggleFreewheel={toggleFreewheel}
         lensHighlight={lens && state.lensStage !== null ? lens[state.lensStage].highlight : null}
-        notice={noticeOpen ? <CarryNotice report={carryReport} onDismiss={() => setNoticeOpen(false)} /> : null}
+        notice={noticeOpen && noticeTrue ? <CarryNotice report={carryReport} onDismiss={() => setNoticeOpen(false)} /> : null}
         body={state.mode === 'compare' ? <CompareLab /> : undefined}
       />
     )

@@ -5,6 +5,7 @@ import { PWM_EXPERIMENTS, PWM_LESSONS, pwmEventLabel, pwmEventWhy, pwmPrediction
 import { PWM_DEFAULTS, PWM_LIMITS, simulatePwm, type PwmParams, type PwmRun } from '../converters/pwm/modulator.ts'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
 import { formatSI, formatTime, formatV } from '../utils/format.ts'
+import { pwmReadings } from './readings.ts'
 
 const CH: Record<string, ChannelMeta> = {
   carrier: { id: 'carrier', label: 'c', name: 'Carrier c(t) (per unit)', unit: '', color: '#aeb7c5', group: 'Modulator' },
@@ -81,7 +82,13 @@ export const PWM_TOPIC: Topic<PwmParams, PwmRun, PwmMeasurements, PwmState> = {
   state: pwmStateAt,
   view: (st, r) => pwmView(st, r),
   why: pwmWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <PwmDiagram st={st} p={r.params} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <PwmDiagram st={st} p={r.params} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
+  // a modulator carries signals, not a load current: the "path" is the signal chain at the cursor
+  path: (st) => ({
+    elements: ['ref', 'carrier', 'cmp', 'dt', 'out'],
+    text: `r ${st.cmp.toFixed(2)} ${st.gate ? '>' : '<'} c ${st.carrier.toFixed(2)} → comparator ${st.gate ? 'HIGH' : 'LOW'} → ${st.gh ? 'GH ON (upper switch)' : st.gl ? 'GL ON (lower switch)' : 'dead time: GH and GL both OFF'}`,
+    reasons: [],
+  }),
   channels: CH,
   defaultChannels: ['carrier', 'cmp', 'gate', 'vout'],
   addOrder: ['carrier', 'ref', 'cmp', 'gate', 'gh', 'gl', 'vout', 'vavg'],
@@ -197,6 +204,7 @@ export const PWM_TOPIC: Topic<PwmParams, PwmRun, PwmMeasurements, PwmState> = {
   lessons: PWM_LESSONS,
   experiments: PWM_EXPERIMENTS,
   predictions: pwmPredictions,
+  readings: pwmReadings,
   measureLabels: {
     v1: { label: 'Fundamental V1 (peak)', fmt: (v) => formatV(v, false) },
     thd: { label: 'THD of vout', fmt: (v) => `${(v * 100).toFixed(1)} %` },

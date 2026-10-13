@@ -4,6 +4,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const OUT = 'scripts/out/'
 mkdirSync(OUT, { recursive: true })
@@ -14,7 +15,7 @@ const check = (cond, msg) => {
   if (!cond) failures.push(msg)
 }
 const URL = process.env.LAB_URL ?? 'http://localhost:5199/'
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -22,7 +23,7 @@ await page.goto(URL + '#/home')
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 
-const shellNav = page.locator('.shell-nav')
+const shellNav = page.locator('.side-nav')
 const stateText = () => page.locator('.dc-state').innerText()
 const scope = page.locator('.cscope canvas.scope-layer--overlay')
 /** Click the scope at a fraction of the shown time window. */
@@ -39,7 +40,7 @@ check((await shellNav.getByRole('link', { name: 'Home' }).getAttribute('aria-cur
 await page.getByRole('link', { name: /DC-DC Converters/ }).first().click()
 await page.waitForTimeout(300)
 check(page.url().endsWith('#/labs/dc-dc'), 'DC-DC landing page is addressable (#/labs/dc-dc)')
-for (const t of ['Ćuk', 'SEPIC', 'Zeta', 'Bidirectional']) check(await page.getByLabel(`${t}, coming soon`).isVisible(), `${t} is listed as coming soon on the landing page`)
+for (const t of ['Ćuk', 'SEPIC', 'Zeta', 'Bidirectional']) check(await page.locator('a.topic-card', { hasText: t }).first().isVisible(), `${t} (built since) opens from the landing page`)
 await page.getByRole('link', { name: /^Buck Step a DC voltage down/ }).click()
 await page.waitForTimeout(700)
 check(page.url().endsWith('#/labs/dc-dc/buck'), 'Buck workspace is addressable (#/labs/dc-dc/buck)')
@@ -80,12 +81,40 @@ check(['Gate', 'Vout', 'iL'].every((c) => chips.some((x) => x.startsWith(c))) &&
 check(/Switch ON interval/.test(await buckState()), 'cursor starts in the switch ON interval')
 check(/Switch Q1\s*ON/.test(await stateText()) && /Diode D1\s*OFF/.test(await stateText()), 'state: Q1 ON, D1 OFF')
 check(/SWITCH ON/i.test(await status()) && /diode OFF/.test(await status()), 'status line: switch ON, diode OFF')
+
+// Number fields: a visible keyboard focus, and the field always shows the value the simulation uses
+{
+  const vin = page.getByLabel('Input voltage Vin value')
+  const frame = page.locator('.pfield-input', { has: vin })
+  const look = () => frame.evaluate((el) => ({ border: getComputedStyle(el).borderColor, shadow: getComputedStyle(el).boxShadow }))
+  const rest = await look()
+  await page.locator('.pfield', { has: vin }).locator('input[type="range"]').focus()
+  await page.keyboard.press('Tab')
+  const focused = await look()
+  check((await vin.evaluate((el) => el === document.activeElement)) && focused.border !== rest.border && focused.shadow !== 'none', 'keyboard focus on a number field is visible (accent frame and ring)')
+  const diagram = () => page.locator('.buck-diagram').textContent()
+  for (const n of [1, 2]) {
+    await vin.fill('99999')
+    await vin.press('Enter')
+    await page.waitForTimeout(300)
+    check((await vin.inputValue()) === '400' && /Limited to 400 V/.test(await page.locator('.pfield', { has: vin }).innerText()) && (await diagram()).includes('400.0 V'), `out-of-range Vin (entry ${n}): the field shows the 400 V the simulation uses, and says it was limited`)
+  }
+  await vin.fill('30')
+  await vin.press('Enter')
+  await page.waitForTimeout(300)
+  check((await vin.inputValue()) === '30' && !/Limited to/.test(await page.locator('.pfield', { has: vin }).innerText()) && (await diagram()).includes('30.00 V'), 'a valid value afterwards: applied, and the limit note is gone')
+  await vin.fill('24')
+  await vin.press('Enter')
+  await page.waitForTimeout(300)
+}
 await openWhy()
 check(await whyQ('Why is D1 OFF?').isVisible(), 'WHY offers “Why is D1 OFF?” in the ON interval')
 check(/What happens next/i.test(await whyText()) && /gate goes LOW at t = /.test(await whyText()), 'WHY: what happens next quotes the next gate edge')
-check((await page.locator('.buck-diagram .wire--flow').count()) === 0, 'the circuit starts clean (current path on request)')
+check((await page.locator('.buck-diagram .wire--flow').count()) > 4, 'the current flows on the circuit from the start (its conducting path)')
 await explore('Show current path')
-check((await page.locator('.buck-diagram .wire--flow').count()) > 4, 'Current path highlights the conducting path on the circuit')
+check((await page.locator('.buck-diagram .wire--flow').count()) === 0, 'Explore → Show current path turns the flow off')
+await explore('Show current path')
+check((await page.locator('.buck-diagram .wire--flow').count()) > 4, '… and on again')
 await page.screenshot({ path: `${OUT}dcdc-explore.png`, fullPage: true })
 
 // Cursor into the OFF interval of period 2 (4 periods shown; D = 0.5 → 1.75/4).
@@ -203,12 +232,12 @@ await page.getByRole('radio', { name: 'Steady state' }).click()
 // ── Boost (the same workspace shell) — reached from the header's "Change circuit" menu ──
 await page.getByLabel('Change circuit').click()
 const menuLinks = await page.locator('.ws-switch-menu a').allInnerTexts()
-check(menuLinks.join('|') === 'Buck|Boost|Buck-Boost', `Change circuit lists the ready converters only (${menuLinks.join(', ')})`)
+check(menuLinks.join('|') === 'Buck|Boost|Buck-Boost|Ćuk|SEPIC|Zeta|Bidirectional', `Change circuit lists the ready converters only (${menuLinks.join(', ')})`)
 await page.locator('.ws-switch-menu').getByRole('link', { name: 'Boost', exact: true }).click()
 await page.waitForSelector('.ws-head h1:text-is("Boost converter")')
 await page.waitForTimeout(500)
 check(page.url().endsWith('#/labs/dc-dc/boost'), 'Change circuit → Boost has its own address')
-check((await page.locator('.ws-actions .ws-act').count()) === 2 && (await page.locator('.ws-params .pfield-label').allInnerTexts()).length >= 4, 'Boost: the same simplified workspace as Buck (parameters, WHY, Explore)')
+check((await page.locator('.ws-actions .ws-act').count()) === 3 && (await page.locator('.ws-params .pfield-label').allInnerTexts()).length >= 4, 'Boost: the same simplified workspace as Buck (parameters, WHY, Ask, Explore)')
 check(/Vout\s*\+2[34]\.\d+ V/.test(await buckState()), 'Boost: 12 V in, about 24 V out')
 await clickScope(1.75 / 4)
 check(/Freewheeling interval/.test(await buckState()), 'Boost: the OFF interval while Q1 is OFF')
@@ -240,9 +269,8 @@ await page.waitForTimeout(500)
 check(/Vout\s*−1[12]\.\d+ V/.test(await buckState()), 'Buck-boost: the output is negative')
 await page.locator('.ov-close').first().click()
 await clickScope(1.75 / 4)
-await explore('Show current path')
+// (the current path is on from the start in every circuit)
 check(/pulled OUT of the output/.test(await page.locator('.wp-path').innerText()), 'Buck-boost: current path explains the negative output')
-await explore('Show current path')
 await wsMode('Learn')
 await page.getByRole('button', { name: /How an inverting buck-boost works/ }).click()
 check(/charges, the output is isolated/.test(await page.locator('.dc-mode-panel').innerText()), 'Buck-boost lesson starts')

@@ -70,7 +70,7 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Every Experiment in the topic labs: a real change, a verdict from the two simulations | 57 |
 | WHY and events stay true away from the defaults (dead time, saturation, steps, peaks, Reverse) | 7 |
 
-**Browser smoke suites.** Ten suites pass (691 checks):
+**Browser smoke suites.** Ten suites pass (695 checks):
 
 | Suite | Checks |
 |---|---|
@@ -78,7 +78,7 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 | Three-phase | 41 |
 | Freewheeling diode | 30 |
 | Controlled / compare | 36 |
-| DC-DC | 71 |
+| DC-DC (incl. number-field focus and out-of-range entry) | 75 |
 | PWM / inverters | 33 |
 | Control, Devices, Drives, Magnetics, EV, Losses & Thermal (incl. Beginner diagrams, next consequence, Predict cover, lesson checks) | 142 |
 | Shell (Home and how it works, Labs, routes, redirects, Continue, workspace guide, level, search, Back, 390 px) | 85 |
@@ -87,14 +87,16 @@ Modes: Explore, Learn, Experiment, Predict, Challenge and Reverse.
 
 ## Run it
 
-Requires Node 20+ (developed on Node 24).
+Requires Node `^20.19.0` or `>=22.12.0` (what Vite 8 supports; developed on Node 24). The app is designed for
+laptop screens (1024 px and wider); narrower windows work but are not a design target.
 
 ```bash
-npm install
-npm run dev          # http://localhost:5173
-npm test             # physics / theory / limits / lessons / challenges (Vitest)
+npm ci               # install exactly the versions in package-lock.json (or: npm install)
+npm run dev          # development server: http://localhost:5173
+npm test             # unit tests: physics, theory, limits, lessons, explanations (Vitest)
 npm run build        # type-check + production build into dist/
-npm run smoke        # browser smoke tests — need the dev server on port 5199:
+npm run preview      # serve the production build (http://localhost:4173)
+npm run smoke        # browser smoke tests — need the app running on port 5199 (or LAB_URL, below):
 npm run smoke3       #   npm run dev -- --port 5199     (then, in another terminal)
 npm run smoke-fw     #   npm run smoke && npm run smoke3 && npm run smoke-fw && npm run smoke-ctl
 npm run smoke-ctl
@@ -106,32 +108,33 @@ npm run smoke-workspace # the universal workspace shell (Buck) at six widths
 npm run smoke-rectifier-shell # the Rectifier Lab in the workspace shell at six widths
 ```
 
-The smoke test drives Microsoft Edge through Playwright (`PW_CHANNEL=chrome` to use
-Chrome instead) and saves screenshots to `scripts/out/`.
+The browser smoke tests drive an installed **Microsoft Edge** through Playwright (no Playwright browser download is
+needed). To use an installed Google Chrome instead, set `PW_CHANNEL=chrome`. Every script opens
+`http://localhost:5199/` unless `LAB_URL` is set — e.g. to test the production build:
+`npm run build`, `npx vite preview --port 5300`, then `LAB_URL=http://localhost:5300/ npm run smoke-shell`
+(PowerShell: `$env:LAB_URL='http://localhost:5300/'`). Run the suites one after another: running two at once slows
+both and can make timing-sensitive checks fail. Screenshots go to `scripts/out/` (ignored by git).
 
 ## Using the lab
 
-**Everything is available, but not everything is visible at once.** The screen shows only what
-you need to follow the circuit. The rest opens when you ask for it, and nothing in the simulation
-changes when you open or close a panel.
+**Everything is available, but not everything is visible at once.** Every lab opens in the same workspace, and
+nothing in the simulation changes when you open or close a panel.
 
-| Level | Always visible | On request |
-|---|---|---|
-| 1 · Essential | the circuit; the state strip (what conducts, Vo, Io, t, θ); playback; one primary view; Basic parameters (V, f, R) | |
-| 2 · Context | | **⇢ Current path** (drawer, path highlighted on the circuit) · **WHY?** · **⚡ Energy** · **🔎 Inspect** (click a component) · Events view · Angle view · channel presets and **+ Add channel** |
-| 3 · Analysis | | **Measurements** (Summary, Output, Load, Diodes, Timing, Theory vs Simulation) · **Theory & equations** (concept, formula, theory, simulation, error, *Explain formula*) |
-| 4 · Learning | | right-panel tabs **State · Why · Learn · Energy**; the Physics Lens inside Why; the modes Learn, Experiment, Predict, Challenge, Reverse |
-
-- **Beginner / Standard / Engineer** (top right) sets how much is shown, never what exists.
-  - **Beginner**: the circuit, Vo and Io, the basic waveforms, WHY and the current path.
-  - **Standard** (default) adds device states, the angle view, measurements and energy.
-  - **Engineer** adds every reading, more channel presets, timing, the theory comparison, and opens the advanced parameters.
-- **◎ Focus** hides everything except the circuit, the waveform and the state, with WHY and the current path one click away.
-- **What do you want to study?** (above the circuit) sets things up for you: channels, view, highlighting and the panel. Choices include how the diodes switch, how the output is formed, the load current, the firing angle, energy flow, measurements and theory.
-- **Primary view**: **Waveforms**, **Angle view** (three-phase), **Events**, or **With / without Dfw** (freewheel circuit), one at a time.
-- **Channels**: presets **Basic · Diode analysis · Load analysis · Power electronics · Everything**, or pick channels one by one with **+ Add channel**. Click a channel chip to hide it.
-- **Parameters**: Basic shows V, f and R (plus the firing angle α for a controlled rectifier). **Advanced parameters** holds load elements (L, C), devices (diode model, Vf, Ron, diodes/SCRs, freewheeling diode), source (φ, sequence, Rs, Ls) and simulation settings. It opens by itself when a challenge unlocks a field inside it.
-- Drawers are non-modal: the cursor and playback keep working behind them, and **Esc** closes them.
+- **Navigation:** the top bar is **Home · Labs · Practice · Progress**, with search (Ctrl K) and Settings. Open a lab
+  from Home or Labs, then a circuit from its landing page; the workspace header has a back link and **Change circuit** (▾).
+- **The workspace:** parameters on the left (Basic, with **Advanced parameters** on request), the circuit in the middle
+  with **one status line** under it, the waveforms below. **WHY** explains the instant at the cursor; one **Explore** menu
+  holds the rest (current path, inspect a component, state details, the lab's own view such as Energy or Spectrum,
+  switching events, Measurements & theory, lessons, Focus view).
+- **Modes** (header tabs): **Explore · Learn · Experiment · Predict**; the Rectifier Lab adds Challenge, Reverse and
+  Compare under **More**. **How to use** reopens the first-visit guide.
+- **Detail: Beginner / Standard / Engineer** (top right) sets how much is shown, never what exists: Beginner keeps the
+  circuit free of live numbers; Standard adds them; Engineer adds every reading and the theory comparison.
+- **Number fields** take a typed value on Enter or when you leave the field. A value outside the allowed range is
+  limited to the nearest bound and the field says so (the Rectifier Lab keeps the typed value, marks it red and states
+  the clamp).
+- **Channels:** remove a waveform with its chip's ×, add one with **+ Add waveform**. Each lane is titled with its
+  quantity and unit. Panels are non-modal, and **Esc** closes them.
 
 | Control | Action |
 |---|---|
@@ -187,8 +190,8 @@ rule deciding which circuits accept Dfw. The netlist, solver, events, measuremen
 ### Commutation overlap μ (three-phase)
 
 Set **Source inductance Ls** (Advanced parameters → Source). The overlap then appears naturally: for μ degrees two devices
-of the same group conduct together. Measurements → **Commutation / μ** (or *What do you want to study? → Commutation
-overlap μ*) shows:
+of the same group conduct together. Measurements → **Commutation / μ** (or Rectifiers → Topics → *Commutation overlap μ*, which opens the
+6-pulse bridge with Ls set) shows:
 
 - **Measured μ** = θ(outgoing device turns OFF) − θ(incoming device turns ON), from the simulation's events.
 - **Theoretical μ** from cos α − cos(α + μ) = 2ωLs·Id/(√6·Vph), solved numerically, with Id taken from the
@@ -201,7 +204,7 @@ next to the natural commutation points.
 
 ### Compare mode
 
-**Compare** (top navigation) is its own lab: choose rectifier A and B (only implemented ones are offered) and a
+**Compare** is a Rectifier Lab mode (header **More → Compare**, or Rectifiers → Topics → *Compare two rectifiers*): choose rectifier A and B (only implemented ones are offered) and a
 **comparison basis**: same phase RMS voltage, same line-to-line RMS voltage, same output power or same input power. The
 power bases re-simulate B until it matches. Load, R, L, C, f, devices and α are held constant and listed.
 
@@ -255,8 +258,7 @@ sit under **Advanced**. Changing any parameter, or the circuit, re-runs the simu
 
 ## DC-DC converters (buck)
 
-Click **DC-DC** in the top bar (or open `#dcdc`). The converter row is Buck → Boost → Buck-Boost →
-Advanced:
+Open **Labs → DC-DC Converters** (`#/labs/dc-dc`; the old `#dcdc` link redirects there). The landing page lists:
 - **Buck, Boost and Buck-Boost** are built and validated.
 - **Advanced** (Ćuk, SEPIC, flyback…) is planned.
 
@@ -296,14 +298,14 @@ experiments and predictions. The five modes:
 
 ### PWM lab
 
-Open **PWM** in the top bar (`#pwm`).
+Open **Labs → PWM** (`#/labs/pwm`; the old `#pwm` link redirects there).
 
 - **Signals:** a triangle or sawtooth carrier against a DC or sine reference, with natural,
   regular-symmetric or regular-asymmetric sampling, an optional N-bit counter, dead time and a
   unipolar or bipolar output.
 - **Explore:** a block diagram, the comparator state, local duty and moving average at the cursor,
-  and a **Spectrum** side tab.
-- **Analyze:** every harmonic against its closed form (pulse-train Fourier series, Bessel
+  and **Explore → Spectrum**.
+- **Measurements & theory:** every harmonic against its closed form (pulse-train Fourier series, Bessel
   double-Fourier series).
 - **Learn:** carrier, comparator, average, spectrum, sampling.
 - **Experiment:** mf, M, overmodulation, sampling.
@@ -311,7 +313,8 @@ Open **PWM** in the top bar (`#pwm`).
 
 ### Inverters
 
-Open **Inverters** (`#inverters`). The sub-navigation is Single-phase · Three-phase · SPWM · SVPWM.
+Open **Labs → Inverters** (`#/labs/inverters`). Its circuits — Single-phase · Three-phase · SPWM · SVPWM — are on the
+landing page and in the workspace's **Change circuit** menu.
 
 - **Circuit:** IGBTs (gated, forward only) with antiparallel diodes, simulated as a circuit. The
   solver decides when a diode carries the returning inductive current, including during dead time.
@@ -323,24 +326,26 @@ Open **Inverters** (`#inverters`). The sub-navigation is Single-phase · Three-p
 - **Explore:** the conducting device of every leg, the load current and the DC power (negative when
   energy returns), WHY cards ("Why does D2 conduct?", "Why does van have steps of Vdc/3?", "Which
   vectors are applied now?") and spectra.
-- **Analyze:** the simulation against the exact ideal-switch theory (closed-form and Bessel spectra,
+- **Measurements & theory:** the simulation against the exact ideal-switch theory (closed-form and Bessel spectra,
   the exact R-L current) and per-device conduction.
 
-## Control, Devices, Drives, Magnetics, EV, Engineering
+## Control, Devices, Drives, Magnetics, EV, Losses & Thermal
 
-Each module opens from the top bar (`#control`, `#devices`, `#drives`, `#magnetics`, `#ev`,
-`#engineering`) in the same five-mode lab. Details, equations and validation are in `docs/modules.md`.
+Each module opens from **Labs** (`#/labs/control`, `#/labs/devices`, `#/labs/drives`, `#/labs/magnetics`, `#/labs/ev`,
+`#/labs/thermal`) in the same workspace. The old `#engineering` link opens Losses & Thermal; **Practice**
+(`#/engineering`) is the practice area. Details, equations and validation are in `docs/modules.md`; what each lab models
+and leaves out is in `docs/LAB-CAPABILITIES.md`.
 
 | Module | What you simulate | THEORY it is checked against |
 |---|---|---|
-| **Control** | buck/boost with a digital PID: reference step, load step, line step; Bode side tab | averaged model with the same PID; discrete loop gain; spectral-radius stability |
+| **Control** | buck/boost with a digital PID: reference step, load step, line step; Explore → Bode | averaged model with the same PID; discrete loop gain; spectral-radius stability |
 | **Devices** | MOSFET double-pulse test: delay, current rise, Miller plateau, ohmic, turn-off | exact piecewise-linear solution; textbook phase formulas |
 | **Drives** | DC motor on a one- or two-quadrant chopper: start-up inrush, soft start, load step, regenerative braking, discontinuous conduction | exact PWL solution (period means, t90); averaged model |
-| **Magnetics** | gapped core with saturation on a square-wave bridge: volt-seconds, DC bias, start-up flux doubling; B–i side tab | exact PWL solution; L = N²μ0Ae/(lg + le/μr), ΔB = V·d·T/(N·Ae) |
+| **Magnetics** | gapped core with saturation on a square-wave bridge: volt-seconds, DC bias, start-up flux doubling; Explore → B–i | exact PWL solution; L = N²μ0Ae/(lg + le/μr), ΔB = V·d·T/(N·Ae) |
 | **EV** | car + battery + motor envelope on urban/highway cycles; 0–100 km/h; regeneration and friction brakes | Gauss–Legendre energy integrals of the followed cycle; t(v) quadrature; top speed |
-| **Engineering** | conduction + switching losses rising with Tj through a Foster thermal network; pulsed load (ΔTj); thermal runaway | exact matrix-exponential solution, periodic state, spectral radius; Ta + P·Rth and Zth(ton) estimates |
+| **Losses & Thermal** | conduction + switching losses rising with Tj through a Foster thermal network; pulsed load (ΔTj); thermal runaway | exact matrix-exponential solution, periodic state, spectral radius; Ta + P·Rth and Zth(ton) estimates |
 
-The four hybrid-system modules (Devices, Drives, Magnetics, Engineering) share one piecewise-linear
+The four hybrid-system modules (Devices, Drives, Magnetics, Losses & Thermal) share one piecewise-linear
 toolkit (`src/converters/pwl.ts`):
 
 - **SIMULATION** is trapezoidal time-stepping with exact event location.
@@ -392,11 +397,11 @@ src/
   challenges/                design challenges and evaluation (Phase 10)
   visualization/             scope renderer (overlay/grouped/separate), signals, channel presets, scales, events
   state/                     reducer, playback, stepping, mode logic (useModes)
-  components/                CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView,
-                             ChannelBar, FreewheelPanel, CompareView, StepThrough,
-                             panels/* (State, Why, Learn, Path, Inspect, Measurements, Theory, Events,
-                             Firing, Overlap), compare/CompareLab, PhysicsLens, Scope, Transport,
-                             EnergyPanel, ParameterPanel, MeasurementTable, EventPanels, modes/*
+  components/                CircuitDiagram, ThreePhaseDiagram (+ circuit/symbols), AngleView, ChannelBar,
+                             FreewheelPanel, CompareView, StepThrough, PhysicsLens, Scope, Transport, ParameterPanel,
+                             panels/* (StateCard, Why, LearnTab, Measurements, Theory, Firing, Overlap),
+                             compare/CompareLab, modes/* (rectifier modes), lab/* (topic-lab parameters, modes, scope,
+                             analysis), dcdc/, pwm/, inverter/, control/ (diagrams and views)
   rectifier/                 RectifierShell (the Rectifier Lab's adapter into the workspace shell), analyze (its
                              measurement rows as Analyze categories), carry (Change circuit keeps compatible values)
   styles/index.css           design tokens + layout
@@ -405,7 +410,7 @@ src/
   catalogue/                 catalogue.ts — THE single source: labs, topics, status, routes, modes, path, keywords;
                              search.ts — search index built from the catalogue
   shell/                     AppShell (top bar, menu, search palette), router (hash routes + legacy redirects),
-                             pages (Home, Labs, landing pages, Engineering, Progress, Settings), WorkspacePage,
+                             pages (Home, Labs, landing pages, Practice, Progress, Settings), WorkspacePage,
                              prefs (information level), progress (Continue, Recent, learning path)
   workspaces/                one lazily loaded workspace per lab, all in the universal workspace shell (the rectifier
                              App via RectifierShell; every other lab's topics via TopicShell)
@@ -554,7 +559,7 @@ Platform milestones, each validated before the next:
 | Drives (DC motor chopper drive) | ✅ |
 | Magnetics (gapped inductor, saturation) | ✅ |
 | EV (drivetrain on a drive cycle) | ✅ |
-| Engineering (losses and thermal) | ✅ |
+| Losses & Thermal | ✅ |
 
 Possible next steps:
 
@@ -562,7 +567,7 @@ Possible next steps:
 - Magnetics: a transformer, and core loss.
 - Devices: IGBT tail current and diode reverse recovery.
 - EV: a battery model with SOC-dependent voltage.
-- Bundle: code-splitting per module (the build is one 1 MB chunk).
+- Bundle: every lab already loads on demand; the Rectifier Lab's chunk (~370 kB) is the largest.
 
 Possible rectifier next steps: a back-EMF load (battery, DC motor), a closed-form theory for commutation
 overlap (it is shown only as an approximation now), and twelve-pulse arrangements.

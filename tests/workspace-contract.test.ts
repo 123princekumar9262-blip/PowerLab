@@ -27,7 +27,7 @@ const { getExplainer } = await import('../src/explanations/index.ts')
 const { rectifierStatus, rectifierWhy, rectifierNextConsequence } = await import('../src/explanations/status.ts')
 const { rectifierEnergy } = await import('../src/explanations/energy.ts')
 const { rectifierPath, rectifierInspection, rectifierParts, rectifierEvents } = await import('../src/rectifier/RectifierShell.tsx')
-const { carryRectifier } = await import('../src/rectifier/carry.ts')
+const { carryRectifier, carriedValuesHold } = await import('../src/rectifier/carry.ts')
 const { inspectPart } = await import('../src/inspect/inspect.ts')
 const { compareWithTheory } = await import('../src/measurements/compare.ts')
 const { DEFAULT_PARAMS, THREE_PHASE_DEFAULTS } = await import('../src/simulation/params.ts')
@@ -231,5 +231,22 @@ describe('Change circuit: compatible values kept, the rest reported (never silen
   })
   it('defaults carry nothing to report', () => {
     expect(carryRectifier(DEFAULT_PARAMS, 'bridge', 'diode', 'RL').report).toEqual({ kept: [], notUsed: [] })
+  })
+})
+
+describe('Change circuit: the notice is shown only while it describes the circuit on the bench', () => {
+  const opened = carryRectifier({ ...DEFAULT_PARAMS, load: { ...DEFAULT_PARAMS.load, resistance: 22 } }, 'bridge', 'diode', 'RL').params
+  it('the circuit as it opened: the notice holds', () => {
+    expect(carriedValuesHold(opened, opened)).toBe(true)
+    expect(carriedValuesHold({ ...opened }, opened)).toBe(true)
+  })
+  it('an activity (lesson, challenge, prediction, puzzle) loads its own values: the notice no longer holds', () => {
+    expect(carriedValuesHold({ ...opened, load: { ...opened.load, resistance: 10 } }, opened)).toBe(false)
+    expect(carriedValuesHold({ ...opened, source: { ...opened.source, vrms: 9 } }, opened)).toBe(false)
+    expect(carriedValuesHold({ ...opened, diode: { ...opened.diode, model: opened.diode.model === 'ideal' ? 'real' : 'ideal' } }, opened)).toBe(false)
+    expect(carriedValuesHold({ ...opened, control: { device: 'scr', alphaDeg: (opened.control?.alphaDeg ?? 30) + 15, freewheel: false } }, opened)).toBe(false)
+  })
+  it('settings the notice never names (run length) leave it standing', () => {
+    expect(carriedValuesHold({ ...opened, sim: { ...opened.sim, cycles: opened.sim.cycles + 4 } }, opened)).toBe(true)
   })
 })

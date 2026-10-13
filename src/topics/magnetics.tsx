@@ -2,7 +2,9 @@ import { compareCore, CORE_DEFAULTS, CORE_EXPERIMENTS, CORE_LESSONS, coreEventLa
 import { CORE_LIMITS as L, currentOf, type CoreMeasurements, type CoreParams, type CoreRun } from '../converters/magnetics/core.ts'
 import { textbookCore } from '../converters/magnetics/theory.ts'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
+import type { CurrentPath } from '../workspace/contract.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
+import { coreReadings } from './readings.ts'
 
 const CH: Record<string, ChannelMeta> = {
   v: { id: 'v', label: 'v', name: 'Applied voltage (H-bridge)', unit: 'V', color: '#3987e5', group: 'Voltage' },
@@ -13,8 +15,32 @@ const CH: Record<string, ChannelMeta> = {
   linc: { id: 'linc', label: 'L', name: 'Incremental inductance [H]', unit: '', color: '#d95926', group: 'Inductance' },
 }
 
-function CoreDiagram({ st, r, selected, onSelect, values, live }: { st: CoreState; r: CoreRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
+/** Largest |i| of the run (cached per signal array): currents below 1e-3 of it are drawn as not flowing. */
+const PEAK = new WeakMap<object, number>()
+function peakAbs(a: ArrayLike<number>): number {
+  let v = PEAK.get(a)
+  if (v === undefined) {
+    v = 0
+    for (let k = 0; k < a.length; k++) v = Math.max(v, Math.abs(a[k]))
+    PEAK.set(a, v)
+  }
+  return v
+}
+
+/** The winding loop in words, from the sign of the simulated current at the cursor (positive = out of the bridge's top terminal). */
+function corePath(st: CoreState, r: CoreRun): CurrentPath {
+  const floor = 1e-3 * peakAbs(r.signals.i)
+  if (st.i > floor) return { elements: ['bridge', 'r', 'winding'], text: `bridge (top) → R → winding, top to bottom → bridge (bottom) · i ${formatA(st.i, true)}`, reasons: [] }
+  if (st.i < -floor) return { elements: ['bridge', 'winding', 'r'], text: `bridge (bottom) → winding, bottom to top → R → bridge (top) · i ${formatA(st.i, true)}`, reasons: [] }
+  return { elements: [], text: 'no current in the winding at this instant', reasons: [] }
+}
+
+function CoreDiagram({ st, r, selected, onSelect, values, live, showPath }: { st: CoreState; r: CoreRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean; showPath: boolean }) {
   const p = r.params
+  // moving conventional current around the winding loop, by the sign of the simulated i at the cursor; the
+  // bridge, R and the coil bodies are skipped so the dashes sit on the wires only
+  const iFloor = 1e-3 * peakAbs(r.signals.i)
+  const flow = !showPath || Math.abs(st.i) <= iFloor ? [] : st.i > 0 ? ['M80 115 V60 H230', 'M290 60 H330 V80', 'M330 190 V210 H80 V155'] : ['M80 155 V210 H330 V190', 'M330 80 V60 H290', 'M230 60 H80 V115']
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -38,12 +64,18 @@ function CoreDiagram({ st, r, selected, onSelect, values, live }: { st: CoreStat
   return (
     <svg className="buck-diagram" viewBox="0 0 690 270" role="group" aria-label={`Gapped core: ${REGION[st.region]}`}>
       {/* source → R → winding */}
-      <path d="M80 60 H230 M80 210 H330 V190" className={`wire ${Math.abs(st.i) > 1e-9 ? 'wire--igbt' : ''}`} />
+      <path d="M80 60 H230 M80 210 H330 V190" className={`wire ${Math.abs(st.i) > 1e-9 && !showPath ? 'wire--igbt' : ''}`} />
       <path d="M80 60 V115 M80 155 V210" className="wire" />
       <path d="M290 60 H330 V80" className="wire" />
+      {flow.map((d) => (
+        <path key={d} d={d} className="wire wire--flow" pointerEvents="none" />
+      ))}
       <g {...part('bridge', `H-bridge ${formatV(st.v)}`)}>
         <rect x={50} y={110} width={60} height={50} className="cpart-hit" />
         <circle cx={80} cy={135} r={20} className="sym-body" />
+        <text x={90} y={110} className="cvalue">
+          +
+        </text>
         <path d="M70 140 V128 H80 V142 H90 V130" className="sym" />
         <text x={116} y={130} className="clabel">
           ±{formatV(p.vdc, false)}
@@ -198,7 +230,8 @@ export const CORE_TOPIC: Topic<CoreParams, CoreRun, CoreMeasurements, CoreState>
   state: coreStateAt,
   view: (st, r) => coreView(st, r),
   why: coreWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <CoreDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <CoreDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
+  path: (st, r) => corePath(st, r),
   channels: CH,
   defaultChannels: ['v', 'b', 'i'],
   addOrder: ['v', 'b', 'i', 'vl', 'h', 'linc'],
@@ -285,6 +318,7 @@ export const CORE_TOPIC: Topic<CoreParams, CoreRun, CoreMeasurements, CoreState>
   lessons: CORE_LESSONS,
   experiments: CORE_EXPERIMENTS,
   predictions: corePredictions,
+  readings: coreReadings,
   measureLabels: {
     dB: { label: 'Flux swing ΔB', fmt: (v) => `${v.toFixed(3)} T` },
     bpk: { label: 'Peak B', fmt: (v) => `${v.toFixed(3)} T` },

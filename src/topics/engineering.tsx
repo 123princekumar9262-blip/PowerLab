@@ -1,8 +1,11 @@
+import { useMemo } from 'react'
 import { compareThermal, measureThermal, simulateThermal, THERMAL_DEFAULTS, THERMAL_EXPERIMENTS, THERMAL_LESSONS, thermalEventLabel, thermalEventWhy, thermalPredictions, thermalStateAt, thermalView, thermalWhy, type ThermalState } from '../converters/engineering/content.ts'
 import { textbookThermal, zth } from '../converters/engineering/theory.ts'
 import { THERMAL_LIMITS as L, type ThermalMeasurements, type ThermalParams, type ThermalRun } from '../converters/engineering/thermal.ts'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
 import { formatSI, formatTime, formatW } from '../utils/format.ts'
+import { thermalReadings } from './readings.ts'
+import '../styles/flow-systems.css'
 
 const CH: Record<string, ChannelMeta> = {
   tj: { id: 'tj', label: 'Tj', name: 'Junction temperature [°C]', unit: '', color: '#e66767', group: 'Temperature' },
@@ -14,8 +17,19 @@ const CH: Record<string, ChannelMeta> = {
   load: { id: 'load', label: 'Load', name: 'Load on', unit: '', color: '#aeb7c5', group: 'Load', logic: true },
 }
 
-function ThermalDiagram({ st, r, selected, onSelect, values, live }: { st: ThermalState; r: ThermalRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
+function ThermalDiagram({ st, r, selected, onSelect, values, live, showPath }: { st: ThermalState; r: ThermalRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean; showPath: boolean }) {
   const p = r.params
+  // the run's peak loss: heat flows below 1e-3 of it are not animated
+  const peak = useMemo(() => r.signals.p.reduce((m, x) => Math.max(m, Math.abs(x)), 0), [r])
+  /**
+   * A heat-flow overlay: moving dashes along d when q > 0, along the reversed path rev when q < 0; faster
+   * when the flow is larger (0.9 s at the run's peak loss).
+   */
+  const flow = (key: string, q: number, d: string, rev: string) => {
+    if (!showPath || !(Math.abs(q) > 1e-3 * peak)) return null
+    const f = Math.min(1, Math.abs(q) / peak)
+    return <path key={key} d={q > 0 ? d : rev} className="wire wire--flow fsys-heat" style={{ animationDuration: `${(0.9 + 1.6 * (1 - f)).toFixed(2)}s` }} />
+  }
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -61,6 +75,8 @@ function ThermalDiagram({ st, r, selected, onSelect, values, live }: { st: Therm
       {p.stages.map((s, j) => {
         const x = x0 + j * w
         const isHs = j === p.stages.length - 1
+        const qr = st.theta[j] / s.r // heat through the stage resistance [W]
+        const qc = st.p - qr // heat into the stage capacitance [W]
         return (
           <g key={j} {...part(isHs ? 'heatsink' : 'jc', isHs ? 'Heatsink stage' : `Junction-case Foster stage ${j + 1}`)}>
             <rect x={x} y={70} width={w - 10} height={110} className="cpart-hit" />
@@ -69,6 +85,13 @@ function ThermalDiagram({ st, r, selected, onSelect, values, live }: { st: Therm
             <rect x={x + 18} y={102} width={50} height={16} rx={2} className="sym-body" />
             <path d={`M${x + 68} 110 H${x + w}`} className="wire" />
             <path d={`M${x + 10} 110 V140 M${x + 76} 110 V140 M${x + 10} 140 H${x + 36} M${x + 50} 140 H${x + 76} M${x + 36} 132 V148 M${x + 50} 132 V148`} className="sym" />
+            {/* Foster stage = R ‖ C in series: the whole loss P enters and leaves the stage, θ/R crosses the resistor,
+                P − θ/R charges the capacitance (negative while it gives its heat back: that branch then flows backwards) */}
+            {flow(`p${j}`, st.p, `M${j === 0 ? 140 : x - w + 76} 110 H${x + 10}`, `M${x + 10} 110 H${j === 0 ? 140 : x - w + 76}`)}
+            {flow(`r${j}`, qr, `M${x + 10} 110 H${x + 76}`, `M${x + 76} 110 H${x + 10}`)}
+            {flow(`c${j}a`, qc, `M${x + 10} 110 V140 H${x + 36}`, `M${x + 36} 140 H${x + 10} V110`)}
+            {flow(`c${j}b`, qc, `M${x + 50} 140 H${x + 76} V110`, `M${x + 76} 110 V140 H${x + 50}`)}
+            {isHs && flow('out', st.p, `M${x + 76} 110 H${x + w - 5}`, `M${x + w - 5} 110 H${x + 76}`)}
             <text x={x + 43} y={96} textAnchor="middle" className="cvalue">
               {s.r.toFixed(2)} K/W
             </text>
@@ -200,7 +223,7 @@ export const THERMAL_TOPIC: Topic<ThermalParams, ThermalRun, ThermalMeasurements
   state: thermalStateAt,
   view: (st, r) => thermalView(st, r),
   why: thermalWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <ThermalDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <ThermalDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
   channels: CH,
   defaultChannels: ['tj', 'ths', 'p'],
   addOrder: ['tj', 'ths', 'ta', 'p', 'pc', 'ps', 'load'],
@@ -279,6 +302,7 @@ export const THERMAL_TOPIC: Topic<ThermalParams, ThermalRun, ThermalMeasurements
   lessons: THERMAL_LESSONS,
   experiments: THERMAL_EXPERIMENTS,
   predictions: thermalPredictions,
+  readings: thermalReadings,
   measureLabels: {
     tjMean: { label: 'Mean Tj', fmt: (v) => `${v.toFixed(1)} °C` },
     tjMax: { label: 'Peak Tj', fmt: (v) => `${v.toFixed(1)} °C` },

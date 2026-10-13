@@ -48,7 +48,11 @@ export function FiringPanel({ ex, params, circuitId, measurements: m }: Props) {
         {ref && (
           <li>
             Average output: Vdc = <b>{formatV(m.voutAvg)}</b> at α = {formatDeg(α)}, versus {formatV(ref.voutAvg)} for the same circuit fired at α = 0 (both simulated).{' '}
-            {m.voutAvg < 0 ? 'Negative: the converter is inverting — the inductor returns energy to the source.' : ref.voutAvg > m.voutAvg ? 'Delaying the gate cuts off the first part of each pulse, so the average falls.' : ''}
+            {m.voutAvg < 0
+              ? 'Negative over this cycle: the inductor is still giving back energy it stored earlier — the run has not settled. With a passive R-L load the steady average cannot stay below zero (Vdc = R·Idc, since L·di/dt averages to zero); lasting inversion needs a source in the load, such as a motor’s back-EMF, which this lab does not model.'
+              : ref.voutAvg > m.voutAvg
+                ? 'Delaying the gate cuts off the first part of each pulse, so the average falls.'
+                : ''}
           </li>
         )}
       </ul>

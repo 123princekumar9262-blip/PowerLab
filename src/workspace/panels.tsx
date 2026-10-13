@@ -22,11 +22,12 @@ export function ParameterPanel({ w, focus, locked }: { w: WorkspaceModel; focus:
       <div className="wp-params-head">
         <h2 className="eyebrow">Basic</h2>
         <span className="sim-tag" title="Educational defaults for simulation — not a recommended design">
-          SIMULATION VALUES
+          Simulation values
         </span>
       </div>
       <SpecList specs={topic.basic} p={params} onChange={w.change} disabled={locked} idPrefix={`ws-${topic.id}`} />
-      {!focus && topic.paramNote && <p className="wp-note muted small">{topic.paramNote(params, w.result)}</p>}
+      {/* derived numbers and model notes: Standard and Engineer (Beginner keeps the controls and the circuit) */}
+      {!focus && topic.paramNote && w.level !== 'beginner' && <p className="wp-note muted small">{topic.paramNote(params, w.result)}</p>}
       {(viewKey || changed) && (
         <div className="wp-row">
           {viewKey && (
@@ -92,8 +93,37 @@ export function WaveformPanel({ w, focus, compact }: { w: WorkspaceModel; focus:
   }, [addable.join(','), meta]) // eslint-disable-line react-hooks/exhaustive-deps
   const std = w.level !== 'beginner'
   const toggle = (c: string) => w.setChannels(w.channels.includes(c) ? w.channels.filter((x) => x !== c) : topic.addOrder.filter((x) => x === c || w.channels.includes(x)))
-  const bar = focus ? null : (
+  // Play: the circuit replays the run in slow motion (the cursor sweeps the shown window and loops)
+  const transport = (
+    <div className="wp-transport" role="group" aria-label="Play the simulation">
+      <button className={`wp-play ${w.playing ? 'on' : ''}`} onClick={() => w.setPlaying(!w.playing)} aria-pressed={w.playing} title={w.playing ? 'Pause' : 'Play: watch the circuit run through time'}>
+        <svg viewBox="0 0 16 16" aria-hidden="true">{w.playing ? <path d="M4 3h3v10H4zM9 3h3v10H9z" /> : <path d="M4 2.5v11l9.5-5.5z" />}</svg>
+        <span>{w.playing ? 'Pause' : 'Play'}</span>
+      </button>
+      <button className="wp-tbtn" onClick={w.restart} title="Back to the start of the window" aria-label="Back to the start">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M13 3 6 8l7 5z" /></svg>
+      </button>
+      <button className="wp-tbtn" onClick={() => w.stepEvent(-1)} title="Previous switching event (Shift + ←)" aria-label="Previous event">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 5 8l5.5 5" /></svg>
+      </button>
+      <button className="wp-tbtn" onClick={() => w.stepEvent(1)} title="Next switching event (Shift + →)" aria-label="Next event">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 11 8l-5.5 5" /></svg>
+      </button>
+      <label className="wp-speed" title="Playback speed">
+        <span className="sr-only">Playback speed</span>
+        <select value={w.speed} onChange={(e) => w.setSpeed(Number(e.target.value))}>
+          {[0.25, 0.5, 1, 2, 4].map((x) => (
+            <option key={x} value={x}>
+              {x}×
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+  const bar = focus ? transport : (
     <div className="dc-channels wp-channels" aria-label="Channels">
+      {transport}
       {shown.map((c) => (
         <button key={c} className="chip chip--on" title={`${meta[c].name} — click to remove`} onClick={() => toggle(c)} aria-label={`Remove channel ${meta[c].label}`}>
           <span className="swatch" style={{ background: meta[c].color }} />
@@ -164,6 +194,7 @@ export function WaveformPanel({ w, focus, compact }: { w: WorkspaceModel; focus:
         onViewport={w.setViewport}
         cursorIndex={w.k}
         onCursorTime={(t) => {
+          w.setPlaying(false)
           w.setCursorTime(t)
           w.setEvent(null)
         }}

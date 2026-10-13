@@ -76,7 +76,7 @@ function Position({ x, y0, y1, igbt, diode, leg, upper, selected, onSelect }: { 
         <path d={`M${x} ${y0 + 6} H${x + 34} V${y1 - 6} H${x}`} className={`wire wire--thin ${dOn ? 'wire--diode' : ''}`} />
         <path d={`M${x + 24} ${cy + 8} H${x + 44} L${x + 34} ${cy - 8} Z`} className={`sym-fill ${dOn ? 'sym-fill--on-d' : ''}`} />
         <line x1={x + 24} x2={x + 44} y1={cy - 8} y2={cy - 8} className="sym" />
-        <text x={x + 48} y={cy + 4} className="cvalue">
+        <text x={x + 48} y={cy + 4} className="cvalue chalo">
           {diode}
         </text>
       </g>
@@ -92,7 +92,8 @@ function Leg({ x, st, idx, p, selected, onSelect }: { x: number; st: InvState; i
       <Position x={x} y0={TOP} y1={MID} igbt={su} diode={du} leg={leg} upper selected={selected} onSelect={onSelect} />
       <Position x={x} y0={MID} y1={BOT} igbt={sl} diode={dl} leg={leg} upper={false} selected={selected} onSelect={onSelect} />
       <circle cx={x} cy={MID} r={4} className="node-dot" />
-      <text x={x - 8} y={MID - 6} textAnchor="end" className="clabel">
+      {/* below the node: the gap above it carries the three-phase wires across the legs */}
+      <text x={x - 8} y={MID + 18} textAnchor="end" className="clabel">
         {leg.name}
       </text>
     </g>
@@ -147,7 +148,7 @@ function Load({ x0, x1, y, p, label, current, values, selected, onSelect, id, co
       )}
       <line x1={lx + w * 0.3} x2={x1} y1={y} y2={y} className="wire wire--load" />
       {compact ? (
-        <text x={x0 + 4} y={y - 8} textAnchor="start" className="cvalue cvalue--il">
+        <text x={x0 + 4} y={y - 14} textAnchor="start" className="cvalue cvalue--il">
           {label} {current >= 0 ? '→' : '←'} {values ? formatA(current, true) : ''}
         </text>
       ) : (
@@ -207,7 +208,15 @@ function Single({ st, p, selected, onSelect, values, live = true }: Props) {
 
 function Three({ st, p, selected, onSelect, values, live = true }: Props) {
   const xs = [200, 300, 400]
-  const ys = [86, 135, 184]
+  const ys = [80, 135, 190]
+  // Each phase wire leaves its leg's midpoint and reaches its load row through the gap between the upper and
+  // lower switch positions (y 108–129), so it crosses the other legs as plain wire crossings — never through a
+  // switch box, a diode or another leg's midpoint node.
+  const phaseWire = [
+    `M200 ${MID} H268 V113 H466 V${ys[0]} H470`,
+    `M300 ${MID} H368 V124 H470 V${ys[1]}`,
+    `M400 ${MID} H444 V${ys[2]} H470`,
+  ]
   const xn = 640
   const cur = [st.ia, st.ib, st.ic]
   return (
@@ -218,9 +227,9 @@ function Three({ st, p, selected, onSelect, values, live = true }: Props) {
       {xs.map((x, i) => (
         <Leg key={i} x={x} st={st} idx={i} p={p} selected={selected} onSelect={onSelect} />
       ))}
-      {xs.map((x, i) => (
+      {phaseWire.map((d, i) => (
         <g key={`w${i}`}>
-          <path d={`M${x} ${MID} H${x + 48} V${ys[i]} H${470}`} className="wire wire--load" />
+          <path d={d} className="wire wire--load" />
           <Load compact x0={470} x1={xn - 10} y={ys[i]} p={p} label={'abc'[i]} current={cur[i]} values={values} selected={selected} onSelect={onSelect} id={`load-${'abc'[i]}`} />
         </g>
       ))}
@@ -229,7 +238,7 @@ function Three({ st, p, selected, onSelect, values, live = true }: Props) {
       <text x={xn - 4} y={ys[1] + 4} className="clabel">
         n
       </text>
-      <text x={(470 + xn) / 2} y={ys[0] - 26} textAnchor="middle" className="cvalue">
+      <text x={(470 + xn) / 2} y={ys[0] - 32} textAnchor="middle" className="cvalue">
         each phase: {formatSI(p.r, 'Ω')}
         {p.load === 'RL' ? ` + ${formatSI(p.l, 'H')}` : ''}
       </text>
@@ -279,7 +288,7 @@ function SpaceVectors({ st, p, live }: { st: InvState; p: ResolvedInverter; live
       })}
       <line x1={cx} y1={cy} x2={cx + rr * Math.cos(refAngle)} y2={cy - rr * Math.sin(refAngle)} className="sv-ref" />
       <circle cx={cx + rr * Math.cos(refAngle)} cy={cy - rr * Math.sin(refAngle)} r={4} className="sv-ref-dot" />
-      <text x={cx} y={cy + 4} textAnchor="middle" className="cvalue">
+      <text x={cx} y={cy + 4} textAnchor="middle" className="cvalue chalo">
         V0, V7
       </text>
       {sv && (

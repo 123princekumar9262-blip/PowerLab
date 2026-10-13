@@ -58,8 +58,22 @@
 
   --font-ui: 'Segoe UI Variable Text', 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
   --font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, ui-monospace, monospace;
+  /* Type scale for interface text. SVG diagram text is sized in drawing units instead
+     (the drawing's own scale sets its rendered size: see .wp-circuit in workspace.css). */
+  --fs-caption: 11px; /* eyebrows, captions, table headings */
+  --fs-small: 12px; /* hints, units, compact segmented controls */
+  --fs-ui: 13px; /* buttons, tabs, labels, dense panel text */
+  --fs-body: 14px; /* reading text: the page's base size */
+  --fs-heading: 15px; /* panel and section headings */
+  --fs-title: 19px; /* workspace title */
+  --fs-display: 28px; /* page title */
+  /* Control heights: compact (toolbars, chips, inline actions) and standard (header tools, workspace actions) */
+  --control-h-sm: 28px;
+  --control-h: 34px;
+  /* Corner radii: controls and blocks nested in a card · cards, panels and menus · pills */
+  --radius-sm: 6px;
   --radius: 10px;
-  --radius-sm: 7px;
+  --radius-full: 999px;
 }
 
 *,
@@ -110,11 +124,11 @@ button:disabled {
   letter-spacing: normal;
 }
 .small {
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 .eyebrow {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--fs-caption);
   font-weight: 650;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -446,9 +460,9 @@ button:disabled {
 .t-btn {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: var(--control-h);
+  height: var(--control-h);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--surface-2);
   transition: background 0.12s, border-color 0.12s;
@@ -486,7 +500,7 @@ button:disabled {
   display: flex;
   gap: 16px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-ui);
   color: var(--text-1);
 }
 .transport-readout em {
@@ -495,10 +509,11 @@ button:disabled {
   margin-right: 4px;
 }
 
+/* a segmented group: compact buttons inside a frame whose corners follow theirs (radius + padding) */
 .seg {
   display: inline-flex;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: calc(var(--radius-sm) + 2px);
   background: var(--bg);
   border: 1px solid var(--border);
   margin-left: 6px;
@@ -508,8 +523,8 @@ button:disabled {
   background: transparent;
   color: var(--text-3);
   padding: 5px 9px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-small);
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
@@ -547,12 +562,13 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  min-height: var(--control-h-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   font-weight: 600;
 }
 .chip--on {
@@ -576,7 +592,7 @@ button:disabled {
 }
 .zoom-info {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-small);
   color: var(--text-3);
   margin-right: 4px;
 }
@@ -585,12 +601,12 @@ button:disabled {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-2);
-  border-radius: 6px;
-  font-size: 12.5px;
-  height: 26px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-ui);
+  height: var(--control-h-sm);
 }
 .icon-btn {
-  width: 26px;
+  width: var(--control-h-sm);
   display: grid;
   place-items: center;
   font-size: 15px;
@@ -627,9 +643,9 @@ button:disabled {
   transform: translateX(-50%);
   background: var(--surface-3);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: var(--fs-small);
   pointer-events: none;
   white-space: nowrap;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -638,16 +654,16 @@ button:disabled {
 .scope-tip-time {
   font-family: var(--font-mono);
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-caption);
 }
 .scope-tip-hint {
   color: var(--text-3);
-  font-size: 11px;
+  font-size: var(--fs-caption);
   margin-top: 3px;
 }
 .scope-hint {
   margin: 0;
-  font-size: 11.5px;
+  font-size: var(--fs-small);
   color: var(--text-3);
 }
 .instrument-foot {
@@ -1617,7 +1633,7 @@ tbody th {
 .circuit .source--b circle { stroke: var(--sig-pb); }
 .circuit .source--c circle { stroke: var(--sig-pc); }
 .circuit .source.is-missing { opacity: 0.25; }
-.circuit .phase-label { font-style: normal; font-size: 11px; fill: var(--text-2); }
+.circuit .phase-label { font-style: normal; font-size: 14px; fill: var(--text-2); }
 .circuit .value--tiny { font-family: var(--font-mono); font-size: 10.5px; fill: var(--text-3); }
 .circuit .value--tiny.is-on { fill: var(--good); }
 .circuit .fault-tag { font-size: 11px; font-weight: 700; fill: var(--warning); }

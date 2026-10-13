@@ -7,24 +7,21 @@
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 
 /* ── Parameters ──────────────────────────────────────────────────────────── */
+/* an information note, not a warning: muted, so real warnings (orange) keep their meaning */
 .sim-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--warning);
-  border: 1px solid rgba(250, 178, 25, 0.35);
-  border-radius: 4px;
-  padding: 1px 6px;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  cursor: help;
 }
 .pfield-label {
   display: flex;
   justify-content: space-between;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   color: var(--text-2);
 }
 .pfield-hint {
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: var(--fs-small);
 }
 .pfield-row {
   display: flex;
@@ -42,7 +39,7 @@
   gap: 4px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 2px 6px;
 }
 .pfield-input input {
@@ -50,20 +47,30 @@
   background: none;
   border: 0;
   color: var(--text-1);
-  font: 12.5px var(--font-mono);
+  font: var(--fs-ui) var(--font-mono);
   text-align: right;
 }
+/* the field's frame carries the focus (the bare input inside it has no outline of its own) */
 .pfield-input input:focus {
   outline: none;
 }
+.pfield-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* a typed value outside the allowed range was clamped: say so beside the value actually used */
+.pfield-limited {
+  font-size: var(--fs-small);
+  color: var(--warning);
+}
 .pfield-unit {
-  font-size: 11.5px;
+  font-size: var(--fs-small);
   color: var(--text-3);
   min-width: 18px;
 }
 .dc-advanced summary {
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   color: var(--text-2);
   margin-bottom: 8px;
 }
@@ -157,7 +164,8 @@
   font-weight: 700;
   fill: #ef8a5f;
 }
-.buck-diagram .path-caption {
+.buck-diagram .path-caption,
+.buck-diagram .cnote {
   font: 12px var(--font-ui);
   fill: var(--text-2);
 }
@@ -195,6 +203,12 @@
 .buck-diagram .cpart--sel .cpart-hit {
   fill: rgba(110, 168, 255, 0.12);
   stroke: var(--accent);
+}
+/* keyboard focus: the full accent (a 40 % outline was too faint to find), dashed so it differs from "selected" */
+.buck-diagram .cpart:focus-visible .cpart-hit {
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-dasharray: 4 3;
 }
 
 /* ── Scope ───────────────────────────────────────────────────────────────── */
@@ -239,7 +253,7 @@
   overflow: auto;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 8px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   display: grid;
@@ -249,9 +263,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .add-item:hover {
@@ -285,16 +299,16 @@
 
 .dc-mode-panel h3 {
   margin: 2px 0 6px;
-  font-size: 15px;
+  font-size: var(--fs-heading);
 }
 .dc-interval {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 650;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   margin-bottom: 8px;
 }
 .dc-interval-dot {
@@ -341,11 +355,11 @@
 }
 .dc-kv dt {
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
 }
 .dc-kv dd {
   margin: 0;
-  font: 12.5px var(--font-mono);
+  font: var(--fs-ui) var(--font-mono);
   text-align: right;
 }
 .tone-on-q {
@@ -367,7 +381,7 @@
 }
 .dc-path {
   margin: 8px 0 0;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   color: var(--text-2);
 }
 .dc-path b {
@@ -382,10 +396,10 @@
 }
 .mode-pill {
   font-weight: 800;
-  font-size: 12px;
+  font-size: var(--fs-small);
   letter-spacing: 0.08em;
   padding: 3px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .mode-pill--ccm {
   background: rgba(57, 135, 229, 0.2);
@@ -399,13 +413,13 @@
   position: relative;
   display: flex;
   height: 20px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: visible;
   margin: 4px 0 6px;
 }
 .boundary-zone {
   flex: 1;
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
   font-weight: 700;
   letter-spacing: 0.08em;
   display: flex;
@@ -415,11 +429,11 @@
 }
 .boundary-zone--dcm {
   background: rgba(250, 178, 25, 0.1);
-  border-radius: 6px 0 0 6px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 .boundary-zone--ccm {
   background: rgba(57, 135, 229, 0.12);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .boundary-mark {
   position: absolute;
@@ -445,9 +459,9 @@
 .why-q {
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 4px 10px;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
 }
 .why-q.on {
   border-color: var(--accent);
@@ -466,11 +480,11 @@
   flex-direction: column;
   gap: 3px;
   background: var(--surface-2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
 }
 .estore-label {
-  font-size: 11.5px;
+  font-size: var(--fs-small);
   color: var(--text-3);
 }
 .estore-value {
@@ -504,7 +518,7 @@
   grid-template-columns: minmax(0, 1.4fr) 1fr auto;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 .eflow-bar {
   height: 6px;
@@ -538,14 +552,14 @@
   gap: 2px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
 }
 .exp-item:hover {
   border-color: var(--accent);
 }
 .exp-q {
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .choice-list {
   display: grid;
@@ -556,7 +570,7 @@
   text-align: left;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
 }
 .choice.on {
@@ -587,13 +601,13 @@
   width: 110px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-1);
   padding: 5px 8px;
-  font: 14px var(--font-mono);
+  font: var(--fs-body) var(--font-mono);
 }
 .lesson-text {
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.55;
 }
 /* the lesson's check question (last step) */
@@ -602,18 +616,35 @@
   padding: 10px 12px;
   border: 1px solid var(--border-strong);
   border-left: 3px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .lesson-check-q {
   margin: 0 0 8px;
-  font-size: 13.5px;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 .lesson-check .exp-verdict {
   margin: 8px 0 0;
   font-weight: 400;
-  font-size: 13px;
+  font-size: var(--fs-ui);
   line-height: 1.5;
+}
+.step-bar {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 10px;
+}
+.step-bar span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.step-bar span.done {
+  background: var(--good);
+}
+.step-bar span.on {
+  background: var(--accent);
 }
 .lesson-dots {
   display: flex;
@@ -634,7 +665,7 @@
 }
 .mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 /* Analyze */
@@ -642,14 +673,14 @@
   white-space: normal;
 }
 .dc-theory h3 {
-  font-size: 14px;
+  font-size: var(--fs-body);
   margin: 12px 0 4px;
 }
 .derivation {
   padding-left: 20px;
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-ui);
 }
 .dc-sweep .sweep-chart {
   width: 100%;
@@ -684,14 +715,24 @@
 }
 
 /* ── PWM lab / generic blocks ───────────────────────────────────────────── */
-.pwm-diagram .pblock {
+/* every lab's function blocks (driver, inverter, PID, comparator…): one look, and one active state —
+   a blue outline with a light tint. (Scoped to .pwm-diagram before, so other labs drew them black.) */
+.buck-diagram .pblock {
   fill: var(--surface-2);
   stroke: var(--border-strong);
   stroke-width: 1.5;
 }
-.pwm-diagram .pblock--on {
+.buck-diagram .pblock--on {
   stroke: #3987e5;
   fill: rgba(57, 135, 229, 0.12);
+}
+/* a label that sits across a line: a halo in the card's colour keeps it legible */
+.buck-diagram .chalo,
+.sv-diagram .chalo {
+  paint-order: stroke;
+  stroke: var(--surface-1);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 .buck-diagram .wire--sig {
   stroke: var(--text-3);

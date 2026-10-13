@@ -18,6 +18,7 @@ import {
 } from '../converters/control/content.ts'
 import type { ChannelMeta, ParamSpec, Topic } from '../lab/types.ts'
 import { formatSI, formatTime, formatV } from '../utils/format.ts'
+import { controlReadings } from './readings.ts'
 
 const CH: Record<string, ChannelMeta> = {
   vout: { id: 'vout', label: 'Vout', name: 'Output voltage (SIMULATION)', unit: 'V', color: '#d95926', group: 'Output' },
@@ -85,7 +86,7 @@ export function controlTopic(kind: PlantKind): Topic<ControlParams, ControlRun, 
     state: controlStateAt,
     view: (st, r) => controlView(st, r),
     why: controlWhy,
-    Diagram: ({ r, st, selected, onSelect, values, live = true }) => <ControlDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+    Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <ControlDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
     channels: CH,
     defaultChannels: ['vout', 'vref', 'vmodel', 'duty', 'il'],
     addOrder: ['vout', 'vref', 'vmodel', 'duty', 'err', 'il', 'io', 'vin', 'gate', 'vsw'],
@@ -167,6 +168,7 @@ export function controlTopic(kind: PlantKind): Topic<ControlParams, ControlRun, 
     lessons: controlLessons(kind),
     experiments: controlExperiments(kind),
     predictions: (seed) => controlPredictions(kind, seed),
+    readings: controlReadings,
     measureLabels: {
       ssError: { label: 'Final error', fmt: (v) => formatV(v) },
       loadDev: { label: 'Load-step deviation', fmt: (v) => formatV(v) },

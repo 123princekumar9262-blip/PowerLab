@@ -1,0 +1,64 @@
+/* BLDC and PMSM drive diagrams (rotor, Hall sensors, back-EMF sources). Class names prefixed bldc- / pmsm-. */
+.bldc-diagram .bldc-stator {
+  fill: var(--surface-2);
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.bldc-diagram .bldc-rotor {
+  fill: var(--surface-3);
+  stroke: var(--text-1);
+  stroke-width: 1.5;
+}
+.bldc-diagram .bldc-north {
+  stroke: #e66767;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.bldc-diagram .bldc-south {
+  stroke: #6fa8f0;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.bldc-diagram .bldc-pole {
+  font: 700 10px var(--font-ui);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--surface-3);
+  stroke-width: 3px;
+}
+.bldc-diagram .bldc-hall {
+  fill: var(--surface-3);
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+}
+.bldc-diagram .bldc-hall--on {
+  fill: var(--warning);
+  stroke: var(--warning);
+}
+.bldc-diagram .bldc-emf {
+  font: 600 10px var(--font-ui);
+  fill: var(--text-1);
+}
+.bldc-diagram .bldc-wire--on {
+  stroke-width: 3.5;
+}
+.bldc-diagram .pmsm-axis {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.bldc-diagram .pmsm-axis--d {
+  stroke: #9085e9;
+}
+.bldc-diagram .pmsm-axis--q {
+  stroke: #d95926;
+}
+.bldc-diagram .pmsm-vec {
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+}
+.bldc-diagram .pmsm-circle {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-dasharray: 4 4;
+}

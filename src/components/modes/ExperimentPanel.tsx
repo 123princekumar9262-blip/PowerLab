@@ -3,6 +3,7 @@ import { describeFault, diffParams, diffQuantities, explainChanges, formatQuanti
 import type { Measurements } from '../../measurements/measurements.ts'
 import { supportsFreewheel, type CircuitId, type DiodeId, type FaultSpec, type LabParams, type LoadType, type RectifierTopology } from '../../types/simulation.ts'
 import { FREEWHEEL_EXPERIMENTS, type FreewheelExperiment } from '../../experiment/freewheel.ts'
+import { StepBar } from '../lab/Modes.tsx'
 
 interface Props {
   circuitId: CircuitId
@@ -59,6 +60,7 @@ export function ExperimentPanel({ circuitId, topology, params, measurements, ste
           </button>
         )}
       </header>
+      <StepBar at={snapshot ? 1 : 0} of={2} label={snapshot ? 'Step 2 of 2: change a value and compare' : 'Step 1 of 2: capture the circuit before'} />
 
       {fwCircuit && (
         <div className="guided">

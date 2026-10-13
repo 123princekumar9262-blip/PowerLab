@@ -3,6 +3,7 @@ import type { Level } from '../shell/prefs.ts'
 import { formatSI, formatTime, formatW } from '../utils/format.ts'
 import { carryIsEmpty, type CarryReport } from './carry.ts'
 import type { AnalysisCategory, ComponentInspection, CurrentPath, EnergyModel, NextConsequence, StatusInfo, WhyQuestion, WorkspaceEvent } from './contract.ts'
+import { Typed, TypedRun } from './Typed.tsx'
 
 /*
  * The shell's generic views. Each renders one contract shape (contract.ts) that a lab adapter produced from
@@ -88,7 +89,15 @@ export function WhyView({ questions, next, onGoTo, detailed, extra }: { question
   const [id, setId] = useState(questions[0]?.id ?? '')
   const [more, setMore] = useState(detailed)
   const q = questions.find((x) => x.id === id) ?? questions[0]
+  // the answer is written out word by word each time a question is chosen (a click shows it all)
+  const [shown, setShown] = useState<string | null>(null)
   if (!q) return <p className="muted small">No explanation for this instant.</p>
+  const pieces: Array<[string, string]> = [
+    ['what', q.what],
+    ['why', q.why],
+    ['principle', q.principle],
+    ...(next ? ([['next', next.text]] as Array<[string, string]>) : []),
+  ]
   return (
     <section className="wv-why" aria-label="Why">
       {questions.length > 1 ? (
@@ -102,19 +111,24 @@ export function WhyView({ questions, next, onGoTo, detailed, extra }: { question
       ) : (
         <p className="wv-question">{q.question}</p>
       )}
+      <TypedRun key={q.id} pieces={pieces} done={shown === q.id} onDone={() => setShown(q.id)}>
       <dl className="wv-steps">
         <div>
           <dt>What is happening?</dt>
-          <dd>{q.what}</dd>
+          <dd>
+            <Typed id="what" text={q.what} />
+          </dd>
         </div>
         <div>
           <dt>Why?</dt>
-          <dd>{q.why}</dd>
+          <dd>
+            <Typed id="why" text={q.why} />
+          </dd>
         </div>
         <div>
           <dt>Physical principle</dt>
           <dd>
-            {q.principle}
+            <Typed id="principle" text={q.principle} />
             {q.equation && <span className="chain-eq wv-eq">{q.equation}</span>}
           </dd>
         </div>
@@ -122,7 +136,7 @@ export function WhyView({ questions, next, onGoTo, detailed, extra }: { question
           <div className="why-next">
             <dt>What happens next?</dt>
             <dd>
-              {next.text}
+              <Typed id="next" text={next.text} />
               {next.time !== null && onGoTo && (
                 <button className="text-btn wv-goto" onClick={() => onGoTo(next.time!)}>
                   Go to t = {formatTime(next.time)} →
@@ -132,6 +146,7 @@ export function WhyView({ questions, next, onGoTo, detailed, extra }: { question
           </div>
         )}
       </dl>
+      </TypedRun>
       {(q.more?.length || extra) && (
         <>
           <button className="text-btn wv-more-btn" aria-expanded={more} onClick={() => setMore(!more)}>
@@ -148,6 +163,31 @@ export function WhyView({ questions, next, onGoTo, detailed, extra }: { question
         </>
       )}
       <p className="muted small">Read from the simulated state at the cursor — move the cursor and the answer follows the circuit.</p>
+    </section>
+  )
+}
+
+// ── Symbols ─────────────────────────────────────────────────────────────────
+
+/** "Symbols used here": every notation of this circuit, its waveforms and its parameters, in plain words. */
+export function SymbolsView({ sections }: { sections: Array<{ title: string; rows: Array<[string, string]> }> }) {
+  return (
+    <section className="wv-symbols" aria-label="Symbols used here">
+      {sections
+        .filter((x) => x.rows.length > 0)
+        .map((x) => (
+          <div key={x.title}>
+            <h3 className="eyebrow">{x.title}</h3>
+            <dl>
+              {x.rows.map(([sym, meaning]) => (
+                <div key={sym}>
+                  <dt>{sym}</dt>
+                  <dd>{meaning}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
     </section>
   )
 }

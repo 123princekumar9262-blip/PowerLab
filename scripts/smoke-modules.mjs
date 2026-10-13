@@ -6,6 +6,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const OUT = 'scripts/out/'
 mkdirSync(OUT, { recursive: true })
@@ -16,7 +17,7 @@ const check = (cond, msg) => {
   if (!cond) failures.push(msg)
 }
 const URL = process.env.LAB_URL ?? 'http://localhost:5199/'
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -103,7 +104,7 @@ const MODULES = [
 await page.goto(URL + '#/labs')
 await page.waitForTimeout(400)
 for (const name of ['Rectifiers', 'DC-DC Converters', 'PWM', 'Inverters', 'Switching Devices', 'Magnetics', 'Control', 'Drives & Motors', 'Losses & Thermal', 'EV Power Electronics'])
-  check(await page.locator('.lab-card', { hasText: name }).first().isVisible(), `${name} is in the Labs catalogue`)
+  check(await page.locator('.lab-tile', { hasText: name }).first().isVisible(), `${name} is in the Labs catalogue`)
 const go = async (route) => {
   await page.goto(URL + route)
   await page.waitForTimeout(900)

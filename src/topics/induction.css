@@ -1,0 +1,136 @@
+/* Induction motor topic (drives lab): its own classes only, all prefixed .im- */
+.im-tn {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.im-tn .im-grid {
+  stroke: var(--scope-grid, rgba(128, 128, 128, 0.18));
+  stroke-width: 1;
+}
+.im-tn .im-axis {
+  stroke: var(--text-3, #6b7280);
+  stroke-width: 1;
+}
+.im-tn .im-tick {
+  font: 10.5px var(--font-ui);
+  fill: var(--text-3);
+}
+.im-tn .im-axis-label {
+  font: 11px var(--font-ui);
+  fill: var(--text-2);
+}
+.im-tn .im-curve {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 1.8;
+}
+.im-tn .im-curve--pre {
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+.im-tn .im-load {
+  fill: none;
+  stroke: #aeb7c5;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.im-tn .im-traj {
+  fill: none;
+  stroke: #d95926;
+  stroke-width: 1.2;
+  opacity: 0.75;
+}
+.im-tn .im-sim-pt {
+  fill: #199e70;
+  stroke: var(--surface-1);
+  stroke-width: 1.5;
+}
+.im-tn .im-th-pt {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 1.5;
+}
+.im-tn .im-bd {
+  fill: var(--text-2);
+}
+.im-tn .im-cursor {
+  fill: #3987e5;
+  stroke: var(--surface-1);
+  stroke-width: 1.5;
+}
+.im-tn .im-label {
+  font: 10.5px var(--font-ui);
+  fill: var(--text-2);
+  paint-order: stroke;
+  stroke: var(--surface-1);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.im-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.im-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.im-key {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--text-1);
+}
+.im-key--load {
+  border-top: 2px dashed #aeb7c5;
+}
+.im-key--traj {
+  border-top-color: #d95926;
+}
+.im-key--dot {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 50%;
+  background: #199e70;
+}
+.im-key--ring {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--text-1);
+  border-radius: 50%;
+}
+/* the motor drawing: field arrows and the rotor mark */
+.buck-diagram .im-field {
+  stroke: #3987e5;
+  stroke-width: 3;
+  fill: none;
+  stroke-linecap: round;
+}
+.buck-diagram .im-field-head {
+  fill: #3987e5;
+}
+.buck-diagram .im-rotor-mark {
+  stroke: #d95926;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.buck-diagram .im-ring {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 9;
+  opacity: 0.22;
+}
+.buck-diagram .im-bar {
+  fill: var(--text-3);
+}
+.im-eqc {
+  max-height: 190px;
+}

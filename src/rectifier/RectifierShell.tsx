@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type ReactNode } from 'react'
+import { useEffect, useState, type Dispatch, type ReactNode } from 'react'
 import { fullName, labById, modesOf, rectifierTopicFor, workspaceModes, type ModeId } from '../catalogue/catalogue.ts'
 import { LOADS } from '../circuits/registry.ts'
 import { AngleView } from '../components/AngleView.tsx'
@@ -15,6 +15,7 @@ import { rectifierNextConsequence, rectifierStatus, rectifierTime, rectifierWhyQ
 import type { Inspection } from '../inspect/inspect.ts'
 import type { Comparison } from '../measurements/compare.ts'
 import { href } from '../shell/router.ts'
+import { subjectOf } from '../catalogue/subjects.ts'
 import type { Drawer, LabAction, LabState, ScopeView } from '../state/labState.ts'
 import { isThreePhase, supportsFreewheel, type CircuitEvent, type LoadType, type SignalId, type SimulationResult } from '../types/simulation.ts'
 import { formatDeg } from '../utils/format.ts'
@@ -22,11 +23,16 @@ import type { EventGroup } from '../visualization/eventGroups.ts'
 import type { ChannelPreset } from '../visualization/presets.ts'
 import type { Viewport } from '../visualization/scopeRenderer.ts'
 import type { ComponentInspection, CurrentPath, WorkspaceEvent } from '../workspace/contract.ts'
-import { AnalyzeView, EnergyView, EventsView, InspectorView, StatusLine, WhyView } from '../workspace/views.tsx'
+import { AnalyzeView, EnergyView, EventsView, InspectorView, StatusLine, SymbolsView, WhyView } from '../workspace/views.tsx'
+import { GLOSSARY } from '../lab/glossary.ts'
+import { AskPanel } from '../assist/AskPanel.tsx'
 import { WorkspaceShell, type ExploreItem, type ShellPanel } from '../workspace/WorkspaceShell.tsx'
 import { categoryFor, rectifierAnalysis } from './analyze.tsx'
 import '../styles/workspace.css'
 import '../styles/rectifier-shell.css'
+import { isFirstVisit, markSeen } from '../shell/prefs.ts'
+import { rectifierReadings } from './readings.ts'
+import { DeviceReadings } from './DeviceReadings.tsx'
 
 /*
  * The adapter between the Rectifier Lab and the universal workspace shell. It owns no simulation state and
@@ -43,6 +49,8 @@ export function panelOf(drawer: Drawer | null): string | null {
     case 'inspect':
     case 'state':
     case 'learn':
+    case 'ask':
+    case 'symbols':
       return drawer.kind
     case 'event':
     case 'events':
@@ -60,6 +68,8 @@ export function drawerOf(panel: string, current: Drawer | null, hasSelectedEvent
     case 'energy':
     case 'state':
     case 'learn':
+    case 'ask':
+    case 'symbols':
       return { kind: panel }
     case 'inspect':
       return { kind: 'inspect', part: current?.kind === 'inspect' ? current.part : undefined }
@@ -168,6 +178,9 @@ export function RectifierShell(p: RectifierShellProps) {
   const { state, dispatch, result, comparison, explanation: ex } = p
   const [showPath, setShowPath] = useState(false)
   const lab = labById('rectifiers')!
+  // the lab's first visit: the essentials (two readings) until "Show everything"
+  const [essentials, setEssentials] = useState(() => isFirstVisit('rectifiers'))
+  useEffect(() => markSeen('rectifiers'), [])
   const device = state.params.control?.device ?? 'diode'
   const entry = rectifierTopicFor({ topology: result.params.topology, device: result.params.topology === 'semi-bridge' || result.params.topology === '3ph-half-controlled' ? 'scr' : device })
   const answersHidden = p.hide || p.hideCircuit
@@ -256,6 +269,7 @@ export function RectifierShell(p: RectifierShellProps) {
         selectedPart={state.drawer?.kind === 'inspect' ? (state.drawer.part ?? null) : null}
         onPart={(part) => dispatch({ type: 'openDrawer', drawer: { kind: 'inspect', part } })}
       />
+      {three && level === 'engineer' && !p.hide && ex.sample && <DeviceReadings params={result.params} sample={ex.sample} result={result} />}
     </div>
   )
 
@@ -373,13 +387,14 @@ export function RectifierShell(p: RectifierShellProps) {
   const explore: ExploreItem[] = answersHidden
     ? []
     : [
-        { id: 'path', label: 'Show current path', icon: '⇢', kind: 'toggle', pressed: showPath, run: () => setShowPath(!showPath) },
-        { id: 'inspect', label: 'Inspect a component', icon: '⌕', kind: 'panel', target: 'inspect' },
-        { id: 'state', label: 'State details', icon: '◉', kind: 'panel', target: 'state' },
-        { id: 'energy', label: 'Energy', icon: '⚡', kind: 'panel', target: 'energy', secondary: true },
-        { id: 'events', label: 'Switching events', icon: '◆', kind: 'panel', target: 'events', secondary: true },
-        { id: 'analyze', label: 'Measurements & theory', icon: '▤', kind: 'panel', target: 'analyze', secondary: true, badge: comparison.allWithinTolerance ? undefined : '⚠' },
-        ...(state.mode === 'lab' ? [{ id: 'learn', label: 'Lessons', icon: '✎', kind: 'panel' as const, target: 'learn', secondary: true }] : []),
+        { id: 'path', label: 'Show current path', icon: '⇢', kind: 'toggle', pressed: showPath, run: () => setShowPath(!showPath), hint: 'Highlight the loop the current takes now, and name it in words' },
+        { id: 'inspect', label: 'Inspect a component', icon: '⌕', kind: 'panel', target: 'inspect', hint: 'Pick a part (or click it on the circuit): its voltage, current and role now' },
+        { id: 'state', label: 'State details', icon: '◉', kind: 'panel', target: 'state', hint: 'Every diode or SCR and every value at the cursor instant' },
+        { id: 'energy', label: 'Energy', icon: '⚡︎', kind: 'panel', target: 'energy', secondary: true, hint: 'Where the power goes at this instant, and the energy stored' },
+        { id: 'events', label: 'Switching events', icon: '◆', kind: 'panel', target: 'events', secondary: true, hint: 'Every turn-on and turn-off found in the run; click one to jump to it' },
+        { id: 'analyze', label: 'Measurements & theory', icon: '▤', kind: 'panel', target: 'analyze', secondary: true, badge: comparison.allWithinTolerance ? undefined : '⚠', hint: 'Measured values, compared with the textbook theory' },
+        { id: 'symbols', label: 'Symbols used here', icon: '§', kind: 'panel', target: 'symbols', secondary: true, hint: 'What every letter on this page means (α, μ, PIV …)' },
+        ...(state.mode === 'lab' ? [{ id: 'learn', label: 'Lessons', icon: '✎', kind: 'panel' as const, target: 'learn', secondary: true, hint: 'Short guided lessons on this circuit' }] : []),
       ]
 
   const inspectPart = state.drawer?.kind === 'inspect' ? (state.drawer.part ?? null) : null
@@ -445,8 +460,33 @@ export function RectifierShell(p: RectifierShellProps) {
         />
       ),
     },
+    symbols: { title: 'Symbols used here', eyebrow: lab.title, render: () => <SymbolsView sections={[{ title: 'On the circuit and in the texts', rows: GLOSSARY.rectifiers }]} /> },
     learn: { title: 'Lessons', eyebrow: 'Learn', render: () => p.learnPanel },
   }
+  // ── Ask a doubt: the question goes with what the simulation shows now ──
+  const askContext = () => {
+    const rp = result.params
+    const st = rectifierStatus(ex, result, true)
+    const pth = rectifierPath(result, ex)
+    const rd = rectifierReadings(comparison.measurements, rp).map((x) => `${x.label}: ${x.value} ${x.unit}${x.note ? ` (${x.note})` : ''}`)
+    return [
+      `Lab: Rectifiers › ${entry ? fullName(entry) : rp.topology}. Mode: ${state.mode}.`,
+      `Circuit: ${rp.topology}, ${rp.control.device === 'scr' ? `SCRs fired at α = ${((rp.control.alpha * 180) / Math.PI).toFixed(1)}°` : 'diodes'}, load ${rp.load}${rp.control.freewheel ? ', freewheeling diode fitted' : ''}.`,
+      `Parameters: source ${rp.vrms} V rms, ${rp.frequency} Hz (Vm = ${rp.vm.toFixed(2)} V); R = ${rp.resistance} Ω; L = ${rp.inductance} H; C = ${rp.capacitance} F; diode model ${rp.diode.kind}${rp.diode.kind === 'real' ? ` (Vf ${rp.diode.vf} V, Ron ${rp.diode.ron} Ω)` : ''}; three-phase source Rs = ${rp.threePhase.rs} Ω, Ls = ${rp.threePhase.ls} H.`,
+      `Readings of the last cycle: ${rd.join('; ')}.`,
+      `At the cursor (${rectifierTime(ex)}): ${st.headline}${st.facts.length ? ` — ${st.facts.join('; ')}` : ''}.`,
+      pth ? `Current path now: ${pth.text}.` : '',
+      `WHY at the cursor: ${rectifierWhyQuestions(result, ex)
+        .slice(0, 3)
+        .map((c) => `${c.question} → ${c.what} ${c.why}`)
+        .join(' | ')}`,
+      `Symbols: ${GLOSSARY.rectifiers.map(([a, b]) => `${a} = ${b}`).join('; ')}.`,
+    ]
+      .filter(Boolean)
+      .join('\n')
+  }
+  const ask: ShellPanel = { title: 'Ask a doubt', eyebrow: 'Rectifiers · live', render: () => <AskPanel id={`rectifiers/${entry?.id ?? result.params.topology}`} context={askContext} /> }
+
   const activity: ShellPanel | null = state.mode !== 'lab' && state.mode !== 'compare' && p.modePanel ? { title: p.modeTitle, render: () => p.modePanel } : null
 
   return (
@@ -454,6 +494,7 @@ export function RectifierShell(p: RectifierShellProps) {
       header={{
         back: { href: href.lab(lab.id), label: lab.title },
         lab: lab.title,
+        subject: subjectOf(lab.id),
         title: `${entry ? fullName(entry) : lab.title}${p.fwCircuit && result.params.control.freewheel ? ' + freewheeling diode' : ''}`,
         siblings,
         ...workspaceModes(modesOf(lab)),
@@ -467,6 +508,7 @@ export function RectifierShell(p: RectifierShellProps) {
       status={status}
       waveform={waveform}
       why={why}
+      ask={answersHidden ? null : ask}
       explore={explore}
       panels={panels}
       open={open}
@@ -477,6 +519,9 @@ export function RectifierShell(p: RectifierShellProps) {
       notice={p.notice}
       runId={p.runId}
       body={p.body}
+      readings={answersHidden ? null : rectifierReadings(comparison.measurements, result.params)}
+      essentials={essentials}
+      onShowAll={() => setEssentials(false)}
     />
   )
 }

@@ -8,6 +8,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const OUT = 'scripts/out/'
 mkdirSync(OUT, { recursive: true })
@@ -19,7 +20,7 @@ const check = (cond, msg) => {
 }
 const URL = process.env.LAB_URL ?? 'http://localhost:5199/'
 const BUCK = URL + '#/labs/dc-dc/buck'
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const ctx = await browser.newContext()
 const open = async (w, h, level = 'beginner') => {
   const p = await ctx.newPage()
@@ -42,7 +43,7 @@ const explore = async (p, name) => {
 }
 const menuItems = async (p) => {
   await p.locator('.ws-explore-btn').click()
-  const items = await p.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  const items = await p.locator('.ws-explore-menu [role^=menuitem] .ws-menu-name').allInnerTexts()
   await p.keyboard.press('Escape')
   return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
 }
@@ -71,8 +72,8 @@ const benchBox = await p.locator('.ws-bench').boundingBox()
 check(benchBox.width > 900, `the circuit is the visual centre (${Math.round(benchBox.width)} px wide)`)
 // the default workspace: two actions, not a row of tools
 const acts = await p.locator('.ws-actions .ws-act').allInnerTexts()
-check(acts.map((x) => x.replace(/\s+/g, ' ').replace(/^[?☰⚙] /, '').trim()).join('|') === 'WHY|Explore', `two everyday actions: WHY and Explore (${acts.length})`)
-check((await menuItems(p)).join('|') === 'Show current path|Inspect a component|State details|Energy|Switching events|Measurements & theory|Lessons|Focus view', 'Explore holds the rest: path, inspect, state, energy, events, measurements, lessons, focus')
+check(acts.map((x) => x.replace(/\s+/g, ' ').replace(/^[?☰⚙] /, '').trim()).join('|') === 'WHY|Ask|Explore', `two everyday actions: WHY and Explore (${acts.length})`)
+check((await menuItems(p)).join('|') === 'Show current path|Inspect a component|State details|Energy|Switching events|Measurements & theory|Symbols used here|Lessons|Focus view', 'Explore holds the rest: path, inspect, state, energy, events, measurements, lessons, focus')
 const modeTabs = await p.locator('.ws-modes-tabs [role=tab]').allInnerTexts()
 check(modeTabs.join('|') === 'Explore|Learn|Experiment|Predict' && (await p.locator('.ws-more-modes').count()) === 0, 'modes: Explore · Learn · Experiment · Predict, all tabs (DC-DC has no practice modes under More)')
 // Basic parameters only; Advanced on demand
@@ -107,8 +108,11 @@ await p.screenshot({ path: `${OUT}ws-desktop-inspect.png` })
 await p.keyboard.press('Escape')
 await p.waitForTimeout(150)
 check((await p.locator('.ws-side').count()) === 0, 'Esc closes the panel and the side column goes away')
+// the current path is on from the start (Explore turns it off and on)
+check((await p.locator('.buck-diagram .wire--flow').count()) > 4 && /Current path\s+Vin\+ → Q1/.test(await p.locator('.wp-path').innerText()), 'the current path flows on the circuit from the start: Vin → Q1 → L (from the simulated devices)')
 await explore(p, 'Show current path')
-check((await p.locator('.buck-diagram .wire--flow').count()) > 4 && /Current path\s+Vin\+ → Q1/.test(await p.locator('.wp-path').innerText()), 'Show current path: highlighted on the circuit, Vin → Q1 → L (from the simulated devices)')
+check((await p.locator('.buck-diagram .wire--flow').count()) === 0 && (await p.locator('.wp-path').count()) === 0, 'Explore → Show current path turns it off')
+await explore(p, 'Show current path')
 await why(p).click()
 const whyOn = await p.locator('.wv-why').innerText()
 check(['WHAT IS HAPPENING?', 'WHY?', 'PHYSICAL PRINCIPLE', 'WHAT HAPPENS NEXT?'].every((h) => whyOn.toUpperCase().includes(h)), 'WHY: what is happening · why · physical principle · what happens next')
@@ -270,7 +274,7 @@ for (const [w, h] of [
   check((await p.locator('.ws-params').count()) === 0 && (await p.locator('.ws-side').count()) === 0, `${w}: parameters and panels are not on the page (sheets)`)
   const bar = p.locator('.ws-actions--sticky')
   check(await bar.isVisible(), `${w}: sticky action bar`)
-  check((await bar.locator('.ws-act').allInnerTexts()).map((x) => x.replace(/\s+/g, ' ').replace(/^[?☰⚙] /, '').trim()).join('|') === 'Parameters|WHY|Explore', `${w}: Parameters · WHY · Explore`)
+  check((await bar.locator('.ws-act').allInnerTexts()).map((x) => x.replace(/\s+/g, ' ').replace(/^[?☰⚙] /, '').trim()).join('|') === 'Parameters|WHY|Ask|Explore', `${w}: Parameters · WHY · Explore`)
   const sizes = await bar.locator('.ws-act').evaluateAll((els) => els.map((e) => [e.getBoundingClientRect().width, e.getBoundingClientRect().height]))
   check(sizes.every(([bw, bh]) => bw >= 44 && bh >= 44), `${w}: action targets ≥ 44 px (${sizes.map((s) => Math.round(s[0])).join(', ')})`)
   // parameters: modal sheet with a focus trap; Esc closes and focus returns
@@ -307,6 +311,30 @@ for (const [w, h] of [
   check((await p.locator('.wp-time').innerText()) !== t0, `${w}: the waveform cursor responds to a tap`)
   await p.screenshot({ path: `${OUT}ws-${w}.png`, fullPage: true })
   await p.close()
+}
+
+// ── A lab's first visit: the essentials (a context without the full-workspace helper) ──
+console.log('── First visit')
+{
+  const raw = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+  const fp = await raw.newPage({ viewport: { width: 1440, height: 900 } })
+  fp.on('pageerror', (e) => errors.push(String(e)))
+  await fp.goto(BUCK)
+  await fp.waitForSelector('.ws .cscope canvas')
+  await fp.waitForTimeout(400)
+  check(await fp.locator('.ws-essentials').isVisible(), 'first visit of a lab: "essentials only" is said, with Show everything')
+  check((await fp.locator('.ws-reading').count()) === 2, 'first visit: two readings')
+  check((await fp.locator('.wp-channels .chip--on').count()) === 2, 'first visit: the main waveforms only (Gate, Vout)')
+  check(/more reading/.test(await fp.locator('.ws-readings').innerText()), 'the other readings are one click away')
+  await fp.locator('.ws-essentials').click()
+  await fp.waitForTimeout(300)
+  check((await fp.locator('.wp-channels .chip--on').count()) === 3 && (await fp.locator('.ws-essentials').count()) === 0, 'Show everything: the default waveforms, no essentials note')
+  await fp.reload()
+  await fp.waitForSelector('.ws .cscope canvas')
+  await fp.waitForTimeout(400)
+  check((await fp.locator('.ws-essentials').count()) === 0 && (await fp.locator('.wp-channels .chip--on').count()) === 3, 'the next visit shows the full workspace')
+  check(/Simulated/.test(await fp.locator('.ws-live').innerText()), 'the strip says its values are simulated')
+  await raw.close()
 }
 
 await browser.close()

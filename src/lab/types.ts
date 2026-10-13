@@ -188,6 +188,22 @@ export interface MeasureLabel {
 }
 
 /**
+ * One headline value of the readings strip above the circuit (workspace shell): a measurement of the
+ * run, never a parameter echo. `value` is the formatted number without its unit.
+ */
+export interface Reading {
+  id: string
+  /** Plain words, e.g. "Output voltage, average". */
+  label: string
+  value: string
+  unit: string
+  /** One short line under the value: the symbol or the relation it follows (Standard and Engineer). */
+  note?: string
+  /** Shown from this density up (default: always). Beginner shows at most two readings. */
+  min?: Density
+}
+
+/**
  * A category of the Analyze panel (workspace shell). `rows` name measurement keys (dotted paths allowed,
  * e.g. "losses.q"); they are shown with their SIMULATION value and, when a compare row with the same key
  * exists, its THEORY value. `tab` reuses one of `analyze.tabs`. Categories with nothing to show are hidden.
@@ -282,6 +298,11 @@ export interface Topic<P, R extends Run, M, S> {
   energyModel?(st: S, m: M, r: R): EnergyModel
   /** The channels Focus view keeps (default: the first default channel). */
   primaryChannels?: string[]
+  /**
+   * The readings strip: 3–4 headline results of the run (from the measurements), most important first.
+   * Beginner sees the first two; Standard and Engineer see all.
+   */
+  readings?(m: M, r: R): Reading[]
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

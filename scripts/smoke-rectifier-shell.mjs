@@ -7,6 +7,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const OUT = 'scripts/out/'
 mkdirSync(OUT, { recursive: true })
@@ -17,7 +18,7 @@ const check = (cond, msg) => {
   if (!cond) failures.push(msg)
 }
 const URL = process.env.LAB_URL ?? 'http://localhost:5199/'
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const ctx = await browser.newContext()
 const open = async (w, h, hash, level = 'standard', ready = '.ws .scope-canvas canvas') => {
   const p = await ctx.newPage()
@@ -44,7 +45,7 @@ const explore = async (p, name) => {
 }
 const menuItems = async (p) => {
   await p.locator('.ws-explore-btn').click()
-  const items = await p.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  const items = await p.locator('.ws-explore-menu [role^=menuitem] .ws-menu-name').allInnerTexts()
   await p.keyboard.press('Escape')
   return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
 }
@@ -65,7 +66,7 @@ let p = await open(1440, 900, '#/labs/rectifiers/1ph-bridge?load=RL')
 check(await p.locator('.ws--desktop').isVisible(), 'desktop presentation at 1440 px')
 for (const region of ['.ws-head', '.ws-params', '.ws-bench', '.ws-wave']) check(await p.locator(region).isVisible(), `region ${region}`)
 check((await p.locator('.ws-side').count()) === 0, 'no side column until something is opened')
-check((await menuItems(p)).join('|') === 'Show current path|Inspect a component|State details|Energy|Switching events|Measurements & theory|Lessons|Focus view', 'one Explore menu: path, inspect, state, energy, events, measurements, lessons, focus')
+check((await menuItems(p)).join('|') === 'Show current path|Inspect a component|State details|Energy|Switching events|Measurements & theory|Symbols used here|Lessons|Focus view', 'one Explore menu: path, inspect, state, energy, events, measurements, lessons, focus')
 check((await p.locator('.ws-modes-tabs [role=tab]').allInnerTexts()).join('|') === 'Explore|Learn|Experiment|Predict', 'modes: Explore · Learn · Experiment · Predict (Challenge, Reverse, Compare under More)')
 check((await p.locator('main.ws').count()) === 1, 'the workspace is the page’s main landmark')
 check((await p.getByRole('heading', { level: 1 }).innerText()) === 'Single-phase bridge', 'header: the circuit name is the page heading')
@@ -187,7 +188,7 @@ for (const w of [390, 375]) {
   p = await open(w, 844, '#/labs/rectifiers/1ph-half-wave-scr?load=RL')
   check(await p.locator('.ws--phone').isVisible(), `${w}: phone presentation`)
   check((await overflow(p)) <= 0, `${w}: no horizontal page scroll`)
-  check((await p.locator('.ws-actions--sticky').count()) === 1 && (await p.locator('.ws-actions--sticky .ws-act').count()) === 3, `${w}: sticky bar: Parameters · WHY · Explore`)
+  check((await p.locator('.ws-actions--sticky').count()) === 1 && (await p.locator('.ws-actions--sticky .ws-act').count()) === 4, `${w}: sticky bar: Parameters · WHY · Ask · Explore`)
   const rc = await p.locator('.rx-circuit').evaluate((e) => ({ sw: e.scrollWidth, cw: e.clientWidth }))
   check(rc.sw > rc.cw, `${w}: the schematic keeps a legible width and scrolls inside its card`)
   await why(p).click()
@@ -235,6 +236,43 @@ check((await p.getByLabel(/^Firing angle/).last().inputValue()) === '60' && /α 
 await p.goto(URL + '#/labs/rectifiers/1ph-bridge-scr?load=RL&alpha=45')
 await p.waitForTimeout(600)
 check((await p.getByLabel(/^Firing angle/).last().inputValue()) === '45', 'an entry point’s own value (α = 45° in the address) wins over the carried one')
+await p.close()
+
+// ── The notice only describes the circuit on the bench; activities' values are not the student's ──
+console.log('── carry: lessons, puzzles, Compare')
+p = await open(1440, 900, '#/labs/rectifiers/1ph-bridge?load=R')
+await setField(/^Resistance/, 22)
+await p.goto(URL + '#/labs/rectifiers/1ph-half-wave/learn')
+await p.waitForTimeout(700)
+check(/R = 22\.00 Ω/.test(await p.locator('.wv-notice').innerText()) && (await p.getByLabel(/^Resistance/).last().inputValue()) === '22', 'Learn opens with the kept R = 22 Ω, and the notice says so')
+await p.locator('.ws-side .lesson-card').first().click()
+await p.waitForTimeout(600)
+check((await p.locator('.wv-notice').count()) === 0 && (await p.getByLabel(/^Resistance/).last().inputValue()) !== '22', 'a lesson loads its own circuit: the “kept” notice no longer claims to describe it')
+await p.goto(URL + '#/labs/rectifiers/1ph-bridge/compare')
+await p.waitForSelector('.compare-lab')
+await p.waitForTimeout(400)
+check((await p.locator('.wv-notice').count()) === 0, 'Compare (its own pair of circuits): no “kept from the previous circuit” notice')
+await p.close()
+// the puzzle is random: a seeded Math.random (test only) makes it the same, non-default circuit on every run
+p = await ctx.newPage()
+await p.setViewportSize({ width: 1440, height: 900 })
+p.on('pageerror', (e) => errors.push(String(e)))
+await p.addInitScript(() => {
+  let s = 20261010
+  Math.random = () => (s = (s * 16807) % 2147483647) / 2147483647
+})
+await p.goto(URL + '#/home')
+await p.evaluate(() => {
+  localStorage.clear()
+  localStorage.setItem('pel.prefs', JSON.stringify({ level: 'standard' }))
+})
+await p.goto(URL + '#/labs/rectifiers/1ph-bridge/reverse')
+await p.reload()
+await p.waitForSelector('.ws .scope-canvas canvas')
+await p.waitForTimeout(500)
+await p.goto(URL + '#/labs/rectifiers/1ph-half-wave')
+await p.waitForTimeout(700)
+check((await p.locator('.wv-notice').count()) === 0 && (await p.getByLabel(/^Resistance/).last().inputValue()) === '10' && (await p.getByLabel(/^Vrms/).last().inputValue()) === '12', 'after a Reverse puzzle the next circuit opens with its defaults: the hidden random values are not carried as the student’s')
 await p.close()
 
 // ── Levels and Focus: the same workspace, more or less detail ──────────────────

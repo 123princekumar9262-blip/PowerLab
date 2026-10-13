@@ -1,7 +1,9 @@
 import { compareMosfet, measureMosfet, MOSFET_DEFAULTS, MOSFET_EXPERIMENTS, MOSFET_LESSONS, mosfetEventLabel, mosfetEventWhy, mosfetPredictions, mosfetStateAt, mosfetView, mosfetWhy, type MosfetState } from '../converters/devices/content.ts'
 import { MOSFET_LIMITS as L, simulateMosfet, type MosfetMeasurements, type MosfetParams, type MosfetRun } from '../converters/devices/mosfet.ts'
+import { DPT_RUNS, dptPath, Flow, flowThr, peakAbs } from '../components/devices/WbgDiagrams.tsx'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV } from '../utils/format.ts'
+import { mosfetReadings } from './readings.ts'
 
 const CH: Record<string, ChannelMeta> = {
   vg: { id: 'vg', label: 'Vdrv', name: 'Gate driver output', unit: 'V', color: '#aeb7c5', dash: [6, 4], group: 'Gate' },
@@ -16,8 +18,12 @@ const CH: Record<string, ChannelMeta> = {
 }
 
 /** Double-pulse test circuit with the MOSFET's gate model; states read from the simulation. */
-function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetState; r: MosfetRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
+function DptDiagram({ st, r, selected, onSelect, values, live, showPath }: { st: MosfetState; r: MosfetRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean; showPath: boolean }) {
   const p = r.params
+  // current flow at the cursor: the load carries I0 = iD + iF (KCL at the drain); the source carries iD
+  const thr = flowThr(p.i0)
+  // with the flow shown, the wires stay neutral under the green dashes (the symbols still show who conducts)
+  const hue = (c: string) => (showPath ? '' : c)
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -37,12 +43,17 @@ function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetSta
   return (
     <svg className="buck-diagram" viewBox="0 0 690 270" role="group" aria-label={`Double-pulse test: ${st.phase}`}>
       <path d="M380 40 H560 V230 H380" className="wire" />
-      <path d="M380 40 V70" className={`wire ${st.diode ? 'wire--diode' : ''}`} />
+      <path d="M380 40 V70" className={`wire ${hue(st.diode ? 'wire--diode' : '')}`} />
       <path d="M380 120 V130" className="wire" />
       <path d="M470 40 V70" className="wire" />
       <path d="M470 120 V130 H380" className="wire" />
-      <path d="M380 130 V160" className={`wire ${chOn ? 'wire--igbt' : ''}`} />
-      <path d="M380 200 V230" className={`wire ${chOn ? 'wire--igbt' : ''}`} />
+      <path d="M380 130 V160" className={`wire ${hue(chOn ? 'wire--igbt' : '')}`} />
+      <path d="M380 200 V230" className={`wire ${hue(chOn ? 'wire--igbt' : '')}`} />
+      <Flow on={showPath} i={st.id} thr={thr} runs={DPT_RUNS.srcTop} />
+      <Flow on={showPath} i={st.id} thr={thr} runs={DPT_RUNS.srcBot} />
+      <Flow on={showPath} i={st.id} thr={thr} runs={[[[380, 130], [380, 160]], [[380, 200], [380, 230]]]} />
+      <Flow on={showPath} i={st.idiode} thr={thr} runs={DPT_RUNS.diode} />
+      <Flow on={showPath} i={p.i0} thr={thr} runs={[[[470, 40], [470, 70]], [[470, 120], [470, 130], [380, 130]]]} />
       {/* DC source */}
       <g {...part('vdc', `Vdc ${p.vdc} V`)}>
         <rect x={545} y={115} width={30} height={30} className="cpart-hit" />
@@ -71,11 +82,16 @@ function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetSta
       <g {...part('load', `Load current ${p.i0} A`)}>
         <rect x={450} y={70} width={40} height={50} className="cpart-hit" />
         <circle cx={470} cy={95} r={16} className="sym-body" />
-        <path d="M470 108 V82 M464 88 L470 82 L476 88" className="sym" />
-        <text x={496} y={99} className="cvalue">
-          I0 {formatA(p.i0)}
+        {/* arrow down: I0 flows from Vdc+ through the inductor into the drain node */}
+        <path d="M470 82 V108 M464 102 L470 108 L476 102" className="sym" />
+        {/* three short lines between the source and the loop's right-hand wire (x = 560) */}
+        <text x={492} y={90} className="cvalue">
+          I0
         </text>
-        <text x={496} y={113} className="cvalue">
+        <text x={492} y={104} className="cvalue">
+          {formatA(p.i0)}
+        </text>
+        <text x={492} y={118} className="cnote">
           (inductor)
         </text>
       </g>
@@ -100,6 +116,7 @@ function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetSta
       {/* gate network */}
       <path d="M120 180 H200" className="wire" />
       <path d="M250 180 H366" className="wire" />
+      <Flow on={showPath} i={st.ig} thr={flowThr(peakAbs(r.signals.ig))} runs={[[[120, 180], [200, 180]], [[250, 180], [366, 180]]]} />
       <g {...part('rg', `Gate resistor ${p.rg} Ω`)}>
         <rect x={198} y={168} width={54} height={24} className="cpart-hit" />
         <rect x={205} y={173} width={40} height={14} rx={2} className="sym-body" />
@@ -124,12 +141,13 @@ function DptDiagram({ st, r, selected, onSelect, values, live }: { st: MosfetSta
           Cgs {formatSI(p.cgs, 'F')}
         </text>
         <path d="M330 180 V120 H380" className="wire wire--thin" strokeDasharray="3 3" />
-        <text x={336} y={146} className="cvalue">
+        {/* left of its dashed branch, clear of the drain wire at x = 380 */}
+        <text x={324} y={146} textAnchor="end" className="cvalue">
           Cgd {formatSI(p.cgd, 'F')}
         </text>
       </g>
       {values && (
-        <text x={262} y={204} textAnchor="middle" className="cvalue cvalue--strong">
+        <text x={250} y={204} textAnchor="middle" className="cvalue cvalue--strong">
           vGS {formatV(st.vgs)}
         </text>
       )}
@@ -162,13 +180,15 @@ export const MOSFET_TOPIC: Topic<MosfetParams, MosfetRun, MosfetMeasurements, Mo
     { kind: 'number', key: 'gm', label: 'Transconductance gm', unit: 'S', min: L.gm.min, max: L.gm.max, log: true },
     { kind: 'number', key: 'ron', label: 'On-resistance Ron', unit: 'mΩ', scale: 1e-3, min: L.ron.min, max: L.ron.max, log: true },
   ],
-  paramNote: (_p, r) => `τ = Rg·Ciss = ${formatTime(r.params.rg * r.params.ciss)} · plateau ≈ Vth + I0/gm = ${formatV(r.params.vpl, false)} · window ${formatTime(r.params.tend)}`,
+  paramNote: (_p, r) =>
+    `τ = Rg·Ciss = ${formatTime(r.params.rg * r.params.ciss)} · plateau ≈ Vth + I0/gm = ${formatV(r.params.vpl, false)} · window ${formatTime(r.params.tend)} · model: constant Cgs, Cgd, Cds (a real Cgd grows as vDS falls, lengthening the plateau), no diode reverse recovery, no stray inductance (so no ringing)`,
   simulate: (p) => simulateMosfet(p),
   measure: measureMosfet,
   state: mosfetStateAt,
   view: (st) => mosfetView(st),
   why: mosfetWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <DptDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <DptDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
+  path: (st, r) => dptPath({ dev: 'Q', devId: 'mosfet', i: st.id, idiode: st.idiode, i0: r.params.i0 }),
   channels: CH,
   defaultChannels: ['vg', 'vgs', 'vds', 'id'],
   addOrder: ['vg', 'vgs', 'ig', 'vds', 'id', 'idiode', 'ich', 'pdev', 'energy'],
@@ -238,6 +258,7 @@ export const MOSFET_TOPIC: Topic<MosfetParams, MosfetRun, MosfetMeasurements, Mo
   lessons: MOSFET_LESSONS,
   experiments: MOSFET_EXPERIMENTS,
   predictions: mosfetPredictions,
+  readings: mosfetReadings,
   measureLabels: {
     tdOn: { label: 'td(on)', fmt: (v) => formatTime(v) },
     tri: { label: 't_ri', fmt: (v) => formatTime(v) },

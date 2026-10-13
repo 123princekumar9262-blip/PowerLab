@@ -1,6 +1,6 @@
 # UI architecture redesign — plan
 
-Status: **Approved. Phases 1–3 implemented.**
+Status: **Approved. Phases 1–5 implemented** (listed below). Section 1 audits the app as it was *before* the redesign (`Platform.tsx`, `LabShell`, `#dcdc` routes, phone sheets): it is history, not the current design — for that see the README and docs/WORKSPACE-SHELL-PLAN.md.
 - Phase 1: global navigation, Home, Labs catalogue, landing pages, routing, READY / COMING SOON,
   Continue learning, learning path, search, Settings, responsive navigation.
 - Phase 2: the universal workspace shell, with Buck as the reference.

@@ -394,15 +394,18 @@ export function drawOverlay(
       ctx.globalAlpha = 0.5
       ctx.setLineDash([3, 4])
       ctx.beginPath()
-      ctx.moveTo(Math.round(x) + 0.5, L.lanesTop)
-      ctx.lineTo(Math.round(x) + 0.5, L.lanesBottom)
+      for (const lane of L.lanes) {
+        ctx.moveTo(Math.round(x) + 0.5, lane.top)
+        ctx.lineTo(Math.round(x) + 0.5, lane.top + lane.height)
+      }
       ctx.stroke()
       ctx.setLineDash([])
       ctx.globalAlpha = 1
     }
   }
 
-  // Cursor: one vertical line through every lane — the same instant everywhere.
+  // Cursor: one vertical line through every lane — the same instant everywhere. It is drawn inside the
+  // lanes only, so it never crosses a lane's title (the handle above the lanes marks it in the event row).
   const t = trace.time[cursorIndex]
   const x = timeToX(L, vp, t)
   if (x < L.plotLeft - 0.5 || x > L.plotRight + 0.5) return
@@ -410,8 +413,10 @@ export function drawOverlay(
   ctx.strokeStyle = colors.cursor
   ctx.lineWidth = 1.5
   ctx.beginPath()
-  ctx.moveTo(xr, L.eventRowBottom - 4)
-  ctx.lineTo(xr, L.lanesBottom)
+  for (const lane of L.lanes) {
+    ctx.moveTo(xr, lane.top)
+    ctx.lineTo(xr, lane.top + lane.height)
+  }
   ctx.stroke()
   ctx.fillStyle = colors.cursor
   ctx.beginPath()

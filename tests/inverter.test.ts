@@ -6,6 +6,7 @@ import { inverterModel, legDevices } from '../src/converters/inverter/model.ts'
 import { legCommands, resolveInverter, svDuty, svDwell, type InverterParams } from '../src/converters/inverter/modulation.ts'
 import { converterIndexAt } from '../src/converters/engine.ts'
 import { INVERTER_DEFAULTS, inverterTopic } from '../src/topics/inverters.tsx'
+import { cpuNow } from './helpers.ts'
 
 const sim = (kind: InvKind, o: Partial<InverterParams> = {}) => inverterTopic(kind).simulate({ ...INVERTER_DEFAULTS[kind], ...o }) as InverterRun
 const run = (kind: InvKind, o: Partial<InverterParams> = {}) => {
@@ -222,9 +223,9 @@ describe('inverters: explanations and content from the simulation', () => {
   })
   it('every inverter topic simulates its defaults fast enough for live interaction', () => {
     for (const kind of kinds) {
-      const t0 = performance.now()
+      const t0 = cpuNow()
       const r = sim(kind)
-      expect(performance.now() - t0).toBeLessThan(3000)
+      expect(cpuNow() - t0).toBeLessThan(3000)
       expect(inverterTopic(kind).analyze.compare(r, measureInverter(r)).allPass).toBe(true)
     }
   })

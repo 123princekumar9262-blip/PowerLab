@@ -31,3 +31,13 @@ export const fwParams = (freewheel: boolean, over: { vf?: number; ron?: number; 
   control: { device: 'diode', alphaDeg: 0, freewheel },
   sim: { ...DEFAULT_PARAMS.sim, cycles: over.cycles ?? 10 },
 })
+
+/**
+ * A clock of the CPU time this test process has used [ms]. Speed tests ask whether a simulation is fast
+ * enough for interactive use: the cost of the code. Wall-clock time also counts every other test file the
+ * runner executes in parallel (each file is its own process), which made those tests fail only on a busy machine.
+ */
+export function cpuNow(): number {
+  const u = process.cpuUsage()
+  return (u.user + u.system) / 1000
+}

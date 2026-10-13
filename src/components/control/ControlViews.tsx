@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { ControlRun, ControlState } from '../../converters/control/content.ts'
 import type { LoopGain } from '../../converters/control/theory.ts'
 import { formatA, formatSI, formatV } from '../../utils/format.ts'
@@ -6,8 +7,10 @@ import { formatA, formatSI, formatV } from '../../utils/format.ts'
  * The feedback loop as a block diagram: reference → comparison → PID → PWM → converter → output,
  * and the sampled measurement back. Every value is the simulated one at the cursor.
  */
-export function ControlDiagram({ st, r, selected, onSelect, values, live = true }: { st: ControlState; r: ControlRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live?: boolean }) {
+export function ControlDiagram({ st, r, selected, onSelect, values, live = true, showPath = false }: { st: ControlState; r: ControlRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live?: boolean; showPath?: boolean }) {
   const p = r.params
+  // the load current (the only electrical flow drawn): animated above 1e-3 of the run's peak
+  const ioPeak = useMemo(() => r.signals.io.reduce((m, x) => Math.max(m, Math.abs(x)), 0), [r])
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -42,6 +45,17 @@ export function ControlDiagram({ st, r, selected, onSelect, values, live = true 
       <path d="M345 90 H380" className="wire wire--hi" />
       <path d="M470 90 H505" className="wire wire--hi" />
       <path d="M625 90 H660 V200 H160 V110" className={`wire ${closed ? 'wire--sig' : 'wire--thin'}`} strokeDasharray={closed ? undefined : '4 4'} />
+      {showPath && (
+        // the signals always travel round the loop: reference → error → controller → PWM → converter, and (closed
+        // loop only) the measured output back to the comparison
+        <>
+          <path d="M100 90 H140" className="wire wire--flow" />
+          <path d="M180 90 H215" className="wire wire--flow" />
+          <path d="M345 90 H380" className="wire wire--flow" />
+          <path d="M470 90 H505" className="wire wire--flow" />
+          {closed && <path d="M625 90 H660 V200 H160 V110" className="wire wire--flow" />}
+        </>
+      )}
       {box(10, 64, 90, 52, 'ref', 'Vref', formatV(st.vref, false))}
       <g {...part('sum', 'Error')}>
         <circle cx={160} cy={90} r={20} className="pblock" />
@@ -74,12 +88,14 @@ export function ControlDiagram({ st, r, selected, onSelect, values, live = true 
       {box(380, 64, 90, 52, 'pwm', 'PWM', `fs ${formatSI(p.fs, 'Hz')}`, st.gate)}
       {box(505, 56, 120, 70, 'plant', p.kind === 'buck' ? 'Buck' : 'Boost', live ? `Vout ${formatV(st.vout)}` : 'converter')}
       {live && (
-        <text x={565} y={142} textAnchor="middle" className="cvalue cvalue--il">
+        // beside the converter's output wire (x = 580), not on it
+        <text x={572} y={142} textAnchor="end" className="cvalue cvalue--il">
           iL {formatA(st.il)}
         </text>
       )}
       {box(520, 210, 130, 46, 'load', p.loadStep === 'on' ? (st.t >= p.tload ? 'Load (stepped)' : 'Load') : 'Load', formatSI(st.rload, 'Ω'))}
       <path d="M580 126 V210" className="wire wire--load" />
+      {showPath && Math.abs(st.io) > 1e-3 * ioPeak && <path d={st.io > 0 ? 'M580 126 V210' : 'M580 210 V126'} className="wire wire--flow" />}
       <g {...part('sensor', 'Sampler')}>
         <rect x={260} y={186} width={200} height={28} rx={8} className="pblock" />
         <text x={360} y={205} textAnchor="middle" className="cvalue">

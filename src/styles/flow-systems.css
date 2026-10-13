@@ -1,0 +1,22 @@
+/* Flow overlays of the non-circuit diagrams (thermal path, EV drivetrain, control loop, PWM modulators).
+   The moving dashes themselves are `.buck-diagram .wire--flow` (dcdc.css); these only recolour or add a
+   static highlight. Prefix: fsys-. */
+
+/* heat (thermal path, friction brakes): the same moving dashes, in the heat colour */
+.buck-diagram .wire--flow.fsys-heat {
+  stroke: #e66767;
+}
+
+/* the bridge path the modulator applies at the cursor (no load current is simulated: a static band, not dashes) */
+.buck-diagram .fsys-applied {
+  fill: none;
+  stroke: #3987e5;
+  stroke-opacity: 0.28;
+  stroke-width: 9;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.buck-diagram .fsys-applied--zero {
+  stroke: var(--text-3);
+  stroke-opacity: 0.3;
+}

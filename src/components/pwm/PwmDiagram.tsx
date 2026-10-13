@@ -10,6 +10,8 @@ interface Props {
   values: boolean
   /** Live numbers (Standard and Engineer). */
   live?: boolean
+  /** Animate the signal flow (there is no load current: the modulator only). */
+  showPath?: boolean
 }
 
 /**
@@ -17,7 +19,7 @@ interface Props {
  * output into the dead-time block and a half-bridge output stage. Values and states are the
  * simulated ones at the cursor; the active path is highlighted.
  */
-export function PwmDiagram({ st, p, selected, onSelect, values, live = true }: Props) {
+export function PwmDiagram({ st, p, selected, onSelect, values, live = true, showPath = false }: Props) {
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -56,6 +58,18 @@ export function PwmDiagram({ st, p, selected, onSelect, values, live = true }: P
       <path d={`M450 120 H490`} className={`wire ${st.gate ? 'wire--hi' : 'wire--sig'}`} />
       <path d={`M580 100 H610`} className={`wire ${st.gh ? 'wire--hi' : 'wire--sig'}`} />
       <path d={`M580 140 H610`} className={`wire ${st.gl ? 'wire--hi' : 'wire--sig'}`} />
+      {showPath && (
+        // signal flow only: the reference and the carrier always reach the comparator; its HIGH output and the gate
+        // command that is ON at the cursor travel on (none during the dead time)
+        <>
+          <path d={`M150 ${yR} H${sampled ? 190 : 330} ${sampled ? '' : `V${yR + 35} H350`}`} className="wire wire--flow" />
+          {sampled && <path d={`M300 ${yR} H330 V${yR + 35} H350`} className="wire wire--flow" />}
+          <path d={`M150 ${yC} H330 V${yC - 35} H350`} className="wire wire--flow" />
+          {st.gate && <path d="M450 120 H490" className="wire wire--flow" />}
+          {st.gh && <path d="M580 100 H610" className="wire wire--flow" />}
+          {st.gl && <path d="M580 140 H610" className="wire wire--flow" />}
+        </>
+      )}
 
       {box(20, yR - 28, 130, 56, 'Reference r(t)', p.reference === 'dc' ? `DC, D = ${(p.duty * 100).toFixed(0)} %` : `sine, M = ${p.m.toFixed(2)}`, 'ref')}
       {sampled && box(190, yR - 28, 110, 56, 'Sample & hold', p.sampling === 'regular-sym' ? 'once per Tc' : 'twice per Tc', 'sh')}
@@ -96,13 +110,16 @@ export function PwmDiagram({ st, p, selected, onSelect, values, live = true }: P
       {/* output stage: half-bridge */}
       <g {...part('out', `Output stage, vout = ${formatV(st.vout)}`)}>
         <rect x={610} y={60} width={70} height={130} rx={10} className="pblock" />
-        <line x1={645} y1={70} x2={645} y2={180} className="sym" />
+        {/* the leg stops at each switch box, so a lit (tinted) switch never shows the line through GH / GL */}
+        <path d="M645 70 V78 M645 108 V142 M645 172 V180" className="sym" />
         <rect x={632} y={78} width={26} height={30} rx={4} className={`pswitch ${st.gh ? 'pswitch--on' : ''}`} />
         <rect x={632} y={142} width={26} height={30} rx={4} className={`pswitch ${st.gl ? 'pswitch--on-l' : ''}`} />
         <text x={645} y={98} textAnchor="middle" className="dchip-text">
+          <title>GH: gate of the high-side (upper) switch</title>
           GH
         </text>
         <text x={645} y={162} textAnchor="middle" className="dchip-text">
+          <title>GL: gate of the low-side (lower) switch</title>
           GL
         </text>
         <circle cx={645} cy={125} r={4} className="node-dot" />
@@ -111,6 +128,10 @@ export function PwmDiagram({ st, p, selected, onSelect, values, live = true }: P
             vout {formatV(st.vout)}
           </text>
         )}
+        {/* the notation, on the drawing itself */}
+        <text x={682} y={228} textAnchor="end" className="cvalue pwm-key">
+          GH upper gate · GL lower gate
+        </text>
         <text x={645} y={54} textAnchor="middle" className="cvalue">
           {p.output === 'bipolar' ? `±${formatV(p.vdc / 2, false)}` : `0 … ${formatV(p.vdc, false)}`}
         </text>

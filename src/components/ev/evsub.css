@@ -1,0 +1,107 @@
+/* EV lab subsystems (battery & BMS, DC-DC stage). Class names prefixed evb- / evd-. */
+.evb-diagram .evb-cell {
+  fill: var(--surface-2);
+  stroke: var(--text-1);
+  stroke-width: 1.6;
+}
+.evb-diagram .evb-cell--low {
+  stroke: #c98500;
+  stroke-width: 2.6;
+}
+.evb-diagram .evb-cell--cut {
+  stroke: #e66767;
+  stroke-width: 3;
+}
+.evb-diagram .evb-cell--held {
+  stroke: #3987e5;
+  stroke-width: 3;
+}
+.evb-diagram .evb-nub {
+  fill: var(--text-2);
+}
+.evb-diagram .evb-fill {
+  opacity: 0.85;
+}
+.evb-diagram .evb-bleed {
+  fill: var(--surface-3);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.evb-diagram .evb-bleed--on {
+  fill: #d95926;
+  stroke: #f08a5d;
+}
+.evb-diagram .evb-val {
+  font: 10.5px var(--font-mono);
+  fill: var(--text-1);
+}
+.evb-diagram .evb-val--soc {
+  fill: var(--text-2);
+}
+.evb-diagram .evb-val--pol {
+  fill: #9085e9;
+}
+.evb-diagram .evb-small,
+.evd-diagram .evd-small {
+  font-size: 10.5px;
+}
+.evd-diagram .evd-arrow {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.evd-diagram .evd-arrow--fwd {
+  stroke: #3987e5;
+}
+.evd-diagram .evd-arrow--back {
+  stroke: #22b14c;
+}
+.evd-chart {
+  width: 100%;
+  display: block;
+}
+.evd-chart .evd-grid {
+  stroke: var(--scope-grid, var(--border));
+  stroke-width: 1;
+}
+.evd-chart .evd-tick {
+  font: 10.5px var(--font-ui);
+  fill: var(--text-3);
+}
+.evd-chart .evd-line {
+  fill: none;
+  stroke: #3987e5;
+  stroke-width: 2;
+}
+.evd-chart .evd-line--sw {
+  stroke: #d95926;
+  stroke-dasharray: 5 4;
+}
+.evd-chart .evd-line--cond {
+  stroke: #9085e9;
+  stroke-dasharray: 2 3;
+}
+.evd-chart .evd-dot {
+  fill: #3987e5;
+}
+.evd-chart .evd-now {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.evd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 4px 0 0;
+  color: var(--text-2);
+}
+.evd-diagram .evd-sw {
+  fill: var(--surface-3);
+  stroke: var(--border-strong);
+}
+.evd-diagram .evd-sw--on {
+  fill: rgba(57, 135, 229, 0.4);
+  stroke: #3987e5;
+}

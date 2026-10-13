@@ -1,0 +1,52 @@
+/* 120° conduction chart (Inverters › 120° conduction). Class names are prefixed c120- (owned by that topic). */
+.c120-chart {
+  width: 100%;
+  display: block;
+  margin-top: 6px;
+}
+.c120-chart .c120-text {
+  font: 12.5px var(--font-mono);
+  fill: var(--text-2);
+}
+.c120-chart .c120-head {
+  font: 600 12.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.c120-chart .c120-muted {
+  font: 12px var(--font-mono);
+  fill: var(--text-3);
+}
+.c120-chart .c120-track {
+  fill: var(--surface-2);
+}
+.c120-chart .c120-grid {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.c120-chart .c120-gate {
+  fill: rgba(57, 135, 229, 0.35);
+}
+.c120-chart .c120-gate--now {
+  fill: rgba(57, 135, 229, 0.8);
+}
+.c120-chart .c120-igbt {
+  fill: rgba(57, 135, 229, 0.6);
+}
+.c120-chart .c120-diode {
+  fill: rgba(34, 177, 76, 0.7);
+}
+.c120-chart .c120-open {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-dasharray: 3 3;
+}
+.c120-chart .c120-cursor {
+  stroke: #d95926;
+  stroke-width: 1.5;
+}
+.c120-chart .c120-key-igbt {
+  fill: rgba(57, 135, 229, 0.6);
+}
+.c120-chart .c120-key-diode {
+  fill: rgba(34, 177, 76, 0.7);
+}

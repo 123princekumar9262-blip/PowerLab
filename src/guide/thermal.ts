@@ -1,0 +1,90 @@
+import type { GuideArticle } from './types.ts'
+
+/** Losses & thermal lab guide. Examples are confirmed by the thermal simulation (tests/guide.test.ts). */
+export const THERMAL_GUIDE: GuideArticle[] = [
+  {
+    id: 'switch-losses',
+    lab: 'thermal',
+    title: 'Where the heat comes from',
+    summary: 'Conduction loss while on, switching loss at every edge — both grow when hot.',
+    group: 'Losses and temperature',
+    topics: ['switch'],
+    blocks: [
+      { kind: 'p', text: 'A switch loses power in two ways. While it is on, the current flows through its on-resistance: conduction loss. At every turn-on and turn-off it carries voltage and current at the same time for a short switching time: switching loss, proportional to the switching frequency. Both grow with the junction temperature Tj.' },
+      { kind: 'eq', eq: { expr: 'Pc = D·I²·Ron(Tj),  Ron(Tj) = Ron25·(1 + α·(Tj − 25 °C))', note: 'Conduction loss at duty D.' } },
+      { kind: 'eq', eq: { expr: 'Ps = fs·½·Vdc·I·tsw·(1 + κ·(Tj − 25 °C))', note: 'Switching loss of a hard-switched leg; tsw is the sum of the rise and fall times.' } },
+      { kind: 'h', text: 'Worked example' },
+      {
+        kind: 'example',
+        text: 'I = 80 A, D = 0.5, Vdc = 600 V, fs = 10 kHz, Ron = 10 mΩ at 25 °C (α = 0.6 %/K), tsw = 133 ns (κ = 0.3 %/K), constant load.',
+        result: 'At 25 °C the switch would lose 32.0 W conducting and 31.9 W switching. Running at its steady junction temperature of 110.9 °C it loses 88.6 W in total.',
+      },
+      { kind: 'try', text: 'A constant load: read the losses in the Analyze panel.', lab: 'thermal', topic: 'switch', query: { load: 'constant' } },
+    ],
+    whyPrompts: ['Where does the heat come from?'],
+  },
+  {
+    id: 'thermal-path',
+    lab: 'thermal',
+    title: 'From losses to junction temperature',
+    summary: 'Heat flows from the die through the case and the heatsink to the air.',
+    group: 'Losses and temperature',
+    topics: ['switch'],
+    blocks: [
+      { kind: 'p', text: 'The heat flows from the junction through the package to the case (Rjc), and from the case through the heatsink to the air (Rca). In steady state the temperature rises add up like voltages across resistors in series. The die and the package heat up in milliseconds; the heatsink, with its large mass, takes minutes.' },
+      { kind: 'eq', eq: { expr: 'Tj = Ta + P·Rth,  Rth = Rjc + Rca', note: 'Steady state, constant power P.' } },
+      { kind: 'eq', eq: { expr: 'Zth(t) = Σ Ri·(1 − e^(−t/τi))', note: 'Transient thermal impedance (Foster network): how the temperature rise builds up after a power step.' } },
+      { kind: 'p', text: 'Because the losses grow with Tj, P is not known in advance: the junction runs hotter than Ta + P·Rth computed with the cold (25 °C) losses.' },
+      { kind: 'h', text: 'Worked example' },
+      {
+        kind: 'example',
+        text: 'The same switch at a constant load; Rjc = 0.3 K/W, heatsink Rca = 0.5 K/W with τ = 60 s, Ta = 40 °C.',
+        result: 'Tj = 40 + 88.6 W·0.8 K/W = 110.9 °C, and the heatsink sits at 84.3 °C. With the cold losses (63.9 W) the estimate would be only 91.1 °C. From cold, the junction needs 134 s to cover 90 % of its rise: the heatsink sets the pace.',
+      },
+      { kind: 'try', text: 'Heat-up from cold at a constant load.', lab: 'thermal', topic: 'switch', query: { load: 'constant', view: 'startup' } },
+    ],
+    whyPrompts: ['Why is Tj higher than Ta + P·Rth?', 'Why does the junction cool so fast at first?'],
+  },
+  {
+    id: 'power-cycling',
+    lab: 'thermal',
+    title: 'Power cycling: the temperature swing',
+    summary: 'A pulsed load makes the junction temperature swing around its mean.',
+    group: 'Losses and temperature',
+    topics: ['switch'],
+    blocks: [
+      { kind: 'p', text: 'When the load is switched on and off, the junction heats during each pulse and cools in each pause. The heatsink is too slow to follow and stays near a mean temperature; the die swings on top of it. Silicon, solder, copper and bond wires expand by different amounts, so every swing strains the joints; their lifetime falls steeply as the swing ΔTj grows.' },
+      { kind: 'eq', eq: { expr: 'ΔTj ≈ P·Zth(ton)', note: 'Roughly: the rise of the fast part of the thermal path during one pulse.' } },
+      { kind: 'p', text: 'Shorter pulses give the die less time to heat, so the swing shrinks, while the mean stays almost the same.' },
+      { kind: 'h', text: 'Worked example' },
+      {
+        kind: 'example',
+        text: 'The same switch, pulsed load 2 s on / 2 s off.',
+        result: 'Tj swings between 59.8 °C and 84.8 °C (ΔTj = 25.0 K) around a mean of 72.2 °C. With 0.2 s on / 0.2 s off: ΔTj = 18.6 K around a mean of 71.7 °C.',
+      },
+      { kind: 'try', text: 'Pulsed load, 2 s on / 2 s off.', lab: 'thermal', topic: 'switch', query: { load: 'pulsed', ton: '2', toff: '2' } },
+      { kind: 'try', text: 'Faster cycling: 0.2 s on / 0.2 s off.', lab: 'thermal', topic: 'switch', query: { load: 'pulsed', ton: '0.2', toff: '0.2' } },
+    ],
+    whyPrompts: ['Why does the temperature swing matter?'],
+  },
+  {
+    id: 'thermal-runaway',
+    lab: 'thermal',
+    title: 'Thermal runaway',
+    summary: 'When hotter means lossier faster than the heatsink can cope.',
+    group: 'Losses and temperature',
+    topics: ['switch'],
+    blocks: [
+      { kind: 'p', text: 'The losses grow with temperature: P = a + b·(Tj − 25 °C), where b (in W/K) is how much extra power each kelvin costs. Each extra watt raises Tj by Rth kelvin. If b·Rth is below 1, the loop settles at a higher temperature. If b·Rth reaches 1, every kelvin brings enough loss to raise Tj by another kelvin: there is no steady state, the junction heats without limit.' },
+      { kind: 'eq', eq: { expr: 'Tj − 25 °C = (Ta − 25 °C + Rth·a)/(1 − b·Rth)', note: 'Constant load. Runaway when b·Rth ≥ 1.' } },
+      { kind: 'h', text: 'Worked example' },
+      {
+        kind: 'example',
+        text: 'The same switch at a constant load: a = 63.9 W at 25 °C and b = 0.29 W/K.',
+        result: 'With Rca = 0.5 K/W (Rth = 0.8 K/W): b·Rth = 0.23 and Tj = 110.9 °C. With a heatsink of Rca = 3.5 K/W (Rth = 3.8 K/W): b·Rth = 1.09 ≥ 1 — thermal runaway, no steady state exists.',
+      },
+      { kind: 'try', text: 'A poor heatsink: Rca = 3.5 K/W at a constant load.', lab: 'thermal', topic: 'switch', query: { load: 'constant', rha: '3.5' } },
+    ],
+    whyPrompts: ['Where does the heat come from?'],
+  },
+]

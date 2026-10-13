@@ -6,6 +6,20 @@ type M = Record<string, unknown>
 
 const show = (labels: Record<string, MeasureLabel>, k: string, v: unknown) => (typeof v === 'number' ? (labels[k]?.fmt(v) ?? v.toPrecision(4)) : String(v))
 
+/**
+ * Where the student is in a mode: one segment per step (done, current, to come). The same bar in every
+ * mode — a lesson's steps, a prediction round's questions, an experiment's four phases.
+ */
+export function StepBar({ at, of, label }: { at: number; of: number; label: string }) {
+  return (
+    <div className="step-bar" role="progressbar" aria-valuemin={1} aria-valuemax={of} aria-valuenow={at + 1} aria-label={label}>
+      {Array.from({ length: of }, (_, k) => (
+        <span key={k} className={k < at ? 'done' : k === at ? 'on' : ''} />
+      ))}
+    </div>
+  )
+}
+
 /** Before/after table of simulated measurements. */
 export function BeforeAfter({ rows, before, after, labels }: { rows: string[]; before: M; after: M; labels: Record<string, MeasureLabel> }) {
   return (
@@ -70,6 +84,7 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
         >
           ← All experiments
         </button>
+        <StepBar at={res ? 3 : choice === null ? 0 : 1} of={4} label="Experiment: predict, run, result, why" />
         <h3>{exp.title}</h3>
         {changed && <p className="small muted">This experiment starts from the lab’s standard values, not the ones you set in Explore.</p>}
         <p className="exp-q">
@@ -128,7 +143,7 @@ export function ExperimentPanel({ topic, params, m, onApply, captureRows }: { to
   return (
     <section className="dc-mode-panel" aria-label="Experiments">
       <h3>Guided experiments</h3>
-      <p className="small muted">Each one starts from your present parameters: predict first, then the simulation answers.</p>
+      <p className="small muted">Each one starts from the lab’s standard values: predict first, then the simulation answers.</p>
       <ul className="exp-list">
         {(topic.experiments as Array<Experiment<object, M>>).map((e) => (
           <li key={e.id}>
@@ -221,6 +236,7 @@ export function PredictPanel({ topic, onShow, onCovered }: { topic: AnyTopic; on
           Score {score.right} / {score.total}
         </span>
       </div>
+      <StepBar at={idx} of={tasks.length} label={`Prediction ${idx + 1} of ${tasks.length}`} />
       <p className="exp-q">{task.prompt}</p>
       {task.kind === 'number' ? (
         <label className="predict-input">
@@ -339,17 +355,13 @@ export function LearnPanel(props: {
           Step {step + 1} of {lesson.steps.length}
         </span>
       </div>
+      <StepBar at={step} of={lesson.steps.length} label={`Step ${step + 1} of ${lesson.steps.length}`} />
       <h3>{s.title}</h3>
       <p className="lesson-text">{props.body}</p>
       <p className="small">
         <b>Look:</b> {s.look}
       </p>
       {step + 1 === lesson.steps.length && lesson.check && <LessonCheckView key={lesson.id} check={lesson.check} />}
-      <div className="lesson-dots" aria-hidden="true">
-        {lesson.steps.map((_, k) => (
-          <span key={k} className={k === step ? 'on' : k < step ? 'done' : ''} />
-        ))}
-      </div>
       <div className="why-actions">
         <button className="text-btn" disabled={step === 0} onClick={() => props.onStep(step - 1)}>
           ← Back

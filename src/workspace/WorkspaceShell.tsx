@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import type { Reading } from '../lab/types.ts'
 import { LEVELS, type Level } from '../shell/prefs.ts'
 import { loadJSON, saveJSON } from '../utils/storage.ts'
 
@@ -47,6 +48,8 @@ export interface ExploreItem {
   run?(): void
   /** Steps aside in Focus view (analysis, events, energy, learning lists). */
   secondary?: boolean
+  /** What it is for, in one line under its name. */
+  hint?: string
 }
 
 export interface ShellPanel {
@@ -60,6 +63,8 @@ export interface ShellPanel {
 export interface ShellHeader {
   back: { href: string; label: string }
   lab: string
+  /** The subject the lab belongs to (shown before the lab's name, linking to the subject's overview). */
+  subject?: { href: string; label: string }
   title: string
   /** The lab's other circuits; `group` (optional) heads a section of the menu. */
   siblings: Array<{ id: string; label: string; href: string; current: boolean; group?: string }>
@@ -81,6 +86,8 @@ export interface WorkspaceShellProps {
   waveform: ReactNode
   /** WHY — the primary learning action, beside the circuit (null while a mode hides the answers). */
   why: ShellPanel | null
+  /** Ask a doubt: a live question about this circuit (null while a mode hides the answers). */
+  ask?: ShellPanel | null
   /** Everything else, behind one Explore menu. */
   explore: ExploreItem[]
   panels: Record<string, ShellPanel>
@@ -97,6 +104,13 @@ export interface WorkspaceShellProps {
   runId?: number
   /** Full-width content that replaces the regions under the header (e.g. a side-by-side comparison). */
   body?: ReactNode
+  /** The readings strip: the run's headline results (null while a prediction covers them). */
+  readings?: Reading[] | null
+  /** A lab's first visit: the essentials only (two readings, the main waveforms) until "Show everything". */
+  essentials?: boolean
+  onShowAll?(): void
+  /** The circuit is being simulated again (a slow solve): the strip says "Updating". */
+  busy?: boolean
 }
 
 export function WorkspaceShell(props: WorkspaceShellProps) {
@@ -115,8 +129,8 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
   useEffect(() => {
     if (pres === 'desktop') setParamsOpen(false)
   }, [pres])
-  const panel: ShellPanel | null = open === 'why' ? props.why : open ? (panels[open] ?? null) : null
-  const items: ExploreItem[] = [...(focus ? props.explore.filter((i) => !i.secondary) : props.explore), { id: 'focus', label: 'Focus view', icon: '◎', kind: 'toggle', pressed: focus, run: () => props.onFocus(!focus) }]
+  const panel: ShellPanel | null = open === 'why' ? props.why : open === 'ask' ? (props.ask ?? null) : open ? (panels[open] ?? null) : null
+  const items: ExploreItem[] = [...(focus ? props.explore.filter((i) => !i.secondary) : props.explore), { id: 'focus', label: 'Focus view', icon: '◎', kind: 'toggle', pressed: focus, run: () => props.onFocus(!focus), hint: 'Hide the side panels: only the circuit and its main waveform' }]
   const runItem = (i: ExploreItem) => {
     if (i.kind === 'toggle') return i.run?.()
     setParamsOpen(false)
@@ -125,6 +139,10 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
   const toggleWhy = () => {
     setParamsOpen(false)
     onOpen(open === 'why' ? null : 'why')
+  }
+  const toggleAsk = () => {
+    setParamsOpen(false)
+    onOpen(open === 'ask' ? null : 'ask')
   }
   const toggleParams = () => {
     onOpen(null)
@@ -146,21 +164,25 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
   const sidePanel = panel && !(pres === 'desktop' && panel.wide) ? panel : null
   // desktop: a third column only while something is open in it (a panel, or the current mode's activity)
   const side = pres === 'desktop' && !!(sidePanel || props.activity)
-  const actions = <ActionBar whyOpen={open === 'why'} onWhy={props.why ? toggleWhy : undefined} items={items} openPanel={open} onItem={runItem} sticky={pres === 'phone'} onParams={pres === 'phone' ? toggleParams : undefined} paramsOpen={paramsOpen} mark={guide && props.why ? 4 : null} />
+  const actions = <ActionBar whyOpen={open === 'why'} onWhy={props.why ? toggleWhy : undefined} askOpen={open === 'ask'} onAsk={props.ask ? toggleAsk : undefined} items={items} openPanel={open} onItem={runItem} sticky={pres === 'phone'} onParams={pres === 'phone' ? toggleParams : undefined} paramsOpen={paramsOpen} mark={guide && props.why ? 4 : null} />
   return (
     <main className={`ws ws--${pres} ${focus ? 'ws--focus' : ''} ${side ? 'ws--side' : ''} ${guide ? 'ws--guide' : ''}`} data-run-id={props.runId}>
       <WorkspaceHeader h={header} pres={pres} onParams={pres === 'tablet' ? toggleParams : undefined} paramsOpen={paramsOpen} guide={guide} onGuide={() => (guide ? closeGuide() : setGuide(true))} />
       {props.notice}
       {guide && <WorkspaceGuide modes={[...header.modes, ...(header.moreModes ?? [])]} why={!!props.why} onClose={closeGuide} />}
+      {props.readings !== undefined && <ReadingsStrip readings={props.readings} level={header.level} essentials={!!props.essentials} onShowAll={props.onShowAll} busy={!!props.busy} />}
       <div className="ws-grid">
         {pres === 'desktop' && !focus && (
-          <aside className="ws-params" aria-label="Parameters">
+          // the column scrolls inside the bench: focusable, so a keyboard can scroll to text below the last control
+          <aside className="ws-params" aria-label="Parameters" tabIndex={0}>
             {mark(1)}
+            <RegionTitle n={1} title="Parameters" />
             {props.params}
           </aside>
         )}
         <section className="ws-bench" aria-label="Circuit">
           {mark(2)}
+          <RegionTitle n={pres === 'desktop' && !focus ? 2 : null} title="Circuit" hint={header.level === 'beginner' ? 'Click a part to see what it is doing' : undefined} />
           {props.circuit}
           {props.status}
           {pres !== 'phone' && actions}
@@ -171,7 +193,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
           )}
         </section>
         {side && (
-          <aside className="ws-side" aria-label={sidePanel ? sidePanel.title : (props.activity?.title ?? 'Panel')}>
+          <aside className="ws-side" aria-label={sidePanel ? sidePanel.title : (props.activity?.title ?? 'Panel')} tabIndex={0}>
             {sidePanel ? (
               <Overlay kind="dock" title={sidePanel.title} eyebrow={sidePanel.eyebrow} onClose={() => onOpen(null)}>
                 {sidePanel.render()}
@@ -185,6 +207,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
       {small && props.activity && <Activity panel={props.activity} inline />}
       <section className="ws-wave" aria-label="Waveforms">
         {mark(3)}
+        <RegionTitle n={pres === 'desktop' && !focus ? 3 : null} title="Waveforms" hint={header.level === 'beginner' ? 'Drag the white cursor to move through time' : undefined} />
         {props.waveform}
       </section>
       {pres === 'phone' && actions}
@@ -207,6 +230,81 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
         </Overlay>
       )}
     </main>
+  )
+}
+
+/** A region's title: its step number (the same numbers as "How this lab works"), its name, a short hint. */
+function RegionTitle({ n, title, hint }: { n: number | null; title: string; hint?: string }) {
+  return (
+    <div className="ws-region-title">
+      {n !== null && (
+        <span className="ws-num" aria-hidden="true">
+          {n}
+        </span>
+      )}
+      <h2>{title}</h2>
+      {hint && <span className="ws-region-hint">{hint}</span>}
+    </div>
+  )
+}
+
+const LEVEL_RANK: Record<Level, number> = { beginner: 0, standard: 1, engineer: 2 }
+/** How many readings a level shows before "more": Beginner (and a lab's first visit) the first two. */
+const READINGS_SHOWN = (level: Level, essentials: boolean) => (essentials || level === 'beginner' ? 2 : 4)
+
+/**
+ * The readings strip: the run's headline results, large, with plain names. Measurements of the whole run
+ * (they do not move with the cursor). Beginner sees the first two, the rest one click away; the relation
+ * behind each value is its tooltip, and printed under it at Engineer.
+ */
+function ReadingsStrip({ readings, level, essentials, onShowAll, busy }: { readings: Reading[] | null; level: Level; essentials: boolean; onShowAll?(): void; busy: boolean }) {
+  const [more, setMore] = useState(false)
+  if (readings === null)
+    return (
+      <section className="ws-readings ws-readings--covered" aria-label="Readings">
+        <p className="muted small">The readings are covered until you check your prediction.</p>
+      </section>
+    )
+  const all = readings.filter((r) => !r.min || LEVEL_RANK[level] >= LEVEL_RANK[r.min])
+  const limit = READINGS_SHOWN(level, essentials)
+  const shown = more ? all : all.slice(0, limit)
+  const hidden = all.length - shown.length
+  return (
+    <section className="ws-readings" aria-label="Readings" aria-live="polite">
+      <div className="ws-readings-list">
+        {shown.map((r) => (
+          <div key={r.id} className="ws-reading" title={r.note}>
+            <span className="ws-reading-label">{r.label}</span>
+            <span className="ws-reading-value">
+              {r.value}
+              {r.unit && <small>{r.unit}</small>}
+            </span>
+            {level === 'engineer' && r.note && <span className="ws-reading-note">{r.note}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="ws-readings-side">
+        {hidden > 0 && (
+          <button className="text-btn ws-readings-more" onClick={() => setMore(true)}>
+            + {hidden} more reading{hidden === 1 ? '' : 's'}
+          </button>
+        )}
+        {more && all.length > limit && (
+          <button className="text-btn ws-readings-more" onClick={() => setMore(false)}>
+            Fewer
+          </button>
+        )}
+        {essentials && onShowAll ? (
+          <button className="ws-essentials" onClick={onShowAll} title="This is your first visit to this lab: only the essentials are shown">
+            First visit: essentials only · <b>Show everything</b>
+          </button>
+        ) : (
+          <span className={`ws-live ${busy ? 'ws-live--busy' : ''}`} title="Every value and waveform on this page comes from the simulation of this circuit">
+            <i aria-hidden="true" /> {busy ? 'Updating…' : 'Simulated'}
+          </span>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -243,18 +341,23 @@ function WorkspaceGuide({ modes, why, onClose }: { modes: Array<{ id: string; la
           </li>
         ))}
       </ol>
+      {/* the modes in one line; what each is for (the same sentence as before) one click away */}
       {modes.length > 1 && (
-        <p className="ws-guide-modes small">
-          <b>Modes</b> (top of the page):{' '}
-          {modes.map((m, k) => (
-            <span key={m.id}>
-              {k > 0 && ' · '}
-              <b>{m.label}</b>
-              {m.hint ? ` — ${m.hint}` : ''}
-            </span>
-          ))}
-          . <b>Detail</b> (top right) sets how much each panel shows.
-        </p>
+        <details className="ws-guide-modes small">
+          <summary>
+            <b>Modes</b> (top of the page): {modes.map((m) => m.label).join(' · ')} — <span className="ws-guide-more">what each is for</span>
+          </summary>
+          <p>
+            {modes.map((m, k) => (
+              <span key={m.id}>
+                {k > 0 && ' · '}
+                <b>{m.label}</b>
+                {m.hint ? ` — ${m.hint}` : ''}
+              </span>
+            ))}
+            . <b>Detail</b> (top right) sets how much each panel shows.
+          </p>
+        </details>
       )}
     </section>
   )
@@ -307,7 +410,17 @@ function WorkspaceHeader({ h, pres, onParams, paramsOpen = false, guide, onGuide
           ← <span className="ws-back-text">{h.back.label}</span>
         </a>
         <div className="ws-title">
-          <p className="eyebrow ws-lab">{h.lab}</p>
+          <p className="eyebrow ws-lab">
+            {h.subject && (
+              <span className="ws-subject-crumb">
+                <a className="ws-subject" href={h.subject.href}>
+                  {h.subject.label}
+                </a>
+                <span aria-hidden="true"> › </span>
+              </span>
+            )}
+            {h.lab}
+          </p>
           <div className="ws-title-row">
             <h1 tabIndex={-1}>{h.title}</h1>
             {h.siblings.length > 1 && <SwitchMenu siblings={h.siblings} />}
@@ -400,7 +513,7 @@ function SwitchMenu({ siblings }: { siblings: ShellHeader['siblings'] }) {
 }
 
 /** Two everyday actions — WHY and Explore (plus Parameters on a phone). */
-function ActionBar({ whyOpen, onWhy, items, openPanel, onItem, sticky, onParams, paramsOpen, mark }: { whyOpen: boolean; onWhy?(): void; items: ExploreItem[]; openPanel: string | null; onItem(i: ExploreItem): void; sticky: boolean; onParams?(): void; paramsOpen: boolean; mark?: number | null }) {
+function ActionBar({ whyOpen, onWhy, askOpen, onAsk, items, openPanel, onItem, sticky, onParams, paramsOpen, mark }: { whyOpen: boolean; onWhy?(): void; askOpen?: boolean; onAsk?(): void; items: ExploreItem[]; openPanel: string | null; onItem(i: ExploreItem): void; sticky: boolean; onParams?(): void; paramsOpen: boolean; mark?: number | null }) {
   const [menu, setMenu] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -442,6 +555,16 @@ function ActionBar({ whyOpen, onWhy, items, openPanel, onItem, sticky, onParams,
         </button>
       )}
       {onWhy && mark ? <GuideMark n={mark} inline /> : null}
+      {onAsk && (
+        <button className={`ws-act ws-act--ask ${askOpen ? 'on' : ''}`} aria-expanded={!!askOpen} onClick={onAsk} title="Ask your own question about this circuit">
+          <span className="ws-act-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+              <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+            </svg>
+          </span>
+          <span className="ws-act-label">Ask</span>
+        </button>
+      )}
       <div className="ws-explore">
         <button className={`ws-act ws-explore-btn ${menu ? 'on' : ''}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
           <span className="ws-act-icon" aria-hidden="true">
@@ -460,15 +583,24 @@ function ActionBar({ whyOpen, onWhy, items, openPanel, onItem, sticky, onParams,
                   role={i.kind === 'toggle' ? 'menuitemcheckbox' : 'menuitem'}
                   aria-checked={i.kind === 'toggle' ? on : undefined}
                   className={on ? 'on' : ''}
+                  aria-label={i.label}
+                  aria-describedby={i.hint ? `ws-hint-${i.id}` : undefined}
                   onClick={() => {
                     setMenu(false)
                     onItem(i)
                   }}
                 >
                   <span className="ws-act-icon" aria-hidden="true">
-                    {i.icon}
+                    <MenuIcon glyph={i.icon} />
                   </span>
-                  <span className="ws-menu-label">{i.label}</span>
+                  <span className="ws-menu-label">
+                    <span className="ws-menu-name">{i.label}</span>
+                    {i.hint && (
+                      <span className="ws-menu-hint" id={`ws-hint-${i.id}`}>
+                        {i.hint}
+                      </span>
+                    )}
+                  </span>
                   {i.kind === 'toggle' && (
                     <span className="ws-check" aria-hidden="true">
                       {on ? '✓' : ''}
@@ -566,5 +698,49 @@ export function Overlay({ kind, side = 'right', title, eyebrow, onClose, wide, c
       {head}
       <div className="ov-body">{children}</div>
     </div>
+  )
+}
+
+// The Explore menu's icons, drawn as one set (16 × 16, 1.5 px line, the text colour): the menu items keep their
+// glyphs as data, and font glyphs of mixed sizes are only the fallback for a glyph not drawn here.
+const MENU_ICONS: Record<string, ReactNode> = {
+  '⇢': <path d="M2 12h5V5h5M10 2.5 12.5 5 10 7.5" />, // current path
+  '⌕': (
+    <>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="m10.5 10.5 3.5 3.5" />
+    </>
+  ), // inspect
+  '◉': (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="2" fill="currentColor" />
+    </>
+  ), // state
+  '⚡︎': <path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z" />, // energy
+  '∿': <path d="M1.5 8c1.6-4.5 3.9-4.5 5.5 0s3.9 4.5 5.5 0" />, // other stored quantity
+  '◆': <path d="M8 2.5 13.5 8 8 13.5 2.5 8z" />, // switching events
+  '▤': <path d="M2.5 2.5h11v11h-11zM2.5 6.5h11M2.5 10h11M6.5 6.5v7" />, // measurements & theory
+  '✎': <path d="m3 13 .8-3.2L10.5 3 13 5.5l-6.8 6.7zM9 4.5 11.5 7" />, // lessons
+  '§': (
+    <>
+      <path d="M3 4h10M3 8h6M3 12h8" />
+    </>
+  ), // symbols used here
+  '◎': (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="2" />
+    </>
+  ), // focus view
+}
+
+function MenuIcon({ glyph }: { glyph: string }) {
+  const drawn = MENU_ICONS[glyph]
+  if (!drawn) return <>{glyph}</>
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {drawn}
+    </svg>
   )
 }

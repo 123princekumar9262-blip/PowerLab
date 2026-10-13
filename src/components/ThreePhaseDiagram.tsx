@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { DEVICE_MAP } from '../explanations/threePhase.ts'
 import type { ResolvedParams, SimulationResult, SimulationSample } from '../types/simulation.ts'
-import { formatA, formatSI, formatV } from '../utils/format.ts'
+import { formatSI, formatV } from '../utils/format.ts'
 import { EX, renderLoad, useFlowAnimation, YB, YT, type Flow } from './CircuitDiagram.tsx'
 import { DiodeSym, diodeEnds, GateLead, hopH, SourceSym, type DeviceState } from './circuit/symbols.tsx'
 
@@ -118,19 +118,12 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
 
   // ── Rectifier ───────────────────────────────────────────────────────────────────
   const deviceTag = (id: string, tx: number, ty: number, anchor: 'start' | 'end' = 'end') => {
-    const d = byId(id)
-    const g = gateOf(id)
     return (
       <g key={`tag${id}`}>
         <text className="label label--device" x={tx} y={ty} textAnchor={anchor}>
           {name(id)}
         </text>
-        {!idle && d && (
-          <text className={`value value--tiny ${d.on ? 'is-on' : ''}`} x={tx} y={ty + 13} textAnchor={anchor}>
-            {d.on ? formatA(d.current) : `${formatV(d.voltage)}`}
-            {g !== null ? (g ? ' · G' : '') : ''}
-          </text>
-        )}
+        {/* the device's live reading is in the row under the circuit (Engineer): readable at every width */}
         {p.faults.diode?.id === id && (
           <text className="fault-tag" x={tx} y={ty - 14} textAnchor={anchor}>
             {p.faults.diode.kind === 'open' ? '✕ open' : '⚡ short'}
@@ -153,7 +146,8 @@ export function ThreePhaseDiagram({ params: p, sample, result, lens }: Props) {
         </g>,
       )
       flows.push({ key: `pl${q}`, d: `M${SRC_X + 20},${y} H${BUS}`, current: iUp(q) })
-      labels.push(deviceTag(up[q], 330, y - 24, 'start'))
+      // name and reading above the phase wire, left of the diode (over the diode they hid its symbol)
+      labels.push(deviceTag(up[q], 310, y - 18, 'end'))
     }
     parts.push(<path key="cbus" className={`wire ${active(irect)}`} d={`M${BUS},${PHASE_Y.c} V${YT} H${EX}`} />)
     flows.push({ key: 'cb1', d: `M${BUS},${PHASE_Y.c} V${PHASE_Y.b}`, current: iUp('c') })

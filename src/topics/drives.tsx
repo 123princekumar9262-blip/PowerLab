@@ -1,7 +1,9 @@
 import { compareDrive, DRIVE_DEFAULTS, DRIVE_EXPERIMENTS, DRIVE_LESSONS, driveEventLabel, driveEventWhy, drivePredictions, driveStateAt, driveView, driveWhy, measureDrive, simulateDrive, type DriveState } from '../converters/drives/content.ts'
 import { averagedSteady, DRIVE_LIMITS as L, rpm, type DriveMeasurements, type DriveParams, type DriveRun } from '../converters/drives/motor.ts'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
+import type { CurrentPath } from '../workspace/contract.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
+import { driveReadings } from './readings.ts'
 
 const CH: Record<string, ChannelMeta> = {
   n: { id: 'n', label: 'n', name: 'Speed [rpm]', unit: '', color: '#199e70', group: 'Speed' },
@@ -16,8 +18,62 @@ const CH: Record<string, ChannelMeta> = {
   pin: { id: 'pin', label: 'Pin', name: 'Power from the supply', unit: 'W', color: '#d55181', group: 'Power' },
 }
 
-function DriveDiagram({ st, r, selected, onSelect, values, live }: { st: DriveState; r: DriveRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
+/** Largest |x| of a simulated signal (cached per array): the scale below which a branch counts as carrying no current. */
+const PEAK = new WeakMap<object, number>()
+function peakAbs(a: ArrayLike<number>): number {
+  let v = PEAK.get(a)
+  if (v === undefined) {
+    v = 0
+    for (let k = 0; k < a.length; k++) v = Math.max(v, Math.abs(a[k]))
+    PEAK.set(a, v)
+  }
+  return v
+}
+
+/**
+ * Animated conventional-current loop at the cursor, read from the simulated state: which device conducts
+ * (st.device, from the simulated mode, gate and sign of ia) and the sign of ia. Segments run on the wires
+ * only (device and component bodies are skipped). Returns the path strings in the direction of flow.
+ */
+function driveFlow(st: DriveState, r: DriveRun): { wires: string[]; shaft: string | null } {
   const p = r.params
+  const iFloor = 1e-3 * peakAbs(r.signals.ia)
+  if (st.device === 'none' || Math.abs(st.ia) <= iFloor) return { wires: [], shaft: null }
+  const pos = st.ia > 0
+  // armature branch: switch node → Ra → La → motor → bottom rail (reversed when ia < 0)
+  const arm = pos ? ['M200 135 H250', 'M300 135 H330', 'M410 135 H480 V156', 'M480 204 V230 H200'] : ['M200 230 H480 V204', 'M480 156 V135 H410', 'M330 135 H300', 'M250 135 H200']
+  const two = p.bridge === '2q'
+  let dev: string[] = []
+  if (st.device === 'Q1') dev = ['M200 230 H60 V146', 'M60 124 V40 H200 V70', 'M200 110 V135']
+  else if (st.device === 'D2') dev = two ? ['M200 230 V200 H226 V196', 'M226 170 V162 H200 V135'] : ['M200 230 V200', 'M200 170 V135']
+  else if (st.device === 'D1') dev = ['M60 146 V230 H200', 'M200 135 V106 H226 V100', 'M226 84 V74 H200 V40 H60 V124']
+  else if (st.device === 'Q2') dev = ['M200 135 V160', 'M200 200 V230']
+  // shaft: mechanical power k·ia·ω flows motor → load when positive, load → motor when negative
+  const wFloor = 1e-3 * peakAbs(r.signals.w)
+  const pm = st.e * st.ia
+  const shaft = Math.abs(st.w) > wFloor ? (pm >= 0 ? 'M506 180 H580' : 'M580 180 H506') : null
+  return { wires: [...dev, ...arm], shaft }
+}
+
+function drivePath(st: DriveState, r: DriveRun): CurrentPath {
+  const low = r.params.bridge === '1q' ? 'D' : st.device
+  switch (st.device) {
+    case 'Q1':
+      return { elements: ['vdc', 'q1', 'ra', 'la', 'motor'], text: `Vdc+ → Q1 → Ra → La → motor → Vdc− (${formatA(st.ia)})`, reasons: [] }
+    case 'D2':
+      return { elements: ['low', 'ra', 'la', 'motor'], text: `${low} → Ra → La → motor → ${low}: freewheeling, va ≈ 0 V (${formatA(st.ia)})`, reasons: [] }
+    case 'D1':
+      return { elements: ['motor', 'la', 'ra', 'q1', 'vdc'], text: `motor → La → Ra → D1 → Vdc+ … Vdc− → motor: energy back to the supply (${formatA(st.ia, true)})`, reasons: [] }
+    case 'Q2':
+      return { elements: ['motor', 'la', 'ra', 'low'], text: `motor → La → Ra → Q2 → motor: the back-EMF drives the braking current (${formatA(st.ia, true)})`, reasons: [] }
+    default:
+      return { elements: [], text: 'no current: the armature current is zero at this instant', reasons: [] }
+  }
+}
+
+function DriveDiagram({ st, r, selected, onSelect, values, live, showPath }: { st: DriveState; r: DriveRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean; showPath: boolean }) {
+  const p = r.params
+  const flow = showPath ? driveFlow(st, r) : { wires: [], shaft: null }
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -35,7 +91,8 @@ function DriveDiagram({ st, r, selected, onSelect, values, live }: { st: DriveSt
   })
   const up = st.device === 'Q1' || st.device === 'D1'
   const low = st.device === 'D2' || st.device === 'Q2'
-  const cls = (on: boolean, diode: boolean) => `wire ${on ? (diode ? 'wire--diode' : 'wire--igbt') : ''}`
+  // with the current path shown, the moving dashes carry the information: the static wires stay plain underneath
+  const cls = (on: boolean, diode: boolean) => `wire ${on && !showPath ? (diode ? 'wire--diode' : 'wire--igbt') : ''}`
   const loopOn = st.device !== 'none'
   const upDiode = st.device === 'D1'
   const lowDiode = st.device === 'D2'
@@ -112,6 +169,10 @@ function DriveDiagram({ st, r, selected, onSelect, values, live }: { st: DriveSt
           </>
         )}
       </g>
+      {/* moving conventional current, from the simulated state at the cursor (drawn over the device stubs, on wires only) */}
+      {flow.wires.map((d) => (
+        <path key={d} d={d} className="wire wire--flow" pointerEvents="none" />
+      ))}
       {values && (
         <text x={210} y={154} className="cvalue cvalue--strong">
           va {formatV(st.va)}
@@ -156,6 +217,7 @@ function DriveDiagram({ st, r, selected, onSelect, values, live }: { st: DriveSt
       </g>
       {/* shaft and load */}
       <path d="M504 176 H580 M504 184 H580" className="wire wire--thin" />
+      {flow.shaft && <path d={flow.shaft} className="wire wire--flow" pointerEvents="none" />}
       <g {...part('load', `Load torque ${st.tl} N·m`)}>
         <rect x={576} y={156} width={80} height={48} className="cpart-hit" />
         <rect x={582} y={162} width={64} height={36} rx={6} className="sym-body" />
@@ -291,7 +353,8 @@ export const DRIVE_TOPIC: Topic<DriveParams, DriveRun, DriveMeasurements, DriveS
   state: driveStateAt,
   view: (st, r) => driveView(st, r),
   why: driveWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <DriveDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  path: (st, r) => drivePath(st, r),
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <DriveDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
   channels: CH,
   defaultChannels: ['n', 'ia', 'va'],
   addOrder: ['n', 'ia', 'va', 'e', 'te', 'tl', 'gate', 'duty', 'iin', 'pin'],
@@ -400,6 +463,7 @@ export const DRIVE_TOPIC: Topic<DriveParams, DriveRun, DriveMeasurements, DriveS
   lessons: DRIVE_LESSONS,
   experiments: DRIVE_EXPERIMENTS,
   predictions: drivePredictions,
+  readings: driveReadings,
   measureLabels: {
     nEnd: { label: 'Speed', fmt: (v) => `${v.toFixed(0)} rpm` },
     iEnd: { label: 'Mean current', fmt: (v) => formatA(v) },

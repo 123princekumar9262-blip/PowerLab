@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { formatQuantity } from '../../experiment/experiment.ts'
 import { evaluateWhatIf, WHAT_IFS, type Outcome, type WhatIf, type WhatIfResult } from '../../prediction/whatIf.ts'
 import type { Section } from '../../state/labState.ts'
+import { StepBar } from '../lab/Modes.tsx'
 
 interface Props {
   section: Section
@@ -52,6 +53,7 @@ export function WhatIfPanel({ section, focus, onShowInLab }: Props) {
           score {score.right}/{score.total}
         </span>
       </header>
+      <StepBar at={k % list.length} of={list.length} label={`Question ${(k % list.length) + 1} of ${list.length}`} />
       <p className="lesson-body">{q.question}</p>
       <div className="quiz" role="group" aria-label="Your prediction">
         {options.map((o) => (

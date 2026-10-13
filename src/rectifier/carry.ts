@@ -42,3 +42,26 @@ export function carryRectifier(prev: LabParams, topology: RectifierTopology, dev
   if (prev.faults && Object.keys(prev.faults).length) notUsed.push('the injected fault (an experiment of the previous circuit)')
   return { params, report: { kept, notUsed } }
 }
+
+/**
+ * Does the circuit still hold the values it opened with — every value the "Kept from the previous circuit"
+ * notice can name (source, load elements, device model, α, source Ls/Rs)? Once an activity loads its own
+ * circuit (a lesson, a challenge, a prediction, a puzzle) or the student changes one of them, the notice no
+ * longer describes the circuit on the bench.
+ */
+export function carriedValuesHold(now: LabParams, opened: LabParams): boolean {
+  const same = (a: number | undefined, b: number | undefined) => a === b || (a !== undefined && b !== undefined && Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b)))
+  return (
+    same(now.source.vrms, opened.source.vrms) &&
+    same(now.source.frequency, opened.source.frequency) &&
+    same(now.load.resistance, opened.load.resistance) &&
+    same(now.load.inductance, opened.load.inductance) &&
+    same(now.load.capacitance, opened.load.capacitance) &&
+    now.diode.model === opened.diode.model &&
+    same(now.diode.vf, opened.diode.vf) &&
+    same(now.diode.ron, opened.diode.ron) &&
+    same(now.control?.alphaDeg, opened.control?.alphaDeg) &&
+    same(now.threePhase?.ls, opened.threePhase?.ls) &&
+    same(now.threePhase?.rs, opened.threePhase?.rs)
+  )
+}

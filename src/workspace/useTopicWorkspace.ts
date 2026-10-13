@@ -200,6 +200,9 @@ const paramStore = new Map<string, Record<string, unknown>>()
  * Moving the cursor only re-reads the stored run at a new sample; the simulation runs again only when a
  * parameter changes. Nothing here computes an electrical value — the topic does, from its simulation.
  */
+/** Real seconds one pass of the shown window lasts at 1× (Play). */
+const PLAY_SECONDS = 6
+
 export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undefined, onReport: (r: WorkspaceReport) => void) {
   const level = useLevel()
   const [mode, setModeRaw] = useState<WsMode>(start?.mode ?? 'explore')
@@ -226,7 +229,8 @@ export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undef
   const startLesson = start?.mode === 'learn' && start.lesson ? topic.lessons.find((l) => l.id === start.lesson!.id) : undefined
   const [lessonId, setLessonId] = useState<string | null>(startLesson?.id ?? null)
   const [lessonStep, setLessonStep] = useState(startLesson ? Math.min(start!.lesson!.step, startLesson.steps.length - 1) : 0)
-  const lessonPending = useRef(false)
+  // the parameter set a lesson step asked for: its cursor is placed on the run simulated FROM that set
+  const lessonTarget = useRef<Record<string, unknown> | null>(null)
 
   // ── the simulation (once per parameter set) and its measurements ──
   const result: Run = useMemo(() => topic.simulate(simParams), [topic, simParams])
@@ -284,14 +288,16 @@ export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undef
   useEffect(() => {
     if (!lesson) return
     const s = lesson.steps[lessonStep]
-    setParams({ ...(topic.defaults as object), ...lesson.base, ...s.params } as Record<string, unknown>)
+    const target = { ...(topic.defaults as object), ...lesson.base, ...s.params } as Record<string, unknown>
+    setParams(target)
     setChannels(s.channels)
     setLayout('separate')
-    lessonPending.current = true
+    lessonTarget.current = target
   }, [lessonId, lessonStep]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!lesson || !lessonPending.current) return
-    lessonPending.current = false
+    // (on a first load the step's parameters are set in the same commit: the run of the old ones must not place it)
+    if (!lesson || !lessonTarget.current || simParams !== lessonTarget.current) return
+    lessonTarget.current = null
     const s = lesson.steps[lessonStep]
     const t = s.at(result as never)
     setCursorTime(t)
@@ -342,6 +348,50 @@ export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undef
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [result, k, p, jumpToEvent])
+
+  // ── Play: the cursor runs through the shown window and loops, so the circuit (states, current flow, status)
+  //    replays the simulated run in slow motion. One window lasts PLAY_SECONDS / speed of real time. ──
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
+  const playRef = useRef({ t: t0, vp, speed, dur: p.duration })
+  playRef.current = { t: result.time[k], vp, speed, dur: p.duration }
+  useEffect(() => {
+    if (!playing) return
+    let raf = 0
+    let last = performance.now()
+    let acc = 0
+    let t = playRef.current.t
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000)
+      last = now
+      acc += dt
+      const { vp: w, speed: sp } = playRef.current
+      const span = w.t1 - w.t0
+      t += (span / PLAY_SECONDS) * sp * dt
+      if (t > w.t1 || t < w.t0) t = w.t0
+      // ~30 updates a second: every panel reads the run at the new instant
+      if (acc >= 1 / 30) {
+        acc = 0
+        setCursorTime(t)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing])
+  // a new run (a changed value) keeps playing from the window's start; a lesson step or a mode change stops it
+  useEffect(() => setPlaying(false), [mode, lessonId, lessonStep])
+  /** One event back or forward (the transport's step buttons; Shift + arrow on the keyboard). */
+  const stepEvent = useCallback(
+    (dir: 1 | -1) => {
+      setPlaying(false)
+      const t = result.time[k]
+      const evs = result.events.filter((x) => (dir > 0 ? x.time > t + p.dt * 0.5 : x.time < t - p.dt * 0.5))
+      const target = dir > 0 ? evs[0] : evs[evs.length - 1]
+      if (target) jumpToEvent(target)
+    },
+    [result, k, p, jumpToEvent],
+  )
 
   const setMode = (mm: WsMode) => {
     setModeRaw(mm)
@@ -412,6 +462,16 @@ export function useTopicWorkspace(topic: AnyTopic, start: WorkspaceStart | undef
     jumpToEvent,
     lessons,
     goExplore,
+    playing,
+    setPlaying,
+    speed,
+    setSpeed,
+    stepEvent,
+    restart: () => {
+      setPlaying(false)
+      setEvent(null)
+      setCursorTime(vp.t0)
+    },
   }
 }
 

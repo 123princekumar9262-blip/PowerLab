@@ -10,8 +10,8 @@ These six modules complete the top navigation. Each one follows the platform rul
 - Where a model leaves something out (core loss, constant efficiency, synthetic cycles), the page
   says so.
 
-All six use the generic `Topic` interface (`src/lab/types.ts`) and `LabShell`, with the five modes
-(Explore, Learn, Experiment, Predict, Analyze) and three information levels.
+All six use the generic `Topic` interface (`src/lab/types.ts`) and the universal workspace shell (`TopicShell`), with the modes
+(Explore, Learn, Experiment, Predict; Measurements & theory in the Explore menu) and three information levels.
 
 ## The piecewise-linear (PWL) toolkit — `src/converters/pwl.ts`
 

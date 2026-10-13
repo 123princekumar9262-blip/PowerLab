@@ -319,8 +319,10 @@ export function LabScope(props: Props) {
         ctx.strokeStyle = 'rgba(242,245,249,0.35)'
         ctx.setLineDash([3, 3])
         ctx.beginPath()
-        ctx.moveTo(x, EVENT_ROW + 4)
-        ctx.lineTo(x, height - AXIS_H)
+        for (const l of lanes) {
+          ctx.moveTo(x, l.top)
+          ctx.lineTo(x, l.bottom)
+        }
         ctx.stroke()
         ctx.setLineDash([])
       }
@@ -328,11 +330,14 @@ export function LabScope(props: Props) {
     const t = result.time[cursorIndex]
     if (t >= viewport.t0 && t <= viewport.t1) {
       const x = Math.round(tx(t)) + 0.5
+      // the cursor runs through every lane but not through the titles between them
       ctx.strokeStyle = col('--scope-cursor', '#f2f5f9')
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.moveTo(x, EVENT_ROW + 4)
-      ctx.lineTo(x, height - AXIS_H)
+      for (const l of lanes) {
+        ctx.moveTo(x, l.top)
+        ctx.lineTo(x, l.bottom)
+      }
       ctx.stroke()
       ctx.font = '600 11px ' + col('--font-mono', 'monospace')
       for (const l of lanes) {

@@ -8,6 +8,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
+import { fullWorkspace } from './full-workspace.mjs'
 
 const APP_URL = process.env.LAB_URL ?? 'http://localhost:5199/'
 const OUT = new URL('./out/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
@@ -23,7 +24,7 @@ const check = (cond, msg) => {
   }
 }
 
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' })
+const browser = fullWorkspace(await chromium.launch({ channel: process.env.PW_CHANNEL ?? 'msedge' }))
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 })
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -50,7 +51,7 @@ const explore = async (name) => {
 }
 const menuItems = async () => {
   await page.locator('.ws-explore-btn').click()
-  const items = await page.locator('.ws-explore-menu [role^=menuitem]').allInnerTexts()
+  const items = await page.locator('.ws-explore-menu [role^=menuitem] .ws-menu-name').allInnerTexts()
   await page.keyboard.press('Escape')
   return items.map((x) => x.replace(/[✓⚠]/g, '').trim().split('\n').pop().trim())
 }

@@ -1,8 +1,11 @@
+import { useMemo } from 'react'
 import { compareEv, EV_DEFAULTS, EV_EXPERIMENTS, EV_LESSONS, evEventLabel, evEventWhy, evPredictions, evStateAt, evView, evWhy, measureEv, simulateEv, type EvState } from '../converters/ev/content.ts'
 import { accelTheory } from '../converters/ev/theory.ts'
 import { CYCLE_NAME, EV_LIMITS as L, type EvMeasurements, type EvParams, type EvRun } from '../converters/ev/vehicle.ts'
 import type { ChannelMeta, Topic } from '../lab/types.ts'
 import { formatA, formatSI, formatTime, formatV, formatW } from '../utils/format.ts'
+import { evReadings } from './readings.ts'
+import '../styles/flow-systems.css'
 
 const CH: Record<string, ChannelMeta> = {
   vkmh: { id: 'vkmh', label: 'v', name: 'Vehicle speed [km/h]', unit: '', color: '#199e70', group: 'Speed' },
@@ -17,8 +20,16 @@ const CH: Record<string, ChannelMeta> = {
   ebatt: { id: 'ebatt', label: 'E', name: 'Energy from the battery terminals', unit: 'J', color: '#d55181', group: 'Energy' },
 }
 
-function EvDiagram({ st, r, selected, onSelect, values, live }: { st: EvState; r: EvRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean }) {
+function EvDiagram({ st, r, selected, onSelect, values, live, showPath }: { st: EvState; r: EvRun; selected: string | null; onSelect: (s: string) => void; values: boolean; live: boolean; showPath: boolean }) {
   const p = r.params
+  // power flow at the cursor, all from the simulated run: battery terminals, the inverter's DC side (battery minus
+  // auxiliaries), the motor at the wheels, and the friction brakes (heat). Below 1e-3 of the run's peak: not animated.
+  const peak = useMemo(() => Math.max(r.signals.pbatt.reduce((m, x) => Math.max(m, Math.abs(x)), 0), r.signals.pbrake.reduce((m, x) => Math.max(m, x), 0)), [r])
+  const pBrake = r.signals.pbrake[st.k] ?? 0
+  const pInv = st.pBatt - p.aux
+  const flowing = (q: number) => showPath && Math.abs(q) > 1e-3 * peak
+  /** Moving dashes from a to b (x at y = 100) when q > 0, from b to a when q < 0. */
+  const pflow = (key: string, q: number, a: number, b: number) => (flowing(q) ? <path key={key} d={q > 0 ? `M${a} 100 H${b}` : `M${b} 100 H${a}`} className="wire wire--flow" /> : null)
   const part = (id: string, label: string) => ({
     'data-part': id,
     role: 'button',
@@ -49,15 +60,28 @@ function EvDiagram({ st, r, selected, onSelect, values, live }: { st: EvState; r
   return (
     <svg className="buck-diagram" viewBox="0 0 690 270" role="group" aria-label={`Electric drivetrain: ${st.phase}`}>
       <path d="M130 100 H170 M250 100 H290 M370 100 H400" className={flow} />
+      {/* auxiliaries (heating, pumps, 12 V supply) on the DC link */}
+      <path d="M152 100 V78" className="wire" />
+      <rect x={145} y={64} width={14} height={14} rx={2} className="sym-body" />
+      <text x={152} y={57} textAnchor="middle" className="cvalue">
+        aux
+      </text>
+      {pflow('batt', st.pBatt, 130, 152)}
+      {pflow('dc', pInv, 152, 170)}
+      {flowing(p.aux) && <path d="M152 100 V78" className="wire wire--flow" />}
+      {pflow('ac', st.pWheel, 250, 290)}
+      {pflow('shaft', st.pWheel, 370, 400)}
       <g {...part('battery', 'Battery')}>
         <rect x={40} y={70} width={90} height={60} rx={8} className="cpart-hit" />
         <rect x={46} y={76} width={78} height={48} rx={6} className="sym-body" />
-        <rect x={50} y={80} width={Math.max(0, Math.min(70, 0.7 * st.soc))} height={40} rx={3} fill="#199e70" opacity={0.35} />
-        <text x={85} y={97} textAnchor="middle" className="clabel">
+        {/* state of charge: a gauge along the bottom of the battery, so the text sits on the plain body */}
+        <rect x={54} y={113} width={62} height={5} rx={2.5} style={{ fill: 'var(--surface-3)' }} />
+        <rect x={54} y={113} width={Math.max(0, Math.min(62, 0.62 * st.soc))} height={5} rx={2.5} fill="#199e70" />
+        <text x={85} y={94} textAnchor="middle" className="clabel">
           battery
         </text>
         {live && (
-          <text x={85} y={114} textAnchor="middle" className="cvalue">
+          <text x={85} y={108} textAnchor="middle" className="cvalue">
             {st.soc.toFixed(2)} %
           </text>
         )}
@@ -112,6 +136,16 @@ function EvDiagram({ st, r, selected, onSelect, values, live }: { st: EvState; r
       {arrow(525, 205, st.f * scale, 'sym sym--on-q', live ? `motor ${st.f.toFixed(0)} N` : 'motor')}
       {arrow(470, 232, -st.fAero * scale, 'sym', live ? `drag ${st.fAero.toFixed(0)} N` : 'drag')}
       {st.fBrake > 1 && arrow(600, 232, -st.fBrake * scale, 'sym', live ? `brake ${st.fBrake.toFixed(0)} N` : 'brake')}
+      {flowing(pBrake) && (
+        // the friction brakes turn kinetic energy into heat at the wheels
+        <g>
+          <path d="M606 158 C618 150 626 166 638 158 S658 150 668 158" className="wire wire--flow fsys-heat" />
+          <path d="M600 170 C612 162 620 178 632 170 S652 162 662 170" className="wire wire--flow fsys-heat" />
+          <text x={668} y={186} textAnchor="end" className="cvalue">
+            heat
+          </text>
+        </g>
+      )}
       <text x={210} y={258} className="path-caption" textAnchor="middle">
         {st.phase}
         {live && ` · ${formatW(st.pBatt)} · ${(st.dist / 1000).toFixed(2)} km`}
@@ -221,7 +255,7 @@ export const EV_TOPIC: Topic<EvParams, EvRun, EvMeasurements, EvState> = {
   state: evStateAt,
   view: (st) => evView(st),
   why: evWhy,
-  Diagram: ({ r, st, selected, onSelect, values, live = true }) => <EvDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} />,
+  Diagram: ({ r, st, selected, onSelect, values, live = true, showPath }) => <EvDiagram r={r} st={st} selected={selected} onSelect={onSelect} values={values} live={live} showPath={showPath} />,
   channels: CH,
   defaultChannels: ['vkmh', 'vref', 'pbatt'],
   addOrder: ['vkmh', 'vref', 'f', 'fbrake', 'pbatt', 'pwheel', 'pbrake', 'ibatt', 'soc', 'ebatt'],
@@ -316,6 +350,7 @@ export const EV_TOPIC: Topic<EvParams, EvRun, EvMeasurements, EvState> = {
   lessons: EV_LESSONS,
   experiments: EV_EXPERIMENTS,
   predictions: evPredictions,
+  readings: evReadings,
   measureLabels: {
     consumption: { label: 'Consumption', fmt: (v) => `${v.toFixed(1)} Wh/km` },
     eRegen: { label: 'Regenerated', fmt: (v) => `${(v / 3600).toFixed(2)} Wh` },

@@ -358,7 +358,8 @@ export function renderLoad(c: LoadCtx): number {
     <g key="llabel">
       <text className="label" x={lx - 26} y={(ly0 + ly1) / 2 - 4} textAnchor="end">L</text>
       <text className="sub" x={lx - 26} y={(ly0 + ly1) / 2 + 13} textAnchor="end">{formatSI(params.inductance, 'H')}</text>
-      {!idle && <text className="value value--small" x={lx + 20} y={(ly0 + ly1) / 2 + 4}>vL {formatV(x.vl ?? 0)}</text>}
+      {/* under the inductor's name and value (to its right it ran into the Vout bracket) */}
+      {!idle && <text className="value value--small" x={lx - 26} y={(ly0 + ly1) / 2 + 30} textAnchor="end">vL {formatV(x.vl ?? 0)}</text>}
     </g>
   )
   const capFill = !idle ? Math.sqrt(Math.min(1, (x.wc ?? 0) / scale.wc)) : 0
@@ -394,7 +395,8 @@ export function renderLoad(c: LoadCtx): number {
     flows.push({ key: 'R', d: resistorPath(EX, rTop, rBot) + ` V${YB}`, current: io })
     labels.push(rLabel(EX, rTop, rBot))
     labels.push(outBracket(EX + 44, YT + 20, YB - 20, idle ? null : (x.vout ?? 0)))
-    if (!idle && io > 0) labels.push(<text key="io" className="value value--current" x={EX + 18} y={YT + 34}>io {formatA(io)}</text>)
+    // left of the load wire: on the right it ran into the Vout bracket and its + sign
+    if (!idle && io > 0) labels.push(<text key="io" className="value value--current" x={EX - 18} y={YT + 34} textAnchor="end">io {formatA(io)}</text>)
   } else {
     // RC: split at y = ys into C (left) and R (right). RLC: inductor first, then the split.
     const ys = load === 'RC' ? 92 : 168
@@ -431,7 +433,8 @@ export function renderLoad(c: LoadCtx): number {
       <g key="clabel">
         <text className="label" x={cx - 30} y={cMid - 4} textAnchor="end">C</text>
         <text className="sub" x={cx - 30} y={cMid + 13} textAnchor="end">{formatCapacitance(params.capacitance)}</text>
-        {!idle && <text className="value value--small" x={cx - 30} y={cMid + 32} textAnchor="end">iC {formatA(ic, true)}</text>}
+        {/* above the name: below it, the reading met the lower diode's label in some circuits */}
+        {!idle && <text className="value value--small" x={cx - 30} y={cMid - 24} textAnchor="end">iC {formatA(ic, true)}</text>}
       </g>,
     )
     labels.push(
@@ -441,7 +444,8 @@ export function renderLoad(c: LoadCtx): number {
         {!idle && <text className="value value--small" x={rx + 20} y={(rTop + rBot) / 2 + 32}>io {formatA(io)}</text>}
       </g>,
     )
-    labels.push(outBracket(rx + 76, ys + 4, YB - 4, idle ? null : (x.vout ?? 0)))
+    // far enough right that R's readings (io) end before it
+    labels.push(outBracket(rx + 100, ys + 4, YB - 4, idle ? null : (x.vout ?? 0)))
     if (load === 'RLC' && !idle) labels.push(<text key="vrect" className="value value--small" x={EX - 22} y={YT - 10} textAnchor="end">vrect {formatV(x.vrect ?? 0)}</text>)
     nLeft = cx
   }

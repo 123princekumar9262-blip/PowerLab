@@ -44,7 +44,9 @@ describe('Buck in the workspace shell: configuration', () => {
     for (const id of ready) {
       const t = (DCDC as Record<string, typeof topic>)[id]
       expect(topicOf(lab, id)).toBeDefined()
-      expect(t.basic.map((s) => s.key), id).toEqual(['vin', 'fs', 'duty', 'r'])
+      // every source-to-load converter keeps Buck's basic set; the bidirectional converter has no Vin/R load —
+      // its basics are the power direction, the current reference (or D) and the two DC voltages
+      expect(t.basic.map((s) => s.key), id).toEqual(id === 'bidirectional' ? ['dir', 'iref', 'duty', 'vhv', 'eb'] : ['vin', 'fs', 'duty', 'r'])
       expect(t.status && t.nextConsequence && t.path && t.energyModel && t.analysis && t.parts, id).toBeTruthy()
     }
   })
