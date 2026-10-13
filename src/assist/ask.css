@@ -1,0 +1,112 @@
+/* "Ask a doubt" — the live tutor panel, wherever it is shown (circuit workspaces, Power Systems modules). */
+
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 100%;
+  font-size: var(--fs-ui);
+  line-height: 1.55;
+}
+.ask p {
+  margin: 0;
+}
+.ask-list {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+}
+.ask-empty {
+  display: grid;
+  gap: 10px;
+}
+.ask-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ask-msg {
+  padding: 8px 11px;
+  border-radius: var(--radius);
+}
+.ask-msg--user {
+  justify-self: end;
+  max-width: 88%;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  color: var(--text-1);
+}
+.ask-msg--assistant {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.ask-answer {
+  display: grid;
+  gap: 8px;
+}
+.ask-answer ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ask-answer b {
+  color: var(--text-1);
+}
+.ask-answer code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+.ask-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--accent);
+  animation: ask-blink 0.9s steps(2, start) infinite;
+}
+@keyframes ask-blink {
+  to {
+    visibility: hidden;
+  }
+}
+.ask-thinking {
+  color: var(--text-3);
+  font-style: italic;
+}
+.ask-error {
+  color: var(--critical);
+}
+.ask-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.ask-form textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-ui);
+}
+.ask-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.ask-form .btn {
+  min-height: var(--control-h);
+}
+.ask-foot {
+  font-size: var(--fs-caption);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask-caret {
+    animation: none;
+  }
+}

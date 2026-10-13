@@ -2,3 +2,8 @@ node_modules
 dist
 *.tsbuildinfo
 scripts/out
+
+# local secrets (never committed)
+.env
+.env.local
+*.local
