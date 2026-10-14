@@ -7,3 +7,6 @@ scripts/out
 .env
 .env.local
 *.local
+
+.vercel
+.env*

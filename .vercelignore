@@ -1,0 +1,11 @@
+# Never upload local secrets; Vercel's GEMINI_API_KEY comes from the project's environment variables.
+.env
+.env.*
+*.local
+
+# Built and generated locally; Vercel builds its own dist.
+node_modules
+dist
+out
+scripts/out
+*.tsbuildinfo
