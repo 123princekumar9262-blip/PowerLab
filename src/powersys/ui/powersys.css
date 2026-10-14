@@ -326,7 +326,7 @@
 .ps-readout dt {
   font-size: var(--fs-caption);
   color: var(--text-3);
-  text-transform: uppercase;
+  /* no uppercase transform: it would turn symbols such as λ, δ, ω into Λ, Δ, Ω */
   letter-spacing: 0.06em;
 }
 .ps-readout dd {
@@ -1007,7 +1007,7 @@
 }
 .ps-table th {
   font-size: var(--fs-caption);
-  text-transform: uppercase;
+  /* no uppercase transform: it would turn symbols such as λ, δ, ω into Λ, Δ, Ω */
   letter-spacing: 0.06em;
   color: var(--text-3);
   font-weight: 650;
@@ -1117,3 +1117,28 @@
 .ps-more p {
   margin: 6px 0 0;
 }
+
+/* practice question labels and common-error notes */
+.ps-q-level {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-caption);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  vertical-align: 1px;
+}
+.ps-q-level--gate {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+.ps-q-mistake {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-weight: 400;
+}
+

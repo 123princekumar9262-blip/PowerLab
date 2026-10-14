@@ -1,0 +1,408 @@
+/* Module 8 — Transmission-Line Parameters: the cross-section editor, figures and panels. */
+
+.lp-flush {
+  padding: 10px 12px;
+}
+
+/* cross-section */
+.lp-xs {
+  margin: 0;
+}
+.lp-xs svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  touch-action: none;
+  user-select: none;
+}
+.lp-xs.has-images svg {
+  max-height: 680px;
+}
+.lp-xs.is-compact svg {
+  max-height: 320px;
+}
+.lp-xs.is-compact .lp-dim-text,
+.lp-xs.is-compact .lp-height-text {
+  font-size: 15px;
+}
+.lp-xs.is-compact .lp-handle-label {
+  font-size: 16px;
+}
+.lp-xs-wrap {
+  display: grid;
+  gap: 8px;
+}
+.lp-xs-tools {
+  flex-wrap: wrap;
+}
+.lp-grid {
+  stroke: var(--scope-grid, rgba(255, 255, 255, 0.05));
+  stroke-width: 1;
+}
+.lp-grid--major {
+  stroke: rgba(255, 255, 255, 0.11);
+}
+.lp-tick {
+  fill: var(--text-3);
+  font: 10.5px var(--font-mono);
+}
+.lp-note {
+  fill: var(--text-3);
+  font: 11px var(--font-ui);
+}
+.lp-ground {
+  stroke: #8a7a5c;
+  stroke-width: 2;
+}
+.lp-hatch {
+  stroke: rgba(138, 122, 92, 0.55);
+  stroke-width: 2;
+}
+.lp-earth-mirror {
+  fill: rgba(138, 122, 92, 0.07);
+}
+.lp-height-line {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.lp-height-text {
+  fill: var(--text-2);
+  font: 11px var(--font-mono);
+}
+.lp-height.is-hl .lp-height-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.lp-height.is-hl .lp-height-text {
+  fill: var(--accent);
+}
+.lp-dim-line {
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+  opacity: 0.75;
+}
+.lp-dim-ext {
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.4;
+}
+.lp-dim-text {
+  fill: var(--accent);
+  font: 11.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.lp-dim.is-hl .lp-dim-line {
+  stroke-width: 2.4;
+  stroke-dasharray: none;
+  opacity: 1;
+}
+.lp-dim.is-hl .lp-dim-text {
+  font-weight: 700;
+}
+.lp-dim.is-sel .lp-dim-line {
+  stroke: var(--warning);
+  opacity: 1;
+}
+.lp-dim.is-sel .lp-dim-text {
+  fill: var(--warning);
+}
+.lp-handle {
+  cursor: default;
+  outline: none;
+}
+.lp-handle.is-edit {
+  cursor: grab;
+}
+.is-dragging .lp-handle.is-edit {
+  cursor: grabbing;
+}
+.lp-handle-hit {
+  fill: transparent;
+}
+.lp-handle-ring {
+  fill: rgba(11, 15, 20, 0.85);
+  stroke-width: 2;
+}
+.lp-handle.is-sel .lp-handle-ring {
+  stroke-width: 3.5;
+}
+.lp-handle:focus-visible .lp-handle-ring {
+  stroke: var(--accent) !important;
+  stroke-width: 4;
+}
+.lp-handle.is-bad .lp-handle-ring {
+  stroke: var(--critical) !important;
+  stroke-dasharray: 4 3;
+}
+.lp-handle-label {
+  font: 700 13px var(--font-ui);
+}
+.lp-min {
+  fill: rgba(230, 103, 103, 0.06);
+  stroke: var(--critical);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.lp-image circle {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+}
+.lp-image text {
+  font: 600 11px var(--font-ui);
+  opacity: 0.85;
+}
+.lp-image-link {
+  stroke: var(--text-3);
+  stroke-dasharray: 1 4;
+}
+.lp-inset-box {
+  fill: rgba(11, 15, 20, 0.9);
+  stroke: var(--border);
+}
+.lp-inset.is-hl .lp-inset-box {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.lp-inset-title,
+.lp-inset-key {
+  fill: var(--text-3);
+  font: 10.5px var(--font-ui);
+}
+.lp-inset-val {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+}
+.lp-inset-sub {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke-width: 1.5;
+}
+.lp-inset-gmr {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+.lp-inset-d {
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+.lp-inset.is-hl .lp-inset-gmr {
+  stroke-width: 2.4;
+}
+
+/* figures */
+.lp-figure {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+.lp-figure svg {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  height: auto;
+}
+.lp-learn-visual > .lp-xs {
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.lp-learn-visual > .lp-xs svg {
+  max-height: 520px;
+}
+.lp-loop {
+  fill: rgba(110, 168, 255, 0.08);
+  stroke: var(--accent);
+  stroke-dasharray: 4 3;
+}
+.lp-flux {
+  fill: none;
+  stroke: rgba(158, 197, 255, 0.35);
+}
+.lp-wire {
+  fill: #c98a4b;
+  stroke: #e8b27a;
+}
+.lp-dot {
+  fill: #1a1a1a;
+}
+.lp-cross line {
+  stroke: #1a1a1a;
+  stroke-width: 2;
+}
+.lp-fig-text {
+  fill: var(--text-2);
+  font: 11.5px var(--font-ui);
+}
+.lp-fig-val {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+}
+.lp-fig-dim {
+  stroke: var(--text-3);
+}
+.lp-fig-kind {
+  fill: var(--text-3);
+  font: italic 10.5px var(--font-ui);
+}
+.lp-tr-line {
+  stroke-width: 3;
+  fill: none;
+}
+.lp-bundle.is-on .lp-inset-gmr {
+  stroke-width: 2.4;
+}
+
+/* panels */
+.lp-learn-visual {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.lp-question {
+  font-size: var(--fs-heading, 15px);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.lp-syllabus {
+  margin-top: 4px;
+}
+.lp-issues {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.lp-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0;
+  width: 100%;
+}
+.lp-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-small, 12px);
+}
+.lp-info dt {
+  color: var(--text-3);
+}
+.lp-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+.lp-pos {
+  margin: 8px 0 10px;
+}
+.lp-pos th,
+.lp-pos td {
+  vertical-align: middle;
+}
+.lp-pos tr.is-bad th {
+  color: var(--critical);
+}
+.lp-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lp-num input {
+  width: 76px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font: 13px var(--font-mono);
+}
+.lp-num input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.lp-num input[aria-invalid='true'] {
+  border-color: var(--critical);
+}
+.lp-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.lp-swatch--a {
+  background: var(--ps-a);
+}
+.lp-swatch--b {
+  background: var(--ps-b);
+}
+.lp-swatch--c {
+  background: var(--ps-c);
+}
+.lp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+}
+.lp-change {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.lp-change p {
+  margin: 2px 0;
+}
+.lp-handoff .ps-toolbar-group {
+  margin: 8px 0 4px;
+}
+.lp-offered {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+  display: grid;
+  gap: 4px;
+}
+.lp-offered p {
+  margin: 0;
+}
+.lp-skin > summary,
+.lp-learn summary {
+  font-weight: 600;
+}
+.lp-skin-body {
+  margin-top: 8px;
+}
+.lp-exp-pair .eyebrow {
+  margin: 0 0 4px;
+}
+.lp-exp-pair > .ps-card + .ps-card {
+  margin-top: 0;
+}
+.lp-handoff .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.lp-learn-visual > .table-wrap {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+}
+.lp-unit {
+  text-transform: none;
+  letter-spacing: 0;
+}

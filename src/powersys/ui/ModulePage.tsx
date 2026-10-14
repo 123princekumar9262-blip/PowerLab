@@ -7,6 +7,7 @@ import { MODULE_LOADERS } from '../modules/index.ts'
 import { isDone, moduleProgress, usePsProgress, visitModule } from '../progress.ts'
 import { PS_MODE_LABEL, type ModuleId, type ModuleProps, type PsMode, type PsModuleMeta } from '../types.ts'
 import { TutorContext } from './kit.tsx'
+import { ModuleSyllabus } from '../syllabus/SyllabusPanel.tsx'
 import './powersys.css'
 
 /**
@@ -105,6 +106,8 @@ function ReadyModule({ m, rawMode }: { m: PsModuleMeta; rawMode?: string }) {
           </div>
         </header>
 
+        <ModuleSyllabus module={m.id} />
+
         <div className="ps-modes" role="tablist" aria-label="Modes">
           {m.modes.map((md) => (
             <button
@@ -191,6 +194,7 @@ function PlannedModule({ m }: { m: PsModuleMeta }) {
           <p className="page-lead">{m.line}</p>
         </div>
       </header>
+      <ModuleSyllabus module={m.id} open />
       <p className="notice">This module is planned and not built yet — nothing here is simulated. {ready.length > 0 && 'These modules are ready:'}</p>
       {ready.length > 0 && (
         <ul className="topic-links">

@@ -252,16 +252,29 @@ export function Predict({
   )
 }
 
+/**
+ * What kind of practice a question is (shown as a label). "University-style" and "GATE-style" questions are written
+ * for this app in the style of those examinations — never presented as official past papers.
+ */
+export type QuizLevel = 'concept' | 'numerical' | 'university' | 'gate'
+export const QUIZ_LEVEL_LABEL: Record<QuizLevel, string> = { concept: 'Concept', numerical: 'Numerical', university: 'University-style', gate: 'GATE-style' }
+
+/** Optional on every question: its kind, and the usual mistake explained when an answer is wrong. */
+interface QuizExtras {
+  level?: QuizLevel
+  mistake?: string
+}
+
 export type QuizItem =
-  | {
+  | ({
       id: string
       q: string
       kind: 'choice'
       options: Choice[]
       answer: string
       why: string
-    }
-  | {
+    } & QuizExtras)
+  | ({
       id: string
       q: string
       kind: 'number'
@@ -269,7 +282,7 @@ export type QuizItem =
       unit: string
       tol: number
       why: string
-    }
+    } & QuizExtras)
 
 /** The result of checking a typed numeric answer. */
 export type NumberCheck = { status: 'invalid'; message: string } | { status: 'right' | 'wrong'; value: number }
@@ -330,7 +343,10 @@ function QuizQuestion({ item, onRight }: { item: QuizItem; onRight(): void }) {
   }
   return (
     <div className="ps-q">
-      <p className="ps-q-text">{item.q}</p>
+      <p className="ps-q-text">
+        {item.level && <span className={`ps-q-level ps-q-level--${item.level}`}>{QUIZ_LEVEL_LABEL[item.level]}</span>}
+        {item.q}
+      </p>
       {item.kind === 'choice' ? (
         <div className="ps-options" role="radiogroup" aria-label={item.q}>
           {item.options.map((o) => (
@@ -399,6 +415,7 @@ function QuizQuestion({ item, onRight }: { item: QuizItem; onRight(): void }) {
               (within ±{fx(item.tol, item.tol < 1 ? 3 : 1)} {item.unit})
             </span>
           )}
+          {!result && item.mistake && <span className="ps-q-mistake">{item.mistake}</span>}
         </p>
       )}
     </div>

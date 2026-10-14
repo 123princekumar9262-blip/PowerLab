@@ -1,0 +1,93 @@
+/* Power Systems syllabus view (ps-syl-). */
+
+.ps-syl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ps-syl-summary {
+  margin: 4px 0 2px;
+  color: var(--text-2);
+}
+.ps-syl-sources {
+  margin: 0 0 14px;
+  max-width: 920px;
+}
+.ps-syl-group {
+  margin-top: 14px;
+}
+.ps-syl-group-title {
+  margin: 0 0 6px;
+  font-size: var(--fs-ui);
+  font-weight: 650;
+  color: var(--text-2);
+}
+.ps-syl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.ps-syl-topic {
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+}
+.ps-syl-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.ps-syl-title {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+.ps-syl-chips {
+  display: flex;
+  gap: 6px;
+}
+.ps-syl-chip {
+  font-size: var(--fs-small);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.ps-syl-chip b {
+  color: var(--text-2);
+  font-weight: 650;
+}
+.ps-syl-chip--verified {
+  border-color: rgba(34, 177, 76, 0.55);
+  color: var(--text-1);
+}
+.ps-syl-chip--partial {
+  border-color: rgba(250, 178, 25, 0.55);
+  color: var(--text-2);
+}
+.ps-syl-meta a {
+  color: var(--accent);
+}
+.ps-syl-words ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  display: grid;
+  gap: 3px;
+}
+.ps-syl-module {
+  margin: -8px 0 16px;
+}
+.ps-syl-module .ps-syl-list {
+  margin-top: 8px;
+}

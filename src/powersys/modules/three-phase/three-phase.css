@@ -288,3 +288,13 @@ details.ps-card[open] > summary {
 .ps-3p-five .ps-readouts {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
+
+/* where the line constants come from (preset by default, or Module 8's design) */
+.ps-3p-source {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+

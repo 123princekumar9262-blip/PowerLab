@@ -33,7 +33,10 @@
     "smoke-powersys-per-unit": "node scripts/smoke-powersys-per-unit.mjs",
     "smoke-powersys-faults": "node scripts/smoke-powersys-faults.mjs",
     "smoke-powersys-load-flow": "node scripts/smoke-powersys-load-flow.mjs",
-    "smoke-powersys-stability": "node scripts/smoke-powersys-stability.mjs"
+    "smoke-powersys-stability": "node scripts/smoke-powersys-stability.mjs",
+    "smoke-powersys-line-params": "node scripts/smoke-powersys-line-params.mjs",
+    "smoke-powersys-economic": "node scripts/smoke-powersys-economic.mjs",
+    "smoke-powersys-gen-control": "node scripts/smoke-powersys-gen-control.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

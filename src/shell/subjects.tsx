@@ -14,6 +14,8 @@ import { psModule } from '../powersys/catalog.ts'
 import { moduleProgress, usePsProgress } from '../powersys/progress.ts'
 import { PS_MODE_LABEL } from '../powersys/types.ts'
 
+/** The Power Systems syllabus view (GATE EE / VIT learning paths) loads with the subject page. */
+const PsSyllabus = lazy(() => import('../powersys/syllabus/SyllabusPanel.tsx').then((m) => ({ default: m.SyllabusPanel })))
 /** A Power Systems module's page loads only when it is opened. */
 const PsModulePage = lazy(() => import('../powersys/ui/ModulePage.tsx').then((m) => ({ default: m.PsModulePage })))
 
@@ -167,7 +169,12 @@ function SubjectPage({ s }: { s: Subject }) {
 
 /** The practice and tools that belong to the whole subject (existing pages, linked). */
 function SubjectExtras({ s }: { s: Subject }) {
-  if (s.id === 'power-systems') return null
+  if (s.id === 'power-systems')
+    return (
+      <Suspense fallback={null}>
+        <PsSyllabus />
+      </Suspense>
+    )
   if (s.id === 'power-electronics') {
     const areas = ENGINEERING.filter((a) => a.status === 'ready')
     return (

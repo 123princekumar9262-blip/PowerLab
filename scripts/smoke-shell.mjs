@@ -39,7 +39,7 @@ check((await page.locator('main canvas, main .scope-canvas, main svg.buck-diagra
 // Home is the Subject Library: three subjects, what each really contains, no invented progress
 const cards = await page.locator('.subject-card').allInnerTexts()
 check(cards.length === 3 && /^Power Electronics/.test(cards[0]) && /^Electrical Machines & Drives/.test(cards[1]) && /^Power Systems/.test(cards[2]), `Home offers the subjects (${cards.length}): Power Electronics, Electrical Machines & Drives, Power Systems`)
-check(/9 topics · 39 circuit simulations · 5 3D models · 73 guided lessons · 45 theory pages/.test(cards[0]) && /6 topics · 4 circuit simulations · 24 3D models · 13 guided lessons · 7 theory pages/.test(cards[1]) && /7 topics · 7 interactive modules/.test(cards[2]), 'each subject says what it really contains (counted from the catalogues)')
+check(/9 topics · 39 circuit simulations · 5 3D models · 73 guided lessons · 45 theory pages/.test(cards[0]) && /6 topics · 4 circuit simulations · 24 3D models · 13 guided lessons · 7 theory pages/.test(cards[1]) && /15 topics · 10 interactive modules/.test(cards[2]), 'each subject says what it really contains (counted from the catalogues)')
 check(/Rectifiers/.test(cards[0]) && /Transformers/.test(cards[1]) && /Grid Explorer/.test(cards[2]), 'each subject names its main topics')
 check((await page.locator('.subject-progress').count()) === 0, 'first visit: no progress shown (none is stored)')
 check((await page.locator('#h-subjects').boundingBox()).y < (await page.locator('#h-how').boundingBox()).y, 'choosing a subject comes before the explanations')
@@ -317,7 +317,7 @@ check((await hash()) === '#/subjects/power-electronics', 'a subject is found by 
 await page.goto(URL + '#/progress')
 await wait()
 const bySubject = await page.locator('.subject-progress-card').allInnerTexts()
-check(bySubject.length === 3 && /of 73 lessons completed/.test(bySubject[0]) && /of 13 lessons completed · \d+ of 24 3D models checked/.test(bySubject[1]) && /\d+ of \d+ activities done in 7 interactive modules/.test(bySubject[2]), 'Progress shows each subject, from stored data only')
+check(bySubject.length === 3 && /of 73 lessons completed/.test(bySubject[0]) && /of 13 lessons completed · \d+ of 24 3D models checked/.test(bySubject[1]) && /\d+ of \d+ activities done in 10 interactive modules/.test(bySubject[2]), 'Progress shows each subject, from stored data only')
 
 // ── TEST 8: phone width, no horizontal overflow; tablet ──────────────────────
 console.log('── Test 8')

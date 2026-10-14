@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { abs, arg, C, deg, div, mul, polarDeg, sub, type Complex } from '../../engine/complex.ts'
 import { completeActivity, isDone, usePsProgress } from '../../progress.ts'
+import { useDesignedLine } from '../../lineDesign.ts'
 import type { ModuleProps } from '../../types.ts'
 import { cx, fx, ph, sg } from '../../ui/format.ts'
 import { Calc, Callout, Eq, Predict, Quiz, Readouts, Seg, Slider, Stepper, Toggle, useTutorContext, type QuizItem } from '../../ui/kit.tsx'
@@ -69,6 +70,10 @@ interface PhState {
 const PH0: PhState = { bScale: 1, bShift: 0, showSum: true }
 interface LineState {
   preset: string
+  /** Where the line constants come from: a preset (the default), or the design calculated in Module 8. */
+  source?: 'preset' | 'module8'
+  /** The design's voltage when the source is Module 8 (the preset's otherwise). */
+  kvOverride?: number
   k: LineConstants
   lengthKm: number
   pMw: number
@@ -89,7 +94,7 @@ const r2d = (r: number) => (r * 180) / Math.PI
 // ── line calculations for the current settings ────────────────────────────────────────────────────────────────
 
 function lineCalc(s: LineState) {
-  const kv = presetOf(s.preset).kv
+  const kv = s.kvOverride ?? presetOf(s.preset).kv
   const p = lineParams(s.k, s.lengthKm)
   const load = { pMw: s.pMw, pf: s.pf, lagging: s.lagging }
   const perf = {
@@ -831,7 +836,16 @@ function LineLab({ line, setLine, seen, setSeen }: { line: LineState; setLine(l:
     const p = presetOf(id)
     const k = constantsOf(id)
     const s = sil(p.kv, Math.sqrt(k.xOhmPerKm / (k.bUsPerKm * 1e-6)))
-    setLine({ ...line, preset: id, k, pMw: Math.round((0.8 * s) / niceStep(s / 60)) * niceStep(s / 60) })
+    setLine({ ...line, preset: id, source: 'preset', kvOverride: undefined, k, pMw: Math.round((0.8 * s) / niceStep(s / 60)) * niceStep(s / 60) })
+  }
+  // the optional source of the constants: the line designed in Module 8 (the preset stays the default)
+  const designed = useDesignedLine()
+  const fromModule8 = line.source === 'module8'
+  // switching the source keeps the load, so the comparison is like for like: only the constants (and voltage) change
+  const chooseSource = (src: 'preset' | 'module8') => {
+    if (src === 'preset') return setLine({ ...line, source: 'preset', kvOverride: undefined, k: constantsOf(line.preset) })
+    if (!designed) return
+    setLine({ ...line, source: 'module8', kvOverride: designed.kv, k: { rOhmPerKm: designed.rOhmPerKm, xOhmPerKm: designed.xOhmPerKm, bUsPerKm: designed.bUsPerKm } })
   }
   const quick = (pMw: number, pf = 1) => setLine({ ...line, pMw, pf, lagging: true })
   const rise = 1 / abs(lc.perf.long.abcd.A)
@@ -840,7 +854,7 @@ function LineLab({ line, setLine, seen, setSeen }: { line: LineState; setLine(l:
   const vrText = `V_r ${fx(lc.kv, 0)} kV · ${fx(line.pMw, 0)} MW`
   useTutorContext(
     () =>
-      `Explore — Transmission line lab. ${lc.kv} kV line, ${line.lengthKm} km, r = ${line.k.rOhmPerKm}, x = ${line.k.xOhmPerKm} Ω/km, b = ${line.k.bUsPerKm} µS/km; model ${MODEL_LABEL[line.model]}. Load ${fx(line.pMw, 1)} MW at pf ${fx(line.pf, 2)} ${line.lagging ? 'lagging' : 'leading'}, receiving end ${lc.kv} kV. Results: V_s ${fx(r.vsLL, 2)} kV at ${fx(r.deltaDeg, 2)}°, I_s ${fx(abs(r.is) * 1000, 1)} A, P_s ${fx(r.ps, 2)} MW, Q_s ${fx(r.qs, 2)} Mvar, regulation ${fx(r.regulationPct, 2)} %, efficiency ${fx(r.efficiencyPct, 2)} %. Zc ${fx(abs(lc.p.zc), 1)} Ω, SIL ${fx(lc.silMw, 1)} MW, βl ${fx(r2d(lc.bl), 2)}°, no-load rise ${fx((rise - 1) * 100, 2)} %.`,
+      `Explore — Transmission line lab. Line constants from ${fromModule8 ? `the Module 8 design (${designed?.summary ?? 'calculated from conductor geometry'})` : 'the preset'}. ${lc.kv} kV line, ${line.lengthKm} km, r = ${line.k.rOhmPerKm}, x = ${line.k.xOhmPerKm} Ω/km, b = ${line.k.bUsPerKm} µS/km; model ${MODEL_LABEL[line.model]}. Load ${fx(line.pMw, 1)} MW at pf ${fx(line.pf, 2)} ${line.lagging ? 'lagging' : 'leading'}, receiving end ${lc.kv} kV. Results: V_s ${fx(r.vsLL, 2)} kV at ${fx(r.deltaDeg, 2)}°, I_s ${fx(abs(r.is) * 1000, 1)} A, P_s ${fx(r.ps, 2)} MW, Q_s ${fx(r.qs, 2)} Mvar, regulation ${fx(r.regulationPct, 2)} %, efficiency ${fx(r.efficiencyPct, 2)} %. Zc ${fx(abs(lc.p.zc), 1)} Ω, SIL ${fx(lc.silMw, 1)} MW, βl ${fx(r2d(lc.bl), 2)}°, no-load rise ${fx((rise - 1) * 100, 2)} %.`,
   )
   const loadTone = line.pMw > lc.silMw * 1.02 ? 'above SIL' : line.pMw < lc.silMw * 0.98 ? 'below SIL' : 'at SIL'
   return (
@@ -905,7 +919,35 @@ function LineLab({ line, setLine, seen, setSeen }: { line: LineState; setLine(l:
         <div className="ps-stack">
           <section className="ps-card" aria-labelledby="ps-3p-line">
             <h3 id="ps-3p-line">The line</h3>
-            <Seg label="Voltage level" full value={line.preset} onChange={setPreset} options={LINE_PRESETS.map((p) => ({ id: p.id, label: p.label }))} />
+            <div className="ps-3p-source">
+              <span className="ps-slider-label">Line constants from</span>
+              <Seg
+                label="Line constants from"
+                full
+                value={fromModule8 ? 'module8' : 'preset'}
+                onChange={(v) => chooseSource(v)}
+                options={[
+                  { id: 'preset', label: 'Preset' },
+                  { id: 'module8', label: 'Module 8 design' },
+                ]}
+              />
+              <p className="ps-hint" aria-live="polite">
+                {fromModule8 && designed ? (
+                  <>
+                    Active: calculated in Module 8 — {designed.summary}, {designed.kv} kV, {designed.fHz} Hz (r {fx(line.k.rOhmPerKm, 4)} Ω/km, x {fx(line.k.xOhmPerKm, 4)} Ω/km, b{' '}
+                    {fx(line.k.bUsPerKm, 3)} µS/km).
+                  </>
+                ) : designed ? (
+                  <>Active: the {presetOf(line.preset).label} preset (typical values). A line designed in Module 8 is available — choose “Module 8 design” to use it.</>
+                ) : (
+                  <>
+                    Active: the {presetOf(line.preset).label} preset (typical values). To use constants calculated from conductor geometry, design a line in{' '}
+                    <a href="#/subjects/power-systems/line-params?mode=explore">Module 8</a> and send it here.
+                  </>
+                )}
+              </p>
+            </div>
+            {!fromModule8 && <Seg label="Voltage level" full value={line.preset} onChange={setPreset} options={LINE_PRESETS.map((p) => ({ id: p.id, label: p.label }))} />}
             <Slider label="Length" value={line.lengthKm} min={10} max={800} step={10} unit="km" decimals={0} onChange={(lengthKm) => setLine({ ...line, lengthKm })} />
             <Seg
               label="Model"
@@ -921,12 +963,14 @@ function LineLab({ line, setLine, seen, setSeen }: { line: LineState; setLine(l:
                   ? 'Capacitance lumped half at each end — up to about 250 km.'
                   : 'Distributed R, L and C — exact at any length.'}
             </p>
-            <details className="ps-more">
-              <summary>Line constants per km (typical values, editable)</summary>
-              <Slider label="Resistance r" value={line.k.rOhmPerKm} min={0} max={0.3} step={0.005} unit="Ω/km" decimals={3} onChange={(v) => setLine({ ...line, k: { ...line.k, rOhmPerKm: v } })} />
-              <Slider label="Reactance x" value={line.k.xOhmPerKm} min={0.2} max={0.5} step={0.005} unit="Ω/km" decimals={3} onChange={(v) => setLine({ ...line, k: { ...line.k, xOhmPerKm: v } })} />
-              <Slider label="Susceptance b" value={line.k.bUsPerKm} min={2} max={5} step={0.05} unit="µS/km" decimals={2} onChange={(v) => setLine({ ...line, k: { ...line.k, bUsPerKm: v } })} />
-            </details>
+            {!fromModule8 && (
+              <details className="ps-more">
+                <summary>Line constants per km (typical values, editable)</summary>
+                <Slider label="Resistance r" value={line.k.rOhmPerKm} min={0} max={0.3} step={0.005} unit="Ω/km" decimals={3} onChange={(v) => setLine({ ...line, k: { ...line.k, rOhmPerKm: v } })} />
+                <Slider label="Reactance x" value={line.k.xOhmPerKm} min={0.2} max={0.5} step={0.005} unit="Ω/km" decimals={3} onChange={(v) => setLine({ ...line, k: { ...line.k, xOhmPerKm: v } })} />
+                <Slider label="Susceptance b" value={line.k.bUsPerKm} min={2} max={5} step={0.05} unit="µS/km" decimals={2} onChange={(v) => setLine({ ...line, k: { ...line.k, bUsPerKm: v } })} />
+              </details>
+            )}
           </section>
           <section className="ps-card" aria-labelledby="ps-3p-rload">
             <h3 id="ps-3p-rload">The load at the receiving end</h3>
@@ -1023,7 +1067,9 @@ function ModelTable({ lc }: { lc: LineCalc }) {
           ))}
         </tbody>
       </table>
-      <p className="small muted">The short model ignores the charging current entirely, so it misses the Ferranti rise and understates the sending current at light load (where the charging current dominates).</p>
+      <p className="small muted">
+        The short model ignores the charging current entirely, so it misses the Ferranti rise and understates the sending current at light load (where the charging current dominates).
+      </p>
     </div>
   )
 }

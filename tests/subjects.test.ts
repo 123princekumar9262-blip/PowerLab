@@ -56,7 +56,7 @@ describe('Subject registry', () => {
     // the subjects as they are today
     expect(subjectCounts(subjectById('power-electronics')!)).toEqual({ topics: 9, simulations: 39, lessons: 73, articles: 45, models: 5, modules: 0 })
     expect(subjectCounts(subjectById('machines')!)).toEqual({ topics: 6, simulations: 4, lessons: 13, articles: 7, models: 24, modules: 0 })
-    expect(subjectCounts(subjectById('power-systems')!)).toEqual({ topics: 7, simulations: 0, lessons: 0, articles: 0, models: 0, modules: 7 })
+    expect(subjectCounts(subjectById('power-systems')!)).toEqual({ topics: 15, simulations: 0, lessons: 0, articles: 0, models: 0, modules: 10 })
   })
 })
 

@@ -1,0 +1,306 @@
+/* Module 12 — Generator & Frequency Control (ps-gc-). */
+
+.ps-gc {
+  --gc-a1: #4f95ea;
+  --gc-a2: #e0a91c;
+  --gc-tie: #9085e9;
+  --gc-agc: #2fb37f;
+  --gc-load: #e66767;
+  display: grid;
+  gap: 14px;
+}
+
+/* ── block diagrams ── */
+.ps-gc-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-ui);
+}
+.ps-gc-block rect {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+}
+.ps-gc-block.is-off rect {
+  stroke-dasharray: 4 3;
+  fill: transparent;
+}
+.ps-gc-block.is-off text {
+  fill: var(--text-3);
+}
+.ps-gc-block.is-hl rect {
+  stroke: var(--ps-sel);
+  stroke-width: 2;
+}
+.ps-gc-block-t {
+  font: 500 12.5px var(--font-mono);
+  fill: var(--text-1);
+}
+.ps-gc-block-s {
+  font-size: 10.5px;
+  fill: var(--text-3);
+}
+.ps-gc-sum circle {
+  fill: var(--surface-1);
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+}
+.ps-gc-sign {
+  font: 600 11px var(--font-mono);
+  fill: var(--text-2);
+}
+.ps-gc-wire {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1.3;
+}
+.ps-gc-wire.is-off {
+  stroke-dasharray: 4 3;
+  opacity: 0.6;
+}
+.ps-gc-arrowhead {
+  fill: var(--text-2);
+}
+.ps-gc-node {
+  fill: var(--text-2);
+}
+.ps-gc-val {
+  font: 500 11.5px var(--font-mono);
+  fill: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.ps-gc-in {
+  font-size: 11px;
+  fill: var(--text-3);
+}
+.ps-gc-out {
+  font: 600 12.5px var(--font-ui);
+  fill: var(--text-1);
+}
+.ps-gc-area {
+  font: 650 12px var(--font-ui);
+  letter-spacing: 0.02em;
+}
+.ps-gc-diagram-card {
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+/* ── 3D info panel ── */
+.ps-gc-info {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 4px;
+  width: 100%;
+}
+.ps-gc-info div {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.ps-gc-info dt {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.ps-gc-info dd {
+  margin: 0;
+  font: 500 var(--fs-ui) var(--font-mono);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── controls and playback ── */
+.ps-gc-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 22px;
+}
+.ps-gc-primary .ps-slider {
+  min-width: 240px;
+  flex: 1 1 240px;
+  margin: 0;
+}
+.ps-gc-primary-group {
+  display: grid;
+  gap: 6px;
+}
+.ps-gc-primary-group > span {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.ps-gc-transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ps-gc-transport .btn {
+  min-width: 92px;
+}
+.ps-gc-scrub {
+  flex: 1 1 260px;
+  display: flex;
+}
+.ps-gc-scrub input {
+  width: 100%;
+}
+.ps-gc-now {
+  font: 500 var(--fs-small) var(--font-mono);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  flex: 1 1 100%;
+}
+.ps-gc-side {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.ps-gc-side details > summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--fs-ui);
+  padding: 4px 0;
+}
+.ps-gc-side details[open] > summary {
+  margin-bottom: 8px;
+}
+.ps-gc-compare {
+  display: grid;
+  grid-template-columns: max-content 1fr 1fr;
+  gap: 4px 14px;
+  font-size: var(--fs-ui);
+  margin: 0;
+}
+.ps-gc-compare dt {
+  color: var(--text-2);
+}
+.ps-gc-compare dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.ps-gc-compare .ps-gc-h {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ps-gc-stability {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.ps-gc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.ps-gc-dot--good {
+  background: var(--good);
+}
+.ps-gc-dot--bad {
+  background: var(--critical);
+}
+.ps-gc-dot--warn {
+  background: var(--warning);
+}
+.ps-gc-routh {
+  border-collapse: collapse;
+  font: 500 var(--fs-ui) var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.ps-gc-routh th,
+.ps-gc-routh td {
+  padding: 3px 12px 3px 0;
+  text-align: left;
+  color: var(--text-1);
+}
+.ps-gc-routh th {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.ps-gc-routh td.is-neg {
+  color: var(--critical);
+}
+.ps-gc-syllabus {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+  margin: 0;
+}
+.ps-gc-exp-list ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ps-gc-exp-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-ui);
+  cursor: pointer;
+}
+.ps-gc-exp-item:hover,
+.ps-gc-exp-item:focus-visible {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+.ps-gc-exp-item.on {
+  color: var(--text-1);
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.ps-gc-exp-n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  font-size: var(--fs-small);
+}
+.ps-gc-exp-kind {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.ps-gc-learn-visual {
+  display: grid;
+  gap: 8px;
+}
+.ps-gc-diagram {
+  max-width: 940px;
+  margin-inline: auto;
+}
+.ps-gc-avr {
+  max-width: 860px;
+}
+table.ps-gc-routh {
+  width: auto;
+  min-width: 260px;
+}
+.ps-gc-avr-learn {
+  display: grid;
+  gap: 10px;
+}
+.ps-gc-avr-learn .ps-gc-diagram-card .ps-gc-diagram {
+  max-width: 760px;
+}
+.ps-gc-avr-learn .ps-plot {
+  max-width: 820px;
+  width: 100%;
+  margin-inline: auto;
+}

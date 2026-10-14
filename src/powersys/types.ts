@@ -5,7 +5,22 @@ import type { ComponentType } from 'react'
  * (src/powersys/modules/<id>/) with a `meta.ts` (what it is, its modes and activities, whether it is built) and an
  * `index.tsx` (its page content). The catalogue (catalog.ts) and the subject registry read only the metas.
  */
-export type ModuleId = 'grid' | 'three-phase' | 'per-unit' | 'faults' | 'load-flow' | 'stability' | 'challenge'
+export type ModuleId =
+  | 'grid'
+  | 'three-phase'
+  | 'per-unit'
+  | 'faults'
+  | 'load-flow'
+  | 'stability'
+  | 'challenge'
+  | 'line-params'
+  | 'mechanical'
+  | 'cables'
+  | 'economic'
+  | 'gen-control'
+  | 'protection'
+  | 'hvdc-facts'
+  | 'transients'
 
 /** How a module is used. Learn: guided explanation · Explore: free interaction · Experiment: change one thing,
  * predict, compare · Verify: the calculation behind a result, checked independently · Practise: questions. */

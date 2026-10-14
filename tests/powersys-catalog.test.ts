@@ -7,9 +7,10 @@ import { PS_MODE_ORDER } from '../src/powersys/types.ts'
 import { buildHash, href, parseRoute } from '../src/shell/router.ts'
 
 describe('Power Systems module catalogue', () => {
-  it('seven modules in order, unique ids, every group used, the subject’s topics are the modules', () => {
-    expect(PS_MODULES.map((m) => m.id)).toEqual(['grid', 'three-phase', 'per-unit', 'faults', 'load-flow', 'stability', 'challenge'])
-    expect(PS_MODULES.map((m) => m.n)).toEqual([1, 2, 3, 4, 5, 6, 7])
+  it('fifteen modules in order (Challenge, Module 7, last), unique ids and numbers, every group used, the subject’s topics are the modules', () => {
+    expect(PS_MODULES.map((m) => m.id)).toEqual(['grid', 'three-phase', 'per-unit', 'faults', 'load-flow', 'stability', 'line-params', 'mechanical', 'cables', 'economic', 'gen-control', 'protection', 'hvdc-facts', 'transients', 'challenge'])
+    expect(PS_MODULES.map((m) => m.n)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 7])
+    expect(new Set(PS_MODULES.map((m) => m.n)).size).toBe(15)
     const s = subjectById('power-systems')!
     expect(s.topics.map((t) => t.id)).toEqual(PS_MODULES.map((m) => m.id))
     expect(s.groups).toEqual(PS_GROUPS)
@@ -27,8 +28,8 @@ describe('Power Systems module catalogue', () => {
         expect(new Set(m.activities.map((a) => a.id)).size).toBe(m.activities.length)
       }
     }
-    // all seven modules are built (a planned module would open a 'planned' page instead)
-    expect(PS_MODULES.filter((m) => m.status !== 'ready').map((m) => m.id)).toEqual([])
+    // the modules built so far (a planned module opens a 'planned' page instead, and is listed as planned)
+    expect(PS_MODULES.filter((m) => m.status === 'ready').map((m) => m.id)).toEqual(['grid', 'three-phase', 'per-unit', 'faults', 'load-flow', 'stability', 'line-params', 'economic', 'gen-control', 'challenge'])
   })
   it('every ready module page loads and exports a component', async () => {
     for (const m of PS_MODULES.filter((x) => x.status === 'ready')) {
