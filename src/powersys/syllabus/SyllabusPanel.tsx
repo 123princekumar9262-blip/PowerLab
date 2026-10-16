@@ -102,8 +102,16 @@ export function SyllabusPanel() {
         />
       </div>
       <p className="ps-syl-summary">
-        {sum.named} topics named by {path === 'combined' ? 'GATE EE or your VIT courses' : path === 'gate-ee' ? 'GATE EE' : 'your VIT courses'} — <b>{sum.taught}</b> taught in a module now,{' '}
-        {sum.planned} planned.
+        {sum.named} topics named by {path === 'combined' ? 'GATE EE or your VIT courses' : path === 'gate-ee' ? 'GATE EE' : 'your VIT courses'} —{' '}
+        {sum.planned === 0 ? (
+          <>
+            all <b>{sum.taught}</b> taught in a module.
+          </>
+        ) : (
+          <>
+            <b>{sum.taught}</b> taught in a module now, {sum.planned} planned.
+          </>
+        )}
       </p>
       <p className="small muted ps-syl-sources">
         From the official documents:{' '}

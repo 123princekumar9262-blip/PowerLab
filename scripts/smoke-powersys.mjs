@@ -37,12 +37,12 @@ console.log('── Subject')
 await go('#/subjects/power-systems')
 check((await h1()) === 'Power Systems', 'the subject page opens')
 const cards = await page.locator('.subject-topic-card').allInnerTexts()
-check(cards.length === 15, `fifteen modules listed (${cards.length})`)
+check(cards.length === 17, `seventeen modules listed (${cards.length})`)
 check(/Engineer’s Challenge|Engineer's Challenge/.test(cards[cards.length - 1]), 'the Engineer’s Challenge is listed last')
 check(/Grid Explorer[\s\S]*Interactive module · Learn · Explore · Experiment · Verify · Practise/.test(cards[0]), 'Module 1 is interactive and lists its modes')
 const planned = cards.filter((c) => /Planned — not built yet/.test(c)).length
 const ready = cards.filter((c) => /Interactive module/.test(c)).length
-check(ready === 10 && planned === 5, `ten modules are interactive and five planned (${ready}; planned ${planned})`)
+check(ready === 17 && planned === 0, `all seventeen modules are interactive, none planned (${ready}; planned ${planned})`)
 check((await page.locator('.side-nav .side-subject', { hasText: 'Power Systems' }).count()) === 1, 'the sidebar lists Power Systems')
 
 // ── the syllabus view: GATE EE / VIT Vellore / Combined ──────────────────────
@@ -54,7 +54,7 @@ const combined = await sumOf()
 await syl.getByRole('radio', { name: 'GATE EE' }).click()
 await wait(300)
 const gateSum = await sumOf()
-check(/topics named by GATE EE — \d+ taught in a module now, \d+ planned/.test(gateSum) && gateSum !== combined, `choosing GATE EE shows its own coverage (${gateSum})`)
+check(/topics named by GATE EE — (all \d+ taught in a module|\d+ taught in a module now, \d+ planned)/.test(gateSum) && gateSum !== combined, `choosing GATE EE shows its own coverage (${gateSum})`)
 check((await syl.innerText()).includes('Economic load dispatch'), 'GATE EE includes economic load dispatch')
 await syl.getByRole('radio', { name: 'VIT Vellore' }).click()
 await wait(300)

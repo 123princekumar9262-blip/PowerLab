@@ -1,0 +1,457 @@
+/* Module 13 — Advanced Protection: R–X plane, time–distance chart, single-line diagram, panels. */
+
+.pr-flush {
+  padding: 10px 12px;
+}
+.pr-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pr-gap-top {
+  margin-top: 10px;
+}
+.pr-issues {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.pr-unit {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.pr-bad {
+  color: var(--critical);
+}
+.pr-outcome {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+.pr-change {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.pr-change p {
+  margin: 0 0 4px;
+}
+.pr-z1-time {
+  align-self: center;
+  margin: 0;
+}
+.pr-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0 6px;
+  width: 100%;
+}
+.pr-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--fs-small);
+}
+.pr-info dt {
+  color: var(--text-3);
+}
+.pr-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* shared chart bits */
+.pr-grid {
+  stroke: var(--scope-grid);
+  stroke-width: 1;
+}
+.pr-axis {
+  stroke: var(--scope-zero);
+  stroke-width: 1.2;
+}
+.pr-tick {
+  fill: var(--text-3);
+  font: 10.5px var(--font-mono);
+}
+.pr-axis-label {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.pr-pt-text {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+
+/* R–X plane */
+.pr-rx {
+  margin: 0;
+}
+.pr-rx svg,
+.pr-td svg,
+.pr-bias svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pr-zone circle {
+  fill: none;
+  stroke-width: 1.4;
+}
+.pr-zone--1 circle {
+  stroke: var(--ps-fault);
+  fill: rgba(255, 90, 61, 0.05);
+}
+.pr-zone--2 circle {
+  stroke: var(--warning);
+  stroke-dasharray: 6 4;
+}
+.pr-zone--3 circle {
+  stroke: var(--ps-c);
+  stroke-dasharray: 2 4;
+}
+.pr-zone.is-active circle {
+  stroke-width: 2.6;
+}
+.pr-zone-text {
+  font: 11px var(--font-ui);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 4px;
+}
+.pr-zone-text--1 {
+  fill: var(--ps-fault);
+}
+.pr-zone-text--2 {
+  fill: var(--warning);
+}
+.pr-zone-text--3 {
+  fill: var(--ps-c);
+}
+.pr-line {
+  stroke: var(--text-1);
+  stroke-width: 2;
+}
+.pr-line--next {
+  stroke: var(--text-3);
+  stroke-dasharray: 5 4;
+}
+.pr-line-tick {
+  fill: var(--text-1);
+}
+.pr-line-text {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.pr-traj {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  opacity: 0.6;
+}
+.pr-shift {
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+.pr-arrowhead {
+  fill: var(--text-2);
+}
+.pr-pt--app circle {
+  fill: var(--accent);
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+.pr-pt--bolted circle {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 1.5;
+}
+.pr-pt--other circle {
+  fill: var(--ps-b);
+  stroke: var(--scope-bg);
+  stroke-width: 1.5;
+}
+.pr-pt--load rect {
+  fill: var(--ps-mv);
+}
+.pr-load {
+  fill: url(#pr-hatch);
+  stroke: var(--ps-mv);
+  stroke-width: 1;
+  opacity: 0.85;
+}
+.pr-hatch-line {
+  stroke: rgba(47, 179, 127, 0.45);
+  stroke-width: 2;
+}
+.pr-load-text {
+  fill: var(--ps-mv);
+  font: 11px var(--font-ui);
+}
+
+/* time–distance */
+.pr-td {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.pr-step rect {
+  fill: currentColor;
+  opacity: 0.85;
+}
+.pr-step-text {
+  fill: currentColor;
+  font: 10.5px var(--font-mono);
+}
+.pr-fault-line {
+  stroke: var(--ps-fault);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+.pr-fault-text {
+  fill: var(--ps-fault);
+  font: 11px var(--font-ui);
+}
+.pr-trip-dot {
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+/* single-line diagrams */
+.pr-sld,
+.pr-diffsvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pr-sld-wire {
+  stroke: var(--ps-ehv);
+  stroke-width: 2;
+  fill: none;
+}
+.pr-sld-line {
+  stroke: var(--ps-ehv);
+  stroke-width: 3;
+}
+.pr-sld-line.is-dead,
+.pr-sld-bus.is-dead {
+  stroke: var(--ps-dead);
+  stroke-dasharray: 6 4;
+}
+.pr-sld-bus {
+  stroke: var(--ps-ehv);
+  stroke-width: 5;
+}
+.pr-sld-bus-text {
+  fill: var(--text-1);
+  font: 600 11.5px var(--font-ui);
+}
+.pr-sld-text {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.pr-sld-state {
+  fill: var(--text-1);
+  font: 10.5px var(--font-mono);
+}
+.pr-sld-kind {
+  fill: var(--text-3);
+  font: italic 10px var(--font-ui);
+}
+.pr-sld-gen {
+  fill: none;
+  stroke: var(--ps-mv);
+  stroke-width: 2;
+}
+.pr-sld-tx {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.pr-sld-ct {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 1.6;
+}
+.pr-sld-sig {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.pr-sld-grid {
+  fill: var(--surface-2);
+  stroke: var(--ps-ehv);
+}
+.pr-sld-cb rect {
+  fill: var(--ps-ehv);
+  stroke: var(--ps-ehv);
+  stroke-width: 2;
+}
+.pr-sld-cb.is-open rect {
+  fill: var(--scope-bg);
+  stroke: var(--good);
+}
+.pr-sld-relay rect,
+.pr-relay-box {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+}
+.pr-sld-fault path {
+  fill: none;
+  stroke: var(--ps-fault);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+.pr-sld-fault-text {
+  fill: var(--ps-fault);
+}
+[role='button'].pr-sld-cb,
+[role='button'].pr-sld-relay,
+[role='button'].pr-sld-el,
+[role='button'].pr-sld-fault {
+  cursor: pointer;
+  outline: none;
+}
+[role='button']:focus-visible > rect,
+[role='button']:focus-visible > circle,
+[role='button']:focus-visible > path {
+  stroke: var(--ps-sel);
+}
+.pr-sld .is-selected rect,
+.pr-sld .is-selected circle,
+.pr-sld .is-selected path,
+.pr-sld .is-selected line {
+  stroke: var(--ps-sel);
+}
+.pr-zone-box {
+  fill: rgba(110, 168, 255, 0.05);
+  stroke: var(--accent);
+  stroke-dasharray: 5 4;
+}
+
+/* directional element */
+.pr-dir {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.pr-dir svg {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+.pr-dir-fwd {
+  fill: rgba(34, 177, 76, 0.12);
+}
+.pr-dir-rev {
+  fill: rgba(224, 82, 82, 0.07);
+}
+.pr-dir-mta {
+  stroke: var(--good);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+.pr-dir-v {
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.pr-dir-i {
+  stroke: var(--ps-a);
+  stroke-width: 2.6;
+}
+.pr-dir-head-v {
+  fill: var(--text-2);
+}
+.pr-dir-head-i {
+  fill: var(--ps-a);
+}
+.pr-dir-text {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.pr-dir-text--i {
+  fill: var(--ps-a);
+  font-weight: 600;
+}
+.pr-dir-zone {
+  fill: var(--text-3);
+  font: italic 11px var(--font-ui);
+}
+
+/* bias characteristic */
+.pr-bias {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.pr-bias-op {
+  fill: rgba(224, 82, 82, 0.08);
+}
+.pr-bias-line {
+  fill: none;
+  stroke: var(--critical);
+  stroke-width: 2;
+}
+.pr-bias-text {
+  fill: var(--text-3);
+  font: italic 11px var(--font-ui);
+}
+.pr-bias-pt circle {
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+.pr-bias-pt--a circle {
+  fill: var(--ps-a);
+}
+.pr-bias-pt--b circle {
+  fill: var(--ps-b);
+}
+.pr-bias-pt--c circle {
+  fill: var(--ps-c);
+}
+
+/* learn */
+.pr-learn-visual {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.pr-question {
+  font-size: var(--fs-heading);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.pr-syllabus ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.pr-learn summary {
+  font-weight: 600;
+}
+
+/* 3D */
+.ps3-label.pr3-isolated {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.pr-rx svg {
+  max-height: 460px;
+}

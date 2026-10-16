@@ -1,0 +1,386 @@
+/* Module 15 — Transients & insulation coordination (tr-). */
+
+.tr-flush {
+  padding: 10px 12px;
+}
+.tr-num {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.tr-unit {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.tr-issues {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* main controls */
+.tr-primary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.tr-primary-row .ps-seg {
+  flex-wrap: wrap;
+}
+
+/* time bar */
+.tr-timebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.tr-time-slider {
+  flex: 1 1 260px;
+  min-width: 160px;
+}
+.tr-time-out {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  color: var(--text-1);
+  min-width: 190px;
+}
+.tr-play {
+  min-width: 84px;
+}
+
+/* charts */
+.tr-chart-svg.is-interactive {
+  cursor: crosshair;
+  touch-action: none;
+}
+.tr-chart-svg:focus-visible,
+.tr-lattice svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.tr-cursor line {
+  stroke: var(--scope-cursor);
+  stroke-width: 1.2;
+  opacity: 0.85;
+}
+.tr-cursor circle {
+  stroke: var(--scope-bg);
+  stroke-width: 1.5;
+}
+.tr-hline line {
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+}
+.tr-hline text {
+  font: 10.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+.tr-hline--muted line {
+  stroke: var(--text-3);
+}
+.tr-hline--muted text {
+  fill: var(--text-3);
+}
+.tr-hline--warn line {
+  stroke: var(--warning);
+}
+.tr-hline--warn text {
+  fill: var(--warning);
+}
+.tr-hline--bad line {
+  stroke: var(--critical);
+}
+.tr-hline--bad text {
+  fill: var(--critical);
+}
+.tr-mark line {
+  stroke: var(--warning);
+  stroke-width: 2;
+}
+.tr-key-dashed {
+  background-image: linear-gradient(90deg, transparent 50%, var(--surface-1) 50%) !important;
+  background-size: 6px 100%;
+}
+
+/* the two-column graphs */
+.tr-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 10px;
+  align-items: start;
+}
+.tr-pair-col {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* lattice */
+.tr-lattice {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+.tr-lattice svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+.tr-lattice svg.is-interactive {
+  cursor: row-resize;
+  touch-action: none;
+}
+.tr-lat-end {
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+.tr-lat-head {
+  fill: var(--text-2);
+  font: 600 11.5px var(--font-ui);
+}
+.tr-lat-sub {
+  fill: var(--text-3);
+  font: 10.5px var(--font-ui);
+}
+.tr-lat-grid {
+  stroke: var(--scope-grid);
+  stroke-width: 1;
+}
+.tr-lat-seg line {
+  stroke-width: 1.6;
+}
+.tr-lat-seg--fwd line {
+  stroke: var(--ps-a);
+}
+.tr-lat-seg--bwd line {
+  stroke: var(--ps-c);
+}
+.tr-lat-seg text {
+  font: 10.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+.tr-lat-seg--fwd text {
+  fill: #f0a3a3;
+}
+.tr-lat-seg--bwd text {
+  fill: #9cc4f5;
+}
+.tr-lat-seg.is-active line {
+  stroke-width: 3;
+}
+.tr-lat-node {
+  fill: var(--text-1);
+  font: 10.5px var(--font-mono);
+}
+.tr-lat-probe {
+  stroke: var(--warning);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+}
+.tr-lat-hit {
+  fill: var(--warning);
+}
+.tr-lat-cursor {
+  stroke: var(--scope-cursor);
+  stroke-width: 1.2;
+  opacity: 0.8;
+}
+.tr-lat-cursor-text {
+  fill: var(--scope-cursor);
+  font: 10.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+.tr-lat-front {
+  fill: var(--scope-cursor);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* 2D line view */
+.tr-lineview {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+.tr-lineview svg,
+.tr-junction svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tr-ground {
+  stroke: #8a7a5c;
+  stroke-width: 2;
+}
+.tr-sym {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.4;
+}
+.tr-sym-text {
+  fill: var(--text-2);
+  stroke: none;
+  font: 11px var(--font-ui);
+}
+.tr-sym-text.muted {
+  fill: var(--text-3);
+}
+.tr-conductor {
+  stroke: var(--ps-c);
+  stroke-width: 3;
+}
+.tr-conductor.is-cable {
+  stroke: #6b7584;
+  stroke-width: 6;
+}
+.tr-strap {
+  stroke: var(--warning);
+  stroke-width: 3;
+}
+.tr-arrester rect {
+  fill: rgba(250, 178, 25, 0.12);
+  stroke: var(--warning);
+}
+.tr-arrester path,
+.tr-arrester line {
+  stroke: var(--warning);
+}
+.tr-wave-fill {
+  fill: rgba(110, 168, 255, 0.18);
+}
+.tr-wave-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.tr-probe2d line {
+  stroke: var(--warning);
+  stroke-dasharray: 3 3;
+}
+.tr-probe2d circle {
+  fill: var(--warning);
+}
+.tr-probe2d text {
+  fill: var(--warning);
+  font: 11px var(--font-mono);
+}
+.tr-val {
+  fill: var(--text-1);
+  font: 11.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg);
+  stroke-width: 3px;
+}
+
+/* junction picture */
+.tr-junction {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.tr-jbar rect {
+  stroke-width: 1.2;
+}
+.tr-jbar text {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+}
+.tr-jbar--inc rect {
+  fill: rgba(230, 103, 103, 0.25);
+  stroke: var(--ps-a);
+}
+.tr-jbar--ref rect {
+  fill: rgba(79, 149, 234, 0.25);
+  stroke: var(--ps-c);
+}
+.tr-jbar--tr rect {
+  fill: rgba(34, 177, 76, 0.22);
+  stroke: var(--good);
+}
+
+/* 3D info and tour */
+.tr-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0;
+  width: 100%;
+}
+.tr-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-small);
+}
+.tr-info dt {
+  color: var(--text-3);
+}
+.tr-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+.tr-tour-btn {
+  margin-top: 4px;
+}
+
+/* results */
+.tr-change {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--accent);
+  background: var(--surface-2);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.tr-change p {
+  margin: 2px 0;
+}
+
+/* learn */
+.tr-learn-visual {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+.tr-question {
+  font-size: var(--fs-heading);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.tr-syllabus {
+  margin-top: 4px;
+}
+
+.tr-exp-result {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .tr-exp-result,
+  .tr-pair {
+    grid-template-columns: 1fr;
+  }
+  .tr-primary-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}

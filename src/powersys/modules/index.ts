@@ -17,4 +17,6 @@ export const MODULE_LOADERS: Record<ModuleId, () => Promise<{ default: ModuleCom
   protection: () => import('./protection/index.tsx'),
   'hvdc-facts': () => import('./hvdc-facts/index.tsx'),
   transients: () => import('./transients/index.tsx'),
+  distribution: () => import('./distribution/index.tsx'),
+  generation: () => import('./generation/index.tsx'),
 }

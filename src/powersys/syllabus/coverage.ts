@@ -44,6 +44,8 @@ export const MODULE_PHASE: Partial<Record<string, PlannedIn>> = {
   cables: 'phase-c',
   transients: 'phase-c',
   'hvdc-facts': 'phase-d',
+  distribution: 'phase-b',
+  generation: 'follow-up',
 }
 /** When a topic not taught yet is planned: its own plan, else its module's phase. */
 export const plannedPhase = (t: SyllabusTopic): PlannedIn | undefined => t.plannedIn ?? (t.module ? MODULE_PHASE[t.module] : undefined)

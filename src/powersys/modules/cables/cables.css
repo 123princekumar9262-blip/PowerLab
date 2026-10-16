@@ -1,0 +1,413 @@
+/* Module 10 — Underground cables: cross-section, figures, legend and panels (cb-). */
+
+.cb-flush {
+  padding: 10px 12px;
+}
+
+/* 2D cross-section */
+.cb-xs {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+.cb-xs svg {
+  display: block;
+  width: 100%;
+  max-height: 440px;
+  height: auto;
+}
+.cb-xs-layer {
+  stroke: rgba(11, 15, 20, 0.55);
+  stroke-width: 0.8;
+}
+.cb-xs-layer.is-sel {
+  stroke: #7ef0ff;
+  stroke-width: 2.5;
+}
+.cb-xs-wire {
+  fill: #9aa4b2;
+  stroke: rgba(11, 15, 20, 0.6);
+  stroke-width: 0.5;
+}
+.cb-xs-eq circle {
+  fill: none;
+  stroke: rgba(11, 15, 20, 0.85);
+  stroke-width: 1.1;
+  stroke-dasharray: 4 3;
+}
+.cb-xs-leader {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 0.8;
+}
+.cb-xs-text {
+  fill: var(--text-2);
+  font: 11.5px var(--font-mono);
+}
+.cb-xs-head {
+  fill: var(--text-1);
+  font: 600 12px var(--font-ui);
+}
+.cb-xs-probe circle {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+.cb-xs-probe.is-sel circle {
+  stroke: #7ef0ff;
+  stroke-width: 3;
+}
+.cb-xs-dim line {
+  stroke: #ffffff;
+  stroke-width: 1.2;
+}
+.cb-xs-dim circle {
+  fill: #ffffff;
+}
+.cb-xs-dimtext {
+  fill: #ffffff;
+  font: 600 12px var(--font-ui);
+  paint-order: stroke;
+  stroke: rgba(11, 15, 20, 0.8);
+  stroke-width: 3px;
+}
+.cb-xs-kind,
+.cb-fig-kind {
+  fill: var(--text-3);
+  font: italic 10.5px var(--font-ui);
+}
+
+/* legend */
+.cb-legend {
+  display: grid;
+  gap: 4px;
+  padding: 8px 2px 0;
+}
+.cb-legend-title {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.cb-legend-bar-wrap {
+  position: relative;
+  height: 34px;
+  margin-right: 60px;
+}
+.cb-legend-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 10px;
+  border-radius: 3px;
+}
+.cb-legend-over {
+  position: absolute;
+  left: calc(100% + 6px);
+  width: 22px;
+  top: 0;
+  height: 10px;
+  border-radius: 3px;
+}
+.cb-legend-mark {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  font: 11px var(--font-mono);
+  color: var(--text-1);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cb-legend-mark::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  height: 14px;
+  border-left: 1px solid #ffffff;
+}
+.cb-legend-mark i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.cb-legend-mark--2 {
+  top: 24px;
+  color: var(--text-2);
+}
+.cb-legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-right: 60px;
+  font: 10.5px var(--font-mono);
+  color: var(--text-3);
+  margin-top: 6px;
+}
+.cb-legend-note {
+  margin: 2px 0 0;
+}
+
+/* scene controls */
+.cb-layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.cb-layers legend {
+  float: left;
+  padding: 0;
+  margin-right: 8px;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.cb-plots {
+  align-items: start;
+}
+
+/* info panel rows */
+.cb-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0;
+  width: 100%;
+}
+.cb-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-small, 12px);
+}
+.cb-info dt {
+  color: var(--text-3);
+}
+.cb-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+.cb-issues {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.cb-change {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.cb-change p {
+  margin: 2px 0;
+}
+.cb-unit {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* learn */
+.cb-learn-visual {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+.cb-question {
+  font-size: var(--fs-heading, 15px);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.cb-syllabus {
+  margin-top: 4px;
+}
+.cb-learn-visual > .table-wrap,
+.cb-card-table {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+}
+.cb-learn summary {
+  font-weight: 600;
+}
+.cb-layer-list {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.cb-layer-list li {
+  margin: 2px 0;
+}
+
+/* illustrations */
+.cb-figure {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+.cb-figure svg {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  height: auto;
+}
+.cb-fig-text {
+  fill: var(--text-2);
+  font: 11.5px var(--font-ui);
+}
+.cb-fig-val {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+}
+.cb-fig-core {
+  fill: #0b0f14;
+  font: 700 12px var(--font-ui);
+}
+.cb-il-cond {
+  fill: #c97a3d;
+}
+.cb-il-ins {
+  fill: #cdbb8f;
+}
+.cb-il-xlpe {
+  fill: #d9e1ea;
+}
+.cb-il-semi {
+  fill: #4a4f58;
+}
+.cb-il-screen {
+  fill: none;
+  stroke: #9aa4b2;
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+.cb-il-belt {
+  fill: #b9a77c;
+}
+.cb-il-filler {
+  fill: #6b5a45;
+}
+.cb-il-sheath {
+  fill: #a9b0ba;
+}
+.cb-il-serving {
+  fill: #5d6470;
+}
+.cb-il-oil {
+  fill: #e0a91c;
+  stroke: #0b0f14;
+}
+.cb-il-pipe {
+  fill: #7d8796;
+}
+.cb-il-gas {
+  fill: #1d2a38;
+}
+.cb-il-cap {
+  stroke-width: 1.4;
+  stroke-dasharray: 5 3;
+}
+.cb-il-cap--c {
+  stroke: var(--ps-b);
+}
+.cb-il-cap--s {
+  stroke: var(--ps-c);
+}
+.cb-il-wire {
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+}
+.cb-il-plate {
+  stroke: var(--text-1);
+  stroke-width: 3;
+}
+.cb-il-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.cb-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: -6px;
+}
+.cb-key--cond {
+  background: #c97a3d;
+}
+.cb-key--ins {
+  background: #cdbb8f;
+}
+.cb-key--xlpe {
+  background: #d9e1ea;
+}
+.cb-key--semi {
+  background: #4a4f58;
+}
+.cb-key--sheath {
+  background: #a9b0ba;
+}
+.cb-key--oil {
+  background: #e0a91c;
+}
+
+/* grading table / panels */
+.cb-grading-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cb-subhead {
+  margin: 10px 0 4px;
+  font-size: var(--fs-ui);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.cb-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cb-num input {
+  width: 92px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  padding: 4px 8px;
+  font: 13px var(--font-mono);
+}
+.cb-num input[aria-invalid='true'] {
+  border-color: var(--critical);
+}
+.cb-logslider output {
+  font-family: var(--font-mono);
+}
+.cb-probe-label {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.cb-plot-narrow {
+  max-width: 760px;
+}
+
+/* table headings here contain symbols (ε_r, g_max, r = 4 mm): never upper-case them */
+.cb .ps-table th {
+  text-transform: none;
+}

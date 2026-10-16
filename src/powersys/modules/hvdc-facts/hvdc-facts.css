@@ -1,0 +1,246 @@
+/* Module 14 — HVDC & FACTS: charts, the schematic, panels (hf- prefix). */
+
+.hf-flush {
+  padding: 10px 12px;
+}
+.hf-question {
+  font-size: var(--fs-heading, 15px);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.hf-learn-visual {
+  align-content: start;
+}
+.hf-learn-visual > .ps-plot,
+.hf-learn-visual > .ps-stack > .ps-plot {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.hf-syllabus {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+.hf-issues {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+/* charts */
+.hf-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hf-chart--square svg {
+  max-width: 420px;
+  margin: 0 auto;
+}
+.hf-marker {
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 2;
+}
+.hf-ring {
+  fill: var(--scope-bg, #0b0f14);
+  stroke-width: 2.4;
+}
+.hf-mlabel {
+  font: 600 11px var(--font-ui);
+  fill: var(--text-1);
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.hf-faint {
+  opacity: 0.35;
+}
+.hf-key-dashed {
+  background-image: repeating-linear-gradient(90deg, transparent 0 3px, var(--scope-bg, #0b0f14) 3px 5px);
+}
+.hf-cap-pair {
+  align-items: start;
+}
+
+/* info panel values */
+.hf-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0;
+  width: 100%;
+}
+.hf-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-small, 12px);
+}
+.hf-info dt {
+  color: var(--text-3);
+}
+.hf-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* change note */
+.hf-change {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.hf-change p {
+  margin: 2px 0;
+}
+.hf-change-rows {
+  margin: 2px 0 4px;
+  padding-left: 16px;
+  font-family: var(--font-mono);
+  color: var(--text-2);
+}
+
+/* schematic (2D) */
+.hf-schematic {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+.hf-schematic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hf-schematic figcaption {
+  margin-top: 4px;
+}
+.hf-sketch {
+  margin: 8px 0 0;
+}
+.hf-sketch svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 140px;
+}
+.hf-wire {
+  stroke: var(--text-2);
+  stroke-width: 2;
+  fill: none;
+}
+.hf-wire--ac {
+  stroke: var(--ps-ehv);
+}
+.hf-wire--dc {
+  stroke: var(--ps-c);
+  stroke-width: 3;
+}
+.hf-busbar {
+  stroke: var(--text-1);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.hf-coil {
+  stroke: #c9a46a;
+  stroke-width: 2.2;
+  fill: none;
+}
+.hf-sym {
+  fill: var(--surface-2);
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.hf-sym.is-off,
+.is-off .hf-wire,
+.is-off .hf-tag {
+  opacity: 0.4;
+}
+.hf-bg {
+  fill: var(--scope-bg, #0b0f14);
+}
+.hf-sym-text {
+  fill: var(--text-1);
+  font: 600 12px var(--font-ui);
+}
+.hf-sym-sub {
+  fill: var(--text-3);
+  font: 10.5px var(--font-ui);
+}
+.hf-tag {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.hf-val {
+  fill: var(--text-1);
+  font: 11.5px var(--font-mono);
+}
+.hf-val--q {
+  fill: var(--ps-b);
+}
+.hf-val--bad {
+  fill: var(--critical);
+  font-family: var(--font-ui);
+}
+.hf-flowarrow {
+  fill: #7ef0a0;
+  opacity: 0.9;
+}
+.hf-arrowhead {
+  fill: var(--ps-ehv);
+}
+.hf-divider {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+.hf-gauge {
+  fill: var(--surface-2);
+  stroke: var(--border);
+}
+.hf-gauge-fill {
+  fill: var(--good);
+}
+.hf-gauge-fill.is-low {
+  fill: var(--warning);
+}
+.hf-gauge-mark {
+  stroke: var(--text-1);
+  stroke-width: 2;
+}
+.hf-el {
+  cursor: pointer;
+  outline: none;
+}
+.hf-el:focus-visible .hf-sym,
+.hf-el:focus-visible .hf-busbar {
+  stroke: var(--accent);
+}
+.hf-el:hover .hf-sym {
+  stroke: var(--text-1);
+}
+.hf-el.is-selected .hf-sym,
+.hf-el.is-selected .hf-wire,
+.hf-el.is-selected .hf-busbar,
+.hf-el.is-selected .hf-coil {
+  stroke: var(--ps-sel);
+}
+.hf-el.is-dim {
+  opacity: 0.55;
+}
+
+/* experiment and step plots: keep the chart text at a readable size in wide cards */
+.hf-flush > .ps-plot,
+.hf-flush > .hf-chart {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+/* table headers here carry symbols (α, δ): no uppercase transform (it would turn α into Α) */
+.hf .ps-table th {
+  text-transform: none;
+}

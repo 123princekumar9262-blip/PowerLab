@@ -1,0 +1,440 @@
+/* Module 17 — Power Generation & Grid Monitoring: figures, the estimation lab and panels. */
+
+.gen-question {
+  font-size: var(--fs-heading);
+  color: var(--text-1) !important;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.gen-syllabus {
+  margin-top: 8px;
+}
+.gen-issues {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.gen-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+.gen-learn-visual {
+  min-width: 0;
+}
+.gen-controls .ps-slider + .ps-slider,
+.gen-ctl-group .ps-slider + .ps-slider {
+  margin-top: 10px;
+}
+.gen-ctl-group {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+.gen-mode {
+  display: grid;
+  gap: 6px;
+}
+.gen-change {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* the info panel */
+.gen-info {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.gen-info div {
+  display: grid;
+  gap: 1px;
+}
+.gen-info dt {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+.gen-info dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  color: var(--text-1);
+}
+
+/* figures (shared) */
+.gen-sankey,
+.gen-pfd,
+.gen-scada,
+.gen-net,
+.gen-reactor {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.gen-sankey svg,
+.gen-pfd svg,
+.gen-scada svg,
+.gen-net svg,
+.gen-reactor svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ps3-fallback .gen-pfd svg {
+  max-height: 440px;
+}
+
+/* Sankey */
+.gen-sk-band {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+.gen-sk-loss {
+  fill: var(--heat);
+  opacity: 0.6;
+}
+.gen-sk-in,
+.gen-sk-out {
+  fill: var(--text-1);
+  font: 600 12px var(--font-ui);
+}
+.gen-sk-val {
+  fill: var(--text-1);
+  font: 11.5px var(--font-mono);
+}
+.gen-sk-lbl {
+  fill: var(--text-2);
+  font: 11px var(--font-ui);
+}
+.gen-sk-eta {
+  fill: #0b0f14;
+  font: 600 10.5px var(--font-mono);
+}
+
+/* process-flow diagrams */
+.gen-node rect {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+}
+.gen-node.is-sel rect {
+  stroke: var(--ps-sel);
+  stroke-width: 2.4;
+}
+.gen-node-label {
+  fill: var(--text-1);
+  font: 600 12px var(--font-ui);
+}
+.gen-node-sub {
+  fill: var(--text-2);
+  font: 11px var(--font-mono);
+}
+.gen-flow polyline {
+  fill: none;
+  stroke-linejoin: round;
+}
+.gen-flow--useful polyline {
+  stroke: var(--accent);
+  opacity: 0.8;
+}
+.gen-flow--useful polygon {
+  fill: var(--accent);
+}
+.gen-flow--loss polyline {
+  stroke: var(--heat);
+  opacity: 0.7;
+}
+.gen-flow--loss polygon {
+  fill: var(--heat);
+}
+.gen-flow--water polyline {
+  stroke: var(--ps-c);
+  opacity: 0.85;
+}
+.gen-flow--water polygon {
+  fill: var(--ps-c);
+}
+.gen-pfd-val {
+  fill: var(--text-1);
+  font: 11px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.gen-pfd-frame {
+  fill: rgba(144, 133, 233, 0.05);
+  stroke: var(--ps-ehv);
+  stroke-dasharray: 6 4;
+}
+.gen-pfd-note {
+  fill: var(--text-3);
+  font: 11px var(--font-ui);
+}
+
+/* SCADA */
+.gen-scada-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+  align-items: start;
+}
+.gen-scada-info {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+.gen-scada-info h4 {
+  margin: 0;
+  font-size: var(--fs-heading);
+  color: var(--text-1);
+}
+.gen-scada-info p {
+  margin: 0;
+}
+.gen-sc-centre {
+  fill: rgba(110, 168, 255, 0.05);
+  stroke: var(--border-strong);
+}
+.gen-sc-sub {
+  fill: rgba(47, 179, 127, 0.05);
+  stroke: var(--border-strong);
+}
+.gen-sc-title {
+  fill: var(--text-2);
+  font: 600 11.5px var(--font-ui);
+}
+.gen-sc-note {
+  fill: var(--text-3);
+  font: 11px var(--font-ui);
+}
+.gen-sc-block {
+  cursor: pointer;
+  outline: none;
+}
+.gen-sc-block rect {
+  fill: var(--surface-2);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+}
+.gen-sc-block text {
+  fill: var(--text-1);
+  font: 12px var(--font-ui);
+}
+.gen-sc-block:hover rect {
+  stroke: var(--text-3);
+}
+.gen-sc-block.is-sel rect {
+  stroke: var(--ps-sel);
+  stroke-width: 2.4;
+}
+.gen-sc-block:focus-visible rect {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.gen-sc-link {
+  stroke: var(--text-3);
+  stroke-width: 1.6;
+  fill: none;
+}
+.gen-sc-link--pmu {
+  stroke: var(--ps-ehv);
+  stroke-dasharray: 5 4;
+}
+
+/* estimation network */
+.gen-net svg {
+  max-height: 330px;
+}
+.gen-net-line {
+  stroke: var(--text-3);
+  stroke-width: 2;
+}
+.gen-net-bus {
+  stroke: var(--text-1);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.gen-net-busname {
+  fill: var(--text-1);
+  font: 600 12px var(--font-ui);
+}
+.gen-net-val {
+  fill: var(--text-2);
+  font: 11.5px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.gen-net-arrow {
+  fill: var(--accent);
+}
+.gen-meter rect,
+.gen-meter circle,
+.gen-meter polygon {
+  stroke-width: 1.6;
+}
+.gen-meter--ok rect,
+.gen-meter--ok circle,
+.gen-meter--ok polygon {
+  fill: rgba(34, 177, 76, 0.35);
+  stroke: var(--good);
+}
+.gen-meter--off rect,
+.gen-meter--off circle,
+.gen-meter--off polygon {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-dasharray: 3 2;
+}
+.gen-meter--flag rect,
+.gen-meter--flag circle,
+.gen-meter--flag polygon {
+  fill: var(--critical);
+  stroke: #ffb3b3;
+}
+.gen-meter--crit rect,
+.gen-meter--crit circle,
+.gen-meter--crit polygon {
+  fill: rgba(250, 178, 25, 0.25);
+  stroke: var(--warning);
+}
+.gen-meter-mark {
+  fill: #fff;
+  font: 700 11px var(--font-ui);
+}
+.gen-meter-id {
+  fill: var(--text-2);
+  font: 11px var(--font-mono);
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.gen-meter.is-bad .gen-meter-id {
+  fill: var(--warning);
+}
+
+/* estimation lab */
+.gen-se-ctl {
+  display: grid;
+  gap: 10px;
+}
+.gen-ctl-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.gen-select {
+  display: grid;
+  gap: 4px;
+}
+.gen-select select {
+  font: inherit;
+  font-size: var(--fs-ui);
+  background: var(--surface-2);
+  color: var(--text-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.gen-select select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.gen-meas thead th {
+  /* the global table style capitalises headings: it would turn r_N into R_N */
+  text-transform: none;
+}
+.gen-meas th[scope='row'] {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-1);
+  font-size: var(--fs-ui);
+  letter-spacing: 0;
+}
+.gen-meas td:first-child {
+  text-align: center;
+}
+.gen-meas tr.is-off td,
+.gen-meas tr.is-off th {
+  opacity: 0.55;
+}
+.gen-meas tr.is-flag td,
+.gen-meas tr.is-flag th {
+  background: var(--critical-bg);
+}
+.gen-badtag {
+  color: var(--warning);
+  font-size: var(--fs-caption);
+}
+.gen-status {
+  font-family: var(--font-ui) !important;
+}
+.gen-status--flagged,
+.gen-status--suspect {
+  color: var(--critical) !important;
+  font-weight: 650;
+}
+.gen-status--critical {
+  color: var(--warning) !important;
+}
+.gen-status--ok {
+  color: var(--good) !important;
+}
+
+/* reactor illustration */
+.gen-rx-shield {
+  fill: rgba(201, 210, 222, 0.05);
+  stroke: var(--text-3);
+  stroke-width: 2;
+}
+.gen-rx-vessel {
+  fill: rgba(125, 135, 150, 0.15);
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.gen-rx-fuel {
+  fill: #e0a91c;
+}
+.gen-rx-rod {
+  fill: #30343a;
+  stroke: var(--text-3);
+}
+.gen-rx-hot,
+.gen-rx-steam {
+  fill: none;
+  stroke: #e07a5f;
+  stroke-width: 4;
+}
+.gen-rx-steam {
+  stroke-dasharray: 6 4;
+}
+.gen-rx-cold {
+  fill: none;
+  stroke: #4f95ea;
+  stroke-width: 4;
+}
+.gen-rx-sg {
+  fill: rgba(185, 194, 204, 0.2);
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.gen-rx-leader {
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+.gen-rx-label {
+  fill: var(--text-2);
+  font: 11.5px var(--font-ui);
+}
+
+@media (max-width: 1000px) {
+  .gen-scada-row {
+    grid-template-columns: 1fr;
+  }
+}

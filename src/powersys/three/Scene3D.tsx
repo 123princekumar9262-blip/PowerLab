@@ -280,7 +280,20 @@ function CameraRig({ cmd, start, target, radius, reduced, zoom }: { cmd: Cmd; st
     if (a.t >= 1) anim.current = null
     else invalidate()
   })
-  return <OrbitControls ref={controls as never} makeDefault target={target} enableDamping={false} enableZoom={zoom} minDistance={radius * 0.3} maxDistance={radius * 6} onChange={() => invalidate()} />
+  // maxPolarAngle: the camera stays above the horizon (dragging could otherwise end looking up from under the ground)
+  return (
+    <OrbitControls
+      ref={controls as never}
+      makeDefault
+      target={target}
+      enableDamping={false}
+      enableZoom={zoom}
+      minDistance={radius * 0.3}
+      maxDistance={radius * 6}
+      maxPolarAngle={Math.PI * 0.48}
+      onChange={() => invalidate()}
+    />
+  )
 }
 
 function Invalidator({ target, deps }: { target: MutableRefObject<() => void>; deps: unknown[] }) {

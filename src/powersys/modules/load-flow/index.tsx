@@ -10,6 +10,9 @@ import { lineFlow, solveCase, type CaseSolution } from './analysis.ts'
 import { EXPERIMENTS, runExperiment, startFrom, type LfExperiment } from './experiments.ts'
 import { gaussSeidel } from './gaussSeidel.ts'
 import { LfDiagram } from './LfDiagram.tsx'
+import { methodsDiagram, MethodsTeaser, MethodsView } from './methods.tsx'
+import { MethodsPractise, MethodsVerify } from './methodsCheck.tsx'
+import { METHODS0, methodsModel, type MethodsState } from './methodsModel.ts'
 import { injectionsPolar, jacobian, newtonRaphson } from './stepwise.ts'
 import { CASES, editCase, lfBuses, SAADAT_PUBLISHED, unreachable, type CaseEdits, type LfCase } from './systems.ts'
 import { GsCompare, log10m, NrStepper, Results, sci, TYPE_NAME, YbusBuilder, YMatrix } from './views.tsx'
@@ -26,7 +29,7 @@ import './load-flow.css'
 
 const MODULE = 'load-flow'
 type SysId = LfCase['id']
-type View = 'ybus' | 'nr' | 'gs' | 'results'
+type View = 'ybus' | 'nr' | 'gs' | 'results' | 'methods'
 
 interface Ops {
   loadScale: number
@@ -258,6 +261,7 @@ function Learn({ onExplore }: { onExplore(v: View): void }) {
       <div className="ps-card ps-lf-tour">
         <Stepper steps={steps} index={step} onIndex={setStep} onFinish={onFinish} />
       </div>
+      <MethodsTeaser onOpen={() => onExplore('methods')} />
     </div>
   )
 }
@@ -280,6 +284,9 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
   const [count, setCount] = useState(0)
   const [idx, setIdx] = useState(0)
   const [alpha, setAlpha] = useState(1)
+  const [meth, setMeth] = useState<MethodsState>(METHODS0)
+  const mm = useMemo(() => (view === 'methods' ? methodsModel(c, meth) : null), [view, c, meth])
+  const md = methodsDiagram(mm, meth.method)
   useEffect(() => setCount(0), [sys])
   useEffect(() => setIdx(0), [run])
   useEffect(() => {
@@ -301,10 +308,11 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
       nr: `Newton–Raphson iteration view at state ${idx} (mismatch ${sg(rec.mismatch, 3)} pu)`,
       gs: `Gauss–Seidel comparison with α = ${alpha}`,
       results: 'results tables',
+      methods: `other solution methods (showing the ${meth.method === 'nr' ? 'Newton–Raphson' : meth.method === 'fdlf' ? 'fast decoupled' : 'DC'} solution${mm?.pst ? `, phase shifter ${mm.pst.phiDeg}° in line ${mm.pst.line}` : ''}${mm && mm.fd.converged ? `; fast decoupled ${mm.fd.iterations} iterations` : ''})`,
     }[view]
     return `Explore mode — ${c.name}. Settings: load × ${ops.loadScale}, lines out: ${ops.outages.join(', ') || 'none'}${sys === 'five' ? `, capacitor at ${base.buses[base.weakBus].name} ${ops.capMvar} Mvar, Q limits ${ops.qLimits ? 'on' : 'off'}` : ''}. Showing: ${where}. ${sol.converged ? `Solved in ${sol.iterations} NR iterations: ${sol.bus.map((b, i) => `bus ${i + 1} ${fx(b.vm, 4)}∠${fx(b.thDeg, 2)}°`).join(', ')}; losses ${fx(sol.totals.pLoss, 3)} MW.` : `No solution: ${sol.error}`}`
   })
-  const busV = view === 'nr' ? rec.Vm.map((vm, i) => ({ vm, thDeg: (rec.th[i] * 180) / Math.PI })) : view === 'ybus' ? null : sol.converged ? sol.bus : null
+  const busV = view === 'methods' ? md.busV : view === 'nr' ? rec.Vm.map((vm, i) => ({ vm, thDeg: (rec.th[i] * 180) / Math.PI })) : view === 'ybus' ? null : sol.converged ? sol.bus : null
   return (
     <div className="ps-stack">
       <div className="ps-toolbar">
@@ -327,6 +335,7 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
               { id: 'nr', label: 'Newton–Raphson' },
               { id: 'gs', label: 'Gauss–Seidel' },
               { id: 'results', label: 'Results' },
+              { id: 'methods', label: 'Other methods' },
             ]}
           />
         </div>
@@ -340,7 +349,7 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
             busV={busV}
             types={view === 'nr' ? rec.types : sol.converged ? sol.bus.map((b) => b.type) : undefined}
             limited={view === 'nr' ? [] : sol.converged ? sol.bus.flatMap((b, i) => (b.atQLimit ? [i] : [])) : []}
-            flows={view === 'results' || view === 'gs' ? (sol.converged ? sol.lines : null) : null}
+            flows={view === 'methods' ? md.flows : view === 'results' || view === 'gs' ? (sol.converged ? sol.lines : null) : null}
             built={
               view === 'ybus'
                 ? steps
@@ -349,7 +358,7 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
                     .map((s) => s.label)
                 : undefined
             }
-            current={view === 'ybus' && cnt > 0 ? steps[cnt - 1].label : null}
+            current={view === 'methods' ? md.current : view === 'ybus' && cnt > 0 ? steps[cnt - 1].label : null}
             onLine={toggleLine}
           />
         </div>
@@ -432,6 +441,7 @@ function Explore({ sys, setSys, ops, setOps, view, setView }: { sys: SysId; setS
           {view === 'ybus' && <YbusBuilder c={c} steps={steps} count={cnt} setCount={setCount} Yfinal={Y} />}
           {view === 'nr' && <NrStepper c={c} run={run} idx={Math.min(idx, run.records.length - 1)} setIdx={setIdx} lb={lb} />}
           {view === 'gs' && <GsCompare c={c} Y={Y} lb={lb} nr={run} alpha={alpha} setAlpha={setAlpha} />}
+          {view === 'methods' && mm && <MethodsView c={c} m={mm} state={meth} setState={setMeth} />}
           {view === 'results' &&
             (sol.converged ? (
               <Results sol={sol} />
@@ -833,6 +843,7 @@ function Verify() {
         <h3>Your turn</h3>
         <Quiz items={quiz} onComplete={() => completeActivity(MODULE, 'verify')} />
       </section>
+      <MethodsVerify />
     </div>
   )
 }
@@ -959,10 +970,13 @@ function Practise() {
       `Practise mode: questions on load flow (bus types, Y_bus, Jacobian size, slack generation, convergence, Q limits, line charging, maximum loadability) using the Saadat 3-bus and the illustrative 5-bus networks.`,
   )
   return (
-    <div className="ps-card ps-lf-practise">
-      <h3>Practice questions</h3>
-      <p className="small muted">Every number comes from this module’s load flows. Answer all of them correctly to complete the activity.</p>
-      <Quiz items={items} onComplete={() => completeActivity(MODULE, 'practice')} />
+    <div className="ps-stack">
+      <div className="ps-card ps-lf-practise">
+        <h3>Practice questions</h3>
+        <p className="small muted">Every number comes from this module’s load flows. Answer all of them correctly to complete the activity.</p>
+        <Quiz items={items} onComplete={() => completeActivity(MODULE, 'practice')} />
+      </div>
+      <MethodsPractise />
     </div>
   )
 }

@@ -36,7 +36,15 @@
     "smoke-powersys-stability": "node scripts/smoke-powersys-stability.mjs",
     "smoke-powersys-line-params": "node scripts/smoke-powersys-line-params.mjs",
     "smoke-powersys-economic": "node scripts/smoke-powersys-economic.mjs",
-    "smoke-powersys-gen-control": "node scripts/smoke-powersys-gen-control.mjs"
+    "smoke-powersys-gen-control": "node scripts/smoke-powersys-gen-control.mjs",
+    "smoke-powersys-mechanical": "node scripts/smoke-powersys-mechanical.mjs",
+    "smoke-powersys-protection": "node scripts/smoke-powersys-protection.mjs",
+    "smoke-powersys-cables": "node scripts/smoke-powersys-cables.mjs",
+    "smoke-powersys-transients": "node scripts/smoke-powersys-transients.mjs",
+    "smoke-powersys-distribution": "node scripts/smoke-powersys-distribution.mjs",
+    "smoke-powersys-hvdc-facts": "node scripts/smoke-powersys-hvdc-facts.mjs",
+    "smoke-powersys-generation": "node scripts/smoke-powersys-generation.mjs",
+    "smoke-powersys-load-flow-methods": "node scripts/smoke-powersys-load-flow-methods.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

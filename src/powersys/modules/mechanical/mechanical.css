@@ -1,0 +1,367 @@
+/* Module 9 — Mechanical Design & Insulation: figures, panels and the ladder diagram (mech-). */
+
+.mech-flush {
+  padding: 10px 12px;
+}
+.mech-question {
+  font-size: var(--fs-heading, 15px);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.mech-syllabus {
+  margin-top: 4px;
+}
+.mech-issues {
+  margin: 0;
+  padding-left: 18px;
+}
+.mech-learn-visual {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+.mech-learn-visual > .table-wrap {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+}
+.mech-fallback {
+  display: grid;
+  gap: 10px;
+}
+.mech-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 10px 0 6px;
+}
+.mech-more {
+  margin-top: 10px;
+}
+.mech-gap {
+  margin-top: 12px;
+}
+.mech-mono {
+  font-family: var(--font-mono);
+  color: var(--text-1);
+}
+.mech-change {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.mech-change p {
+  margin: 2px 0;
+}
+.mech-exp-pair .eyebrow {
+  margin: 0 0 4px;
+}
+.mech-exp-pair > .ps-card + .ps-card {
+  margin-top: 0;
+}
+.mech-bad {
+  color: var(--critical);
+}
+
+/* info panel values */
+.mech-info {
+  display: grid;
+  gap: 3px;
+  margin: 2px 0;
+  width: 100%;
+}
+.mech-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-small, 12px);
+}
+.mech-info dt {
+  color: var(--text-3);
+}
+.mech-info dd {
+  margin: 0;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* figures */
+.mech-figure {
+  margin: 0;
+  background: var(--scope-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+.mech-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mech-elev svg {
+  max-height: 360px;
+}
+.mech-ladder svg {
+  max-height: 560px;
+}
+.mech-ladder.is-compact svg {
+  max-height: 380px;
+}
+.ps-card > .mech-figure {
+  border: none;
+  padding: 0;
+  background: none;
+}
+.mech-svg-text {
+  fill: var(--text-2);
+  font: 12px var(--font-ui);
+}
+.mech-svg-text.is-compact {
+  font-size: 16px;
+}
+.mech-svg-text.is-value {
+  fill: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  paint-order: stroke;
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 4px;
+}
+.mech-svg-text.is-compact.is-value {
+  font-size: 15px;
+}
+.mech-svg-text.is-bad {
+  fill: var(--critical);
+}
+.mech-kind {
+  fill: var(--text-3);
+  font-style: italic;
+}
+.mech-ground2d {
+  stroke: #8a7a5c;
+  stroke-width: 2;
+}
+.mech-hatch2d {
+  stroke: rgba(138, 122, 92, 0.5);
+  stroke-width: 1.5;
+}
+.mech-tower2d path,
+.mech-tower2d line {
+  fill: none;
+  stroke: #7d8796;
+  stroke-width: 1.2;
+}
+.mech-tower2d .mech-arm2d {
+  stroke-width: 2.4;
+}
+.mech-tower2d .mech-string2d {
+  stroke: #c9d2de;
+  stroke-width: 3;
+  stroke-dasharray: 2 2;
+}
+.mech-cat {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+.mech-par {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 5;
+}
+.mech-ref {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.mech-dimline {
+  stroke: var(--text-2);
+  stroke-width: 1.2;
+}
+.mech-clearline {
+  stroke: var(--good);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 3;
+}
+.mech-clearline.is-bad {
+  stroke: var(--critical);
+}
+.mech-minclear {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 8 5;
+}
+.mech-minclear.is-bad {
+  stroke: var(--critical);
+}
+.mech-lowdot {
+  fill: var(--warning);
+  stroke: var(--scope-bg, #0b0f14);
+  stroke-width: 2;
+}
+
+/* ladder */
+.mech-earthbar {
+  stroke: #7d8796;
+  stroke-width: 4;
+}
+.mech-wire2d {
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.mech-wire2d.is-thin {
+  stroke-width: 1;
+  stroke: var(--text-3);
+}
+.mech-wire2d.is-guard {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+.mech-plate {
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+.mech-plate.is-shunt {
+  stroke: var(--text-3);
+  stroke-width: 2;
+}
+.mech-plate.is-guard {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.mech-node {
+  fill: var(--text-1);
+}
+.mech-linebar {
+  stroke: var(--ps-a, #e66767);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.mech-eqline {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.mech-row-hit {
+  fill: transparent;
+}
+.mech-disc2d.is-btn {
+  cursor: pointer;
+  outline: none;
+}
+.mech-disc2d.is-btn:hover .mech-row-hit {
+  fill: rgba(255, 255, 255, 0.04);
+}
+.mech-disc2d.is-btn:focus-visible .mech-row-hit {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.mech-disc2d.is-sel .mech-row-hit {
+  fill: rgba(126, 240, 255, 0.08);
+  stroke: #7ef0ff;
+  stroke-width: 1.5;
+}
+
+/* disc colour key */
+.mech-legend {
+  display: grid;
+  gap: 6px;
+}
+.mech-legend-scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.mech-legend-bar {
+  width: 160px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgb(79, 149, 234), rgb(154, 166, 178) 50%, rgb(224, 169, 28) 75%, rgb(230, 103, 103));
+}
+.mech-legend-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mech-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-2);
+  font: 11.5px var(--font-mono);
+  cursor: pointer;
+}
+.mech-chip:hover,
+.mech-chip:focus-visible {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+.mech-chip.on {
+  border-color: var(--accent);
+  color: var(--text-1);
+  background: var(--surface-2);
+}
+.mech-chip-sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* loads */
+.mech-ice2d {
+  fill: rgba(220, 236, 255, 0.28);
+  stroke: rgba(220, 236, 255, 0.7);
+  stroke-width: 1.2;
+}
+.mech-cond2d {
+  fill: #9aa3ad;
+  stroke: #c3cad3;
+  stroke-width: 1.5;
+}
+.mech-windarrow {
+  stroke: var(--text-2);
+  stroke-width: 1.6;
+}
+.mech-arrowhead {
+  fill: context-stroke;
+}
+.mech-force {
+  stroke-width: 2.6;
+}
+.mech-force.is-w {
+  stroke: var(--text-1);
+}
+.mech-force.is-ice {
+  stroke: #9ec5ff;
+}
+.mech-force.is-wind {
+  stroke: var(--ps-b, #e0a91c);
+}
+.mech-force.is-res {
+  stroke: var(--accent);
+  stroke-dasharray: 6 3;
+}
+.mech-arc {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1;
+}
+.mech-fieldline {
+  stroke: rgba(158, 197, 255, 0.45);
+  stroke-width: 1.2;
+}

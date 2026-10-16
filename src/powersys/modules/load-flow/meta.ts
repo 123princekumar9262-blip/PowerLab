@@ -13,6 +13,7 @@ export const meta: PsModuleMeta = {
     'how Y_bus is assembled from line data, one branch at a time',
     'how Newton–Raphson corrects the voltages with the Jacobian, and why it converges so much faster than Gauss–Seidel',
     'how loading, generator reactive limits, shunt capacitors and line outages change the operating point — up to the maximum loadability',
+    'how the fast decoupled and DC load flows approximate Newton–Raphson, and how a phase-shifting transformer steers active power round a loop',
   ],
   modes: ['learn', 'explore', 'experiment', 'verify', 'practise'],
   activities: [
@@ -39,5 +40,13 @@ export const meta: PsModuleMeta = {
     'voltage collapse',
     'nose curve',
     'n-1',
+    'fast decoupled',
+    'fdlf',
+    'decoupled load flow',
+    'dc load flow',
+    'dc power flow',
+    'phase shifting transformer',
+    'phase shifter',
+    'pst',
   ],
 }

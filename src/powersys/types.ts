@@ -21,6 +21,8 @@ export type ModuleId =
   | 'protection'
   | 'hvdc-facts'
   | 'transients'
+  | 'distribution'
+  | 'generation'
 
 /** How a module is used. Learn: guided explanation · Explore: free interaction · Experiment: change one thing,
  * predict, compare · Verify: the calculation behind a result, checked independently · Practise: questions. */
