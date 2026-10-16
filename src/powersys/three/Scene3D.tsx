@@ -306,6 +306,55 @@ function Invalidator({ target, deps }: { target: MutableRefObject<() => void>; d
   return null
 }
 
+/**
+ * Full screen for one view: the browser's own full-screen mode where it is allowed, otherwise the view fills the window
+ * (a fixed overlay). Esc leaves either; leaving full screen through the browser (Esc, F11) is followed too.
+ */
+function useFullScreen() {
+  const ref = useRef<HTMLElement | null>(null)
+  const [overlay, setOverlay] = useState(false)
+  const [native, setNative] = useState(false)
+  useEffect(() => {
+    const sync = () => setNative(!!ref.current && document.fullscreenElement === ref.current)
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+  useEffect(() => {
+    if (!overlay) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOverlay(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.classList.add('ps3-no-scroll')
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.classList.remove('ps3-no-scroll')
+    }
+  }, [overlay])
+  // leaving the page while in full screen must not leave the browser in full-screen mode
+  useEffect(
+    () => () => {
+      if (ref.current && document.fullscreenElement === ref.current) void document.exitFullscreen().catch(() => {})
+    },
+    [],
+  )
+  const toggle = () => {
+    const el = ref.current
+    if (!el) return
+    if (native) {
+      void document.exitFullscreen().catch(() => {})
+      return
+    }
+    if (overlay) {
+      setOverlay(false)
+      return
+    }
+    if (document.fullscreenEnabled && typeof el.requestFullscreen === 'function') el.requestFullscreen().catch(() => setOverlay(true))
+    else setOverlay(true)
+  }
+  return { ref, on: native || overlay, toggle }
+}
+
 // ── the scene ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 export function Scene3D(p: SceneProps) {
@@ -317,6 +366,7 @@ export function Scene3D(p: SceneProps) {
   const [zoom, setZoom] = useState(false)
   const [cmd, setCmd] = useState<Cmd>({ kind: 'reset', nonce: 0 })
   const [step, setStep] = useState<number | null>(null)
+  const full = useFullScreen()
   const labels = useMemo(() => new LabelStore(), [])
   const invalidateRef = useRef<() => void>(() => {})
   const command = (kind: Cmd['kind'], to?: [number, number, number]) => setCmd((c) => ({ kind, to, nonce: c.nonce + 1 }))
@@ -329,9 +379,20 @@ export function Scene3D(p: SceneProps) {
     p.onSelect(s.focus[0] ?? null)
     if (s.camera) command('goto', s.camera)
   }
-  useEffect(() => invalidateRef.current(), [p.selected, hovered, showLabels])
+  useEffect(() => invalidateRef.current(), [p.selected, hovered, showLabels, full.on])
+  // entering full screen: frame the whole scene from the current angle (leaving keeps the camera where it was put)
+  const firstFull = useRef(true)
+  useEffect(() => {
+    if (firstFull.current) {
+      firstFull.current = false
+      return
+    }
+    if (view !== '3d' || !full.on) return
+    const t = window.setTimeout(() => command('fit'), 120)
+    return () => window.clearTimeout(t)
+  }, [full.on]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <section className="ps3" aria-label={p.label}>
+    <section ref={full.ref} className={`ps3 ${full.on ? 'is-full' : ''}`} aria-label={p.label}>
       <div className="ps3-toolbar" role="toolbar" aria-label="3D view controls">
         <div className="seg ps-seg" role="radiogroup" aria-label="View">
           <button type="button" role="radio" aria-checked={view === '3d'} className={view === '3d' ? 'on' : ''} disabled={!hasGl} onClick={() => setView('3d')}>
@@ -365,10 +426,13 @@ export function Scene3D(p: SceneProps) {
             )}
           </>
         )}
+        <button type="button" className="text-btn ps3-full-btn" aria-pressed={full.on} title={full.on ? 'Leave full screen (Esc)' : 'Show this view on the whole screen'} onClick={full.toggle}>
+          {full.on ? '✕ Exit full screen' : '⛶ Full screen'}
+        </button>
       </div>
       {!hasGl && <p className="ps-hint">3D is not available in this browser; the 2D diagram shows the same model.</p>}
       <div className="ps3-body">
-        <div className="ps3-stage" style={{ height: view === '3d' ? (p.height ?? 380) : undefined }}>
+        <div className="ps3-stage" style={{ height: view === '3d' && !full.on ? (p.height ?? 380) : undefined }}>
           {view === '3d' ? (
             <SceneBoundary fallback={p.fallback}>
               <div

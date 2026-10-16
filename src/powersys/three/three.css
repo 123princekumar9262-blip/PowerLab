@@ -138,3 +138,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* full screen: the browser's own mode (:fullscreen) or, where that is not allowed, a fixed overlay (.is-full) */
+.ps3-full-btn {
+  margin-left: auto;
+}
+.ps3.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg);
+}
+.ps3.is-full .ps3-body {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: stretch;
+}
+.ps3.is-full .ps3-stage {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.ps3.is-full .ps3-fallback {
+  overflow: auto;
+}
+.ps3.is-full .ps3-side {
+  min-height: 0;
+  overflow: auto;
+}
+body.ps3-no-scroll {
+  overflow: hidden;
+}

@@ -44,7 +44,8 @@
     "smoke-powersys-distribution": "node scripts/smoke-powersys-distribution.mjs",
     "smoke-powersys-hvdc-facts": "node scripts/smoke-powersys-hvdc-facts.mjs",
     "smoke-powersys-generation": "node scripts/smoke-powersys-generation.mjs",
-    "smoke-powersys-load-flow-methods": "node scripts/smoke-powersys-load-flow-methods.mjs"
+    "smoke-powersys-load-flow-methods": "node scripts/smoke-powersys-load-flow-methods.mjs",
+    "smoke-powersys-3d-fullscreen": "node scripts/smoke-powersys-3d-fullscreen.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
